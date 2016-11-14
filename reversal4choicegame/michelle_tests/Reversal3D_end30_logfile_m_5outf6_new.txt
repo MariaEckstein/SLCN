@@ -1,0 +1,1 @@
+pID	Age	Gender	TrialNumber	Reversal	Target	Choice	Correct	TotalScore	RunningTotal	TrialNumPhase	Visits0	Visits1	Visits2	Visits3	ResponseTime	

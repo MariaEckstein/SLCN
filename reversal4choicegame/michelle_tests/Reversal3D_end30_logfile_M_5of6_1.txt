@@ -1,0 +1,9 @@
+pID	Age	Gender	TrialNumber	Reversal	Target	Choice	Correct	TotalScore	RunningTotal	TrialNumPhase	Visits0	Visits1	Visits2	Visits3	ResponseTime	
+M_5of6_1	x	Male	0	0	2	1	0	0	0	1	0	1	0	0	2.23336601257	
+M_5of6_1	x	Male	1	0	2	0	0	0	0	2	1	0	0	0	5.50015997887	
+M_5of6_1	x	Male	2	0	2	2	1	1	1	3	0	0	1	0	4.33346509933	
+M_5of6_1	x	Male	3	0	2	2	1	2	2	4	0	0	1	1	5.10028195381	
+M_5of6_1	x	Male	4	0	2	1	0	2	0	5	0	1	1	0	15.4338319302	
+M_5of6_1	x	Male	5	0	2	2	1	3	1	6	0	0	1	0	19.4005439281	
+M_5of6_1	x	Male	6	0	2	2	1	4	2	7	1	1	1	1	25.8008110523	
+M_5of6_1	x	Male	7	1	0	1	0	4	0	1	0	1	0	1	11.166891098	
