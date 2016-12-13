@@ -21,11 +21,11 @@ exp.PROBSWITCHdata.reward = [];
 
 % Load run_length and coin_win randomizations (s1->r1; s2->r2, ..., s11->r1, s12->r12, ...)
 run_length_filename = sprintf('Prerandomized sequences/run_length%i', ...
-    mod(str2num(exp.subj), 10));
+    mod(str2num(exp.subj), 4));
 load(run_length_filename);
 exp.run_length = run_length;
 coin_win_filename = sprintf('Prerandomized sequences/coin_win%i', ...
-    mod(str2num(exp.subj), 10));
+    mod(str2num(exp.subj), 4));
 load(coin_win_filename);
 exp.coin_win = coin_win;
 exp.right_box_chosen_counter = 1;
@@ -47,10 +47,7 @@ exp.times.initial_fixation     =   250;
 exp.times.boxes                =  5000;    % Max response time
 exp.times.box                  =   200;    % How long is the selected box presented?
 exp.times.reward               =  1000;
-exp.times.iti                  = ones(1, exp.numb_of_trials.prob_switch);                     % Inter-trial interval [0.3 0.7] with mean 0.5
-while mean(exp.times.iti) > 501 || mean(exp.times.iti) < 499
-    exp.times.iti = 300 + 400 * rand(1, exp.numb_of_trials.prob_switch + 50);
-end
+exp.times.iti                  =   500;
 
 % Set keys to select arrows and stimuli
 exp.nkey.le          =  97;

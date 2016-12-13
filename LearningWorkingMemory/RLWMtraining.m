@@ -23,9 +23,9 @@ nA=3;
 % open the screen
 % ---------------
 
-text{1} =  'Block ';
-text{2} = 'Take some time to identify the images for this block.';
-text{3} = '[Press a key to continue.]';
+text{1} = 'Block ';
+text{2} = 'Take some time to look at the images for this block.';
+text{3} = '[Press space to continue.]';
 text{4} = '';
 text{5} = '0';
 text{6} = 'End of block ';

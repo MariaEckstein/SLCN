@@ -1,4 +1,4 @@
-    function rec_trial(trial)
+function rec_trial(trial)
 
 global exp;
 
@@ -6,6 +6,7 @@ global exp;
 exp.PROBSWITCHdata.stimulus_time(trial)    = exp.t;                              % Stimulus presentation time
 exp.PROBSWITCHdata.better_box_left(trial)  = exp.better_box_left;                % Which box was the better one? (1 => left better; 0 => right better)
 exp.PROBSWITCHdata.switch_trial(trial)     = exp.switch_trial;
+exp.PROBSWITCHdata.ACC(trial)              = exp.ACC;
 
 if ~isempty(exp.key)                                                             % If a keypress has been made
     exp.PROBSWITCHdata.key(trial)          = exp.key(1);                         % Which key has been pressed?
@@ -25,5 +26,5 @@ exp.PROBSWITCHdata.end_time_h = end_clock(4);
 exp.PROBSWITCHdata.end_time_m = end_clock(5);
 
 %% Save results to file
-result_file_name = [exp.results_filepath, sprintf('/Results/PROBSWITCH_%s.mat', exp.subj)];
+result_file_name = [exp.results_filepath, sprintf('/Results/PROBSWITCH_%s.mat', num2str(exp.subj))];
 save(result_file_name, 'exp');

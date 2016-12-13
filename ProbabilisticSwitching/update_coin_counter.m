@@ -14,6 +14,6 @@ end
 
 %% Wait ITI
 drawpict(exp.buffer.fixation);
-wait(exp.times.iti(trial));
+wait(exp.times.iti);
 
 end

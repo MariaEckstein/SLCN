@@ -35,7 +35,7 @@ done = 1;
 while done
 % %****BEGINNING OF INSTRUCTIONS****
 % %Instructions 1
-anykey = 'Press any key to continue.';
+anykey = 'Press space to continue.';
 %% Instructions1
 text{1} = 'In this experiment, you will see an image on the screen.';
 text{2} = 'Press a key to see an example on the next screen.';
@@ -89,8 +89,8 @@ singleTrial(w,rect,Actions,imaget,acor,timing);
 
 
 %% Instructions 4
-text{1} = 'For each image, there is only one key that will win you points (1 / 1).';
-text{2} = 'If you press any other key when you see that image, you will not receive points (0 / 1).';
+text{1} = 'For each image, there is only one key that will win you points.';
+text{2} = 'If you press any other key when you see that image, you will not receive points.';
 text{3} = 'On the next screen, try finding the winning key!';
 
 textI = [text{1},'\n\n\n',text{2},'\n\n\n',text{3},'\n\n\n\n\n\n\n',anykey];

@@ -7,7 +7,7 @@ clearkeys;
 
 %% Initialize truth values
 exp.switch_trial        = 0;
-exp.ACC                 = nan;
+exp.ACC                 = 0;
 exp.key                 = [];
 exp.keytime             = [];
 exp.reward = 0;

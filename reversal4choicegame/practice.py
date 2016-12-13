@@ -2,9 +2,9 @@
 #
 #
 #
+from panda3d.core import *
 from direct.showbase.ShowBase import ShowBase
 from direct.gui.OnscreenText import OnscreenText
-from panda3d.core import *
 from direct.gui.OnscreenImage import OnscreenImage
 from direct.showbase.Transitions import Transitions
 from panda3d.core import TransparencyAttrib
@@ -24,7 +24,7 @@ try:
     joystick.init()
 
 except:
-    print "Error: pygame not installed"
+    print("Error: pygame not installed")
 
 
 

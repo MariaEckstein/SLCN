@@ -29,9 +29,9 @@ Entrees.stimuli=stimuli;
 Entrees.rules=rules;
 dataT{length(blocks)+1}=Entrees;
 
-text{1} =  'Block ';
-text{2} = 'Take some time to identify the images for this block.';
-text{3} = '[Press a key to continue.]';
+text{1} = 'Block ';
+text{2} = 'Take some time to look at the images for this block.';
+text{3} = '[Press space to continue.]';
 text{4} = '';
 text{5} = '0';
 text{6} = 'End of block ';
@@ -120,7 +120,7 @@ try
         
         
         % Stim sets presentation in previously built boxes
-        Screen('FillRect', w,0)
+        Screen('FillRect', w,0);
         Screen('TextColor',w,[255 255 255]);
         textI = [text{1},num2str(b),'\n\n\n',text{2},'\n\n\n',text{3}];        
         DrawFormattedText(w,textI,'center','center');

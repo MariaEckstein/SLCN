@@ -76,11 +76,11 @@ if FBprestime>0
 if code==1 | code==2 | code==3;
     if code==acor
         cor=1;
-        word='1 / 1';
+        word='Correct!';
         couleur = green;
     else
         cor=0;
-        word='0 / 1';%text{5};
+        word='Try again!';%text{5};
         couleur = red;
     end
 

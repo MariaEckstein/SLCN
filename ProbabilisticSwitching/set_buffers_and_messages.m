@@ -16,9 +16,11 @@ exp.buffer.coin_left                    = 5;
 exp.buffer.coin_right                   = 6;
 exp.buffer.fixation                     = 7;
 exp.buffer.no_coin_left                 = 9;
-exp.buffer.no_coin_right                =12;
 exp.buffer.wrong_key                    =10;
 exp.buffer.no_response                  =11;
+exp.buffer.no_coin_right                =12;
+exp.buffer.break                        =13;
+exp.buffer.after_break                  =14;
 exp.buffer.message                      =15;
 
 %% Load box and coin pics into buffers
@@ -44,5 +46,19 @@ preparestring('no response!', exp.buffer.no_response);
 
 %% Load fixation cross into buffer
 preparestring(' ', exp.buffer.fixation);
+
+%% Load break text into break buffers
+break1 = 'BREAK';
+break2 = 'You now have a break of 1 minute!';
+break3 = 'You can stand up and walk around, but come back in time!';
+preparestring(break1, exp.buffer.break, 0, 250);
+preparestring(break2, exp.buffer.break);
+preparestring(break3, exp.buffer.break, 0, -100); 
+
+after_break1 = 'The break is over!';
+after_break2 = 'Press space to continue the task.';
+preparestring(after_break1, exp.buffer.after_break, 0, 250); 
+preparestring(after_break2, exp.buffer.after_break); 
+
 
 end

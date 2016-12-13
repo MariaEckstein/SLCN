@@ -2,7 +2,7 @@ function pr_feedback(version)
 
 global exp
 
-%% Look up which box is the better one
+%% Look up which key is the right one
 if exp.better_box_left == 1
     better_key = exp.nkey.le;
 elseif exp.better_box_left == 0
@@ -18,6 +18,7 @@ if isempty(exp.key)
 elseif exp.key == exp.nkey.le || exp.key == exp.nkey.ri
     % Was the better key pressed (= correct box selected)? -> safe this
     if exp.key == better_key
+        exp.ACC = 1;
         exp.right_box_chosen_counter = exp.right_box_chosen_counter + 1;
     end
     %  Give reward as predetermined (or always in deterministic version)
