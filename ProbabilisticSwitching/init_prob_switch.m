@@ -50,8 +50,8 @@ exp.times.reward               =  1000;
 exp.times.iti                  =   500;
 
 % Set keys to select arrows and stimuli
-exp.nkey.le          =  97;
-exp.nkey.ri          =  98;
+exp.nkey.le          =  10;
+exp.nkey.ri          =  12;
 
 %% Positions on the screen
 exp.p.box_x   =  250;

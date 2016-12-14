@@ -63,11 +63,11 @@ subject_id = input('Enter the subject ID # :\n');
 
 %% implement safeguard
 
-    if exist(['GroupedExpeData/RLWMPST_ID',num2str(subject_id),'.mat'])
-        ow = 1;
-    else
-        ow = 0;
-    end
+if exist(['GroupedExpeData/RLWMPST_ID',num2str(subject_id),'.mat'])
+    ow = 1;
+else
+    ow = 0;
+end
 if ow
     disp('!!! CAUTION !!! Data already exists for this subject number.')
     disp('Proceeding to the task may overwrite previous data.')

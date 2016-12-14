@@ -62,6 +62,8 @@ try
     
     RLWMtraining(subject_id,w,rect,Actions);
     
+    [w, rect] = Screen('OpenWindow', 0, 0,screenRect,32,2);
+    HideCursor;	% Hide the mouse cursor
     
     % create stim sample display boxes
     x=rect(3)/7;
@@ -119,6 +121,17 @@ try
         TMin=nS*3*3;
         
         
+        % get screen parameters
+%         Screen('Preference', 'SkipSyncTests',1);
+%         if debug 
+%         screenRect = [0,0,1250,800]; % screen for debugging
+%         else
+%         screenRect = []; % full screen
+%         end
+%         [w, rect] = Screen('OpenWindow', 0, 0,screenRect,32,2);
+%         HideCursor;	% Hide the mouse cursor
+        %ListenChar(2);
+    
         % Stim sets presentation in previously built boxes
         Screen('FillRect', w,0);
         Screen('TextColor',w,[255 255 255]);

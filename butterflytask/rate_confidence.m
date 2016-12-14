@@ -6,7 +6,11 @@ global exp
 exp.t_conf = drawpict(exp.buffer.mem_confidence);
 [exp.key_conf, exp.keytime_conf] = waitkeydown(exp.times.mem_test);
 % Blank screen
-if ~(exp.key_conf >= 28 && exp.key_conf <= 31)
+if isempty(exp.key_conf)
+    drawpict(exp.buffer.no_response);
+    wait(2 * exp.times.display_choice);
+    exp.ACC_conf = nan;    
+elseif ~(exp.key_conf >= 28 && exp.key_conf <= 31)
     clearpict(exp.buffer.wrong_key);
     preparestring('WRONG KEY (Use number keys 1 to 4)', exp.buffer.wrong_key);
     drawpict(exp.buffer.wrong_key);

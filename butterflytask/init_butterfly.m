@@ -70,13 +70,13 @@ exp.times.reminder             =  5000;    % Time of response reminder
 exp.times.display_choice       =  1000;    % How long is the selected box presented?
 exp.times.reward               =  2000;
 exp.times.iti                  =   500;
-exp.times.mem_test             =  5000;
+exp.times.mem_test             = 10000;
 exp.times.break                = 60000;    % 60000 msec = 60 sec = 1 minute
 
 
 %% Set keys to select arrows and stimuli
-exp.nkey.le          =  97;
-exp.nkey.ri          =  98;
+exp.nkey.le          =  10;
+exp.nkey.ri          =  12;
 
 
 %% Positions on the screen
@@ -111,7 +111,7 @@ addpath(genpath('C:\Users\maria\Dropbox\NSFSLCN\Tasks\butterflytask\Cogent2000v1
 addpath(genpath('C:\Users\prokofiev\Dropbox\NSFSLCN\Tasks\ButterflyTask\Cogent2000v1.32'));
 addpath(genpath('C:\toolbox\Psychtoolbox'));
 % Configure display & keyboard
-config_display(1, 3, [0 0 0], [1 1 1], 'Helvetica', 40, exp.numb_of_buffers, 0);   % Configure display (0 = window mode; 5 = 1280x1024; [1 1 1] = white background; grey text; fontname; fontsize; nbuffers)
+config_display(1, 3, [0 0 0], [1 1 1], 'Helvetica', 28, exp.numb_of_buffers, 0);   % Configure display (0 = window mode; 5 = 1280x1024; [1 1 1] = white background; grey text; fontname; fontsize; nbuffers)
 config_keyboard;
 % Try to start cogent (else, wait for enter - to get matlab window)
 try

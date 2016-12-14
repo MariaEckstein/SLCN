@@ -1,4 +1,4 @@
-Parameters for Reversal 3D. Saved on 12/12/2016 at 16:53:18
+Parameters for Reversal 3D. Saved on 13/12/2016 at 14:23:13
 View Height	60	
 #Correct before Reversal...	5	
 Approach distance	4.5	

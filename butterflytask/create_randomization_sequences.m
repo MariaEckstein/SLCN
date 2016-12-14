@@ -1,11 +1,13 @@
 function create_randomization_sequences(n_trials, n_randomizations)
 
+%n_randomizations = 4;
+%n_trials = 120;
 
 %% Order of butterfly presentation
 butterflies = [1:4, 1:4];
 for r = 0:(n_randomizations-1)
     butterfly_sequence = [];
-    for times = 1:ceil(n_trials / length(butterflies))
+    for times = 1:ceil((n_trials+50) / length(butterflies))   % Needed for training and practice trials!
         butterfly_sequence = [butterfly_sequence, ...
             randsample(butterflies, length(butterflies), false)];
     end

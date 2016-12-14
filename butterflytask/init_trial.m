@@ -40,7 +40,7 @@ end
 % Pick an image to be presented during feedback
 if strcmp(train_or_exp, 'train')
     exp.image = sprintf('stims/P%02i.jpg', trial);
-else
+elseif strcmp(pic_no_pic, 'with_picture')
     exp.image = sprintf('stims/%s', char(exp.old_images(trial)));
 end
 

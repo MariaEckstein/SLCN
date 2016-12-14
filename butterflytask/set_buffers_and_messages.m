@@ -22,9 +22,11 @@ exp.buffer.incorrect                    =10;
 exp.buffer.wrong_key                    =11;
 exp.buffer.no_response                  =12;
 exp.buffer.response_reminder            =13;
+exp.buffer.instructions                 = 14;
+exp.buffer.final                        = 15;
 
 %% Buffers
-preparestring('WRONG KEY (Use left and right arrow keys)', exp.buffer.wrong_key);
+preparestring('WRONG KEY (Use the keys with stickers "j" and "l")', exp.buffer.wrong_key);
 preparestring('NO RESPONSE', exp.buffer.no_response);
 preparestring('PLEASE RESPOND', exp.buffer.response_reminder);
 preparestring('', exp.buffer.blank);

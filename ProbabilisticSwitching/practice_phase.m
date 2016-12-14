@@ -35,8 +35,8 @@ waitkeydown(inf)
 % Phase 1: Left box is magical; deterministic; 7 trials
 clearpict(exp.buffer.message)
 preparestring('In the game, there will be two boxes, but only one is magical.', exp.buffer.message, 0, 200)
-preparestring('Try finding the magical box. The left arrow key opens the left box', exp.buffer.message, 0, 150)
-preparestring('and the right arrow key opens the right box.', exp.buffer.message, 0, 100)
+preparestring('Try finding the magical box. The "j" key opens the left box', exp.buffer.message, 0, 150)
+preparestring('and the "l" key opens the right box.', exp.buffer.message, 0, 100)
 drawpict(exp.buffer.message)
 wait(300);
 waitkeydown(inf)
