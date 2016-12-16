@@ -42,12 +42,12 @@ end
 reward_sequence_filename = sprintf('Prerandomized sequences/rewards%i', ...
     exp.version);
 load(reward_sequence_filename);
-exp.reward_sequence = reward_sequence;
+exp.reward_sequence = reward_sequences;
 % Load reward sequence for incorrect choices (20% will be rewarded)
 reward_inc_sequence_filename = sprintf('Prerandomized sequences/rewards_inc%i', ...
     exp.version);
 load(reward_inc_sequence_filename);
-exp.reward_sequence_inc = reward_sequence_inc;
+exp.reward_sequence_inc = reward_sequences_inc;
 % Load order of butterfly presentation
 butterfly_sequence_filename = sprintf('Prerandomized sequences/butterfly%i', ...
     exp.version);
@@ -98,20 +98,21 @@ exp.BUTTERFLYdata.start_time_m = start_clock(5);
 
 
 %% Set Variables
-exp.n_correct = 1;                                                          % Count of correct choices
-exp.n_incorrect = 1;                                                        % Count of incorrect choices; used to find right spot in the pre-randomized reward sequence
+exp.n_correct = ones(1, 4);                                                 % Count of correct choices (separately for each butterfly)
+exp.n_incorrect = ones(1, 4);                                               % Count of incorrect choices; used to find right spot in the pre-randomized reward sequence
 exp.wdir = cd;                                                              % Working directory
 exp.results_filepath = exp.wdir;
 
 
 %% Configure Cogent
-exp.numb_of_buffers = 15;
+exp.numb_of_buffers = 16;
 % Add cogent to the path
 addpath(genpath('C:\Users\maria\Dropbox\NSFSLCN\Tasks\butterflytask\Cogent2000v1.32'));
 addpath(genpath('C:\Users\prokofiev\Dropbox\NSFSLCN\Tasks\ButterflyTask\Cogent2000v1.32'));
+addpath(genpath('C:\Users\Amy\Desktop\butterflytask\Cogent2000v1.32'))
 addpath(genpath('C:\toolbox\Psychtoolbox'));
 % Configure display & keyboard
-config_display(1, 3, [0 0 0], [1 1 1], 'Helvetica', 28, exp.numb_of_buffers, 0);   % Configure display (0 = window mode; 5 = 1280x1024; [1 1 1] = white background; grey text; fontname; fontsize; nbuffers)
+config_display(0, 3, [0 0 0], [1 1 1], 'Helvetica', 28, exp.numb_of_buffers, 0);   % Configure display (0 = window mode; 5 = 1280x1024; [1 1 1] = white background; grey text; fontname; fontsize; nbuffers)
 config_keyboard;
 % Try to start cogent (else, wait for enter - to get matlab window)
 try

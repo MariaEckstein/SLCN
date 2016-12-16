@@ -19,7 +19,7 @@ elseif ~(exp.key_conf >= 28 && exp.key_conf <= 31)
 else
     exp.ACC_conf = 1;
 end
-
+clearpict(exp.buffer.blank);
 drawpict(exp.buffer.blank);
 wait(exp.times.iti);
 

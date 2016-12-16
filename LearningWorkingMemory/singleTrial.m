@@ -7,16 +7,23 @@ FBprestime = timing(3);
 % interstimulus interval
 ISI= timing(4);
 
+% > help snd
+%   Snd('Play',sin(0:10000)); % play 22 KHz/(2*pi)=3.5 kHz tone
+%   Snd('Play',[sin(1:20000) zeros(1,10000);zeros(1,10000) sin(1:20000)]); % stereo
+%   Snd('Wait');         		% wait until end of all sounds currently in channel
+%   Snd('Quiet');        		% stop the sound and flush the queue
+ 
+
 invalid = 'No valid answer';
 
 red = [255 0 0];
 green = [0 255 0];
 %blue =[0 0 255];% 
-gray = [127 127 127];
+gray = [0 0 0];%[127 127 127];
 white = [255 255 255];
     
 % 400 pixel rectangle for presentation. Adjust at will
-p400 = min(rect(3:4))/4;
+p400 = 2*min(rect(3:4))/4;
 crectP = CenterRectOnPoint([0 0 p400 p400],rect(3)/2,rect(4)/2);% 3: width; 4: height
 p200 = p400/3;
 for k=1:3

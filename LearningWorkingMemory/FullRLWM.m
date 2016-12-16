@@ -62,8 +62,8 @@ try
     
     RLWMtraining(subject_id,w,rect,Actions);
     
-    [w, rect] = Screen('OpenWindow', 0, 0,screenRect,32,2);
-    HideCursor;	% Hide the mouse cursor
+    %[w, rect] = Screen('OpenWindow', 0, 0,screenRect,32,2);
+    %HideCursor;	% Hide the mouse cursor
     
     % create stim sample display boxes
     x=rect(3)/7;
@@ -75,7 +75,7 @@ try
                         3*x 3*x 4*x 4*x;
                         5*x 3*x 6*x 4*x];
     
-    HideCursor;	% Hide the mouse cursor
+    %HideCursor;	% Hide the mouse cursor
     %ListenChar(2);
     
 %    Screen('TextFont', w , 'Arial');

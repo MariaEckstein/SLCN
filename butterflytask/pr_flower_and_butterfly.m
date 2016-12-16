@@ -19,7 +19,7 @@ while isempty(exp.key)
     drawpict(exp.buffer.butterfly_reminder);
     break
 end
-if elapsed_time(6) > 5
+if elapsed_time(6) > exp.times.reminder/1000
     [exp.key, exp.keytime] = waitkeydown(exp.times.butterfly-exp.times.reminder);
 end
 

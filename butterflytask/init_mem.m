@@ -1,6 +1,6 @@
 function init_mem(trial)
 
-global exp
+global exp;
 
 
 %% Initialize truth values

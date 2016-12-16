@@ -16,24 +16,32 @@ end
 
 %% Order of CORRECT and INCORRECT feedback for correct responses (80%)
 rewards = [ones(1, 8), zeros(1, 2)];
-for r = 0:(n_randomizations-1)
-    reward_sequence = [];
-    for times = 1:ceil(n_trials / length(rewards))
-        reward_sequence = [reward_sequence, ...
-            randsample(rewards, length(rewards), false)];
+for r = 0:(n_randomizations-1)   % 4 randomization versions
+    reward_sequences = [];
+    for b = 1:4   % 4 butterflies
+        reward_sequence = [];
+        for times = 1:ceil(n_trials / length(rewards))
+            reward_sequence = [reward_sequence, ...
+                randsample(rewards, length(rewards), false)];
+        end
+        reward_sequences(:,b) = reward_sequence;
     end
-    save(sprintf('Prerandomized sequences/rewards%i.mat', r), 'reward_sequence');
+    save(sprintf('Prerandomized sequences/rewards%i.mat', r), 'reward_sequences');
 end
 
 %% Order of CORRECT and INCORRECT feedback for incorrect responses (20%)
 rewards_inc = [ones(1, 2), zeros(1, 8)];
 for r = 0:(n_randomizations-1)
-    reward_sequence_inc = [];
-    for times = 1:ceil(n_trials / length(rewards_inc))
-        reward_sequence_inc = [reward_sequence_inc, ...
-            randsample(rewards_inc, length(rewards_inc), false)];
+    reward_sequences_inc = [];
+    for b = 1:4   % 4 butterflies
+        reward_sequence_inc = [];
+        for times = 1:ceil(n_trials / length(rewards_inc))
+            reward_sequence_inc = [reward_sequence_inc, ...
+                randsample(rewards_inc, length(rewards_inc), false)];
+        end
+        reward_sequences_inc(:,b) = reward_sequence_inc;
     end
-    save(sprintf('Prerandomized sequences/rewards_inc%i.mat', r), 'reward_sequence_inc');
+    save(sprintf('Prerandomized sequences/rewards_inc%i.mat', r), 'reward_sequences_inc');
 end
 
 %% Order of random images and distribution into old and new (learning phase)

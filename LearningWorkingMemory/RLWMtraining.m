@@ -174,10 +174,10 @@ try
     Screen(w,'DrawText',text{9},(rect(3)/2)-150,rect(4)/2-100,255);
     %Screen(w,'DrawText',['It lasted ',num2str(minutes),' min, ',num2str(secondes),' sec.'],(rect(3)/2)-150,rect(4)/2,255);
         
-    ShowCursor;
+%     ShowCursor;
     %ListenChar(0);
-    Snd('Close')
-    Screen('CloseAll');
+%     Snd('Close')
+%     Screen('CloseAll');
 catch
     ShowCursor
     %ListenChar(0);

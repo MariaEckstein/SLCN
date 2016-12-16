@@ -9,7 +9,6 @@ end
 
 %% Name buffers
 exp.buffer.butterfly                    = 1;
-exp.buffer.butterfly_reminder           =14;
 exp.buffer.le_choice                    = 2;
 exp.buffer.ri_choice                    = 3;
 exp.buffer.break                        = 4;
@@ -22,8 +21,10 @@ exp.buffer.incorrect                    =10;
 exp.buffer.wrong_key                    =11;
 exp.buffer.no_response                  =12;
 exp.buffer.response_reminder            =13;
-exp.buffer.instructions                 = 14;
-exp.buffer.final                        = 15;
+exp.buffer.butterfly_reminder           =14;
+exp.buffer.instructions                 =15;
+exp.buffer.final                        =16;
+
 
 %% Buffers
 preparestring('WRONG KEY (Use the keys with stickers "j" and "l")', exp.buffer.wrong_key);

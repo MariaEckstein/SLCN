@@ -19,6 +19,10 @@ if ~isempty(exp.key_oldnew)
         wait(2 * exp.times.display_choice);
         exp.ACC_oldnew = nan;
     end
+else
+    drawpict(exp.buffer.no_response);
+    wait (2 * exp.times.display_choice);
+    exp.ACC_oldnew = nan;
 end
 % Blank screen
 drawpict(exp.buffer.blank);
