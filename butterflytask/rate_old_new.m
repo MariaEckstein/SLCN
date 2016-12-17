@@ -3,8 +3,8 @@ function rate_old_new
 global exp
 
 % Present picture and old/new choice
-exp.t_oldnew = drawpict(exp.buffer.mem_oldnew);
-[exp.key_oldnew, exp.keytime_oldnew] = waitkeydown(exp.times.mem_test);
+%exp.t_oldnew = drawpict(exp.buffer.mem_oldnew);
+%[exp.key_oldnew, exp.keytime_oldnew] = waitkeydown(exp.times.mem_test);
 
 % Determine accuracy of decision
 if ~isempty(exp.key_oldnew)
@@ -25,6 +25,9 @@ else
     exp.ACC_oldnew = nan;
 end
 % Blank screen
+if exp.no_oldnew_ans
+    clearpict(exp.buffer.blank);
+end
 drawpict(exp.buffer.blank);
 wait(exp.times.iti);
 

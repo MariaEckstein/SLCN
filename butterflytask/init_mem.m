@@ -20,7 +20,6 @@ loadpict(exp.image, ...
 preparestring('Old                                           New', ...
    exp.buffer.mem_oldnew, exp.p.feedback_x, exp.p.feedback_y);
 
-
 %%% Confidence rating
 loadpict(exp.image, ...
     exp.buffer.mem_confidence, exp.p.image_x, exp.p.image_y);
@@ -32,8 +31,9 @@ loadpict('stims/certain.jpeg', exp.buffer.mem_confidence,  -300, 160, 130, 130);
 loadpict('stims/uncertain.jpg', exp.buffer.mem_confidence,  300, 160, 130, 130);
 
 %%% "Blank" screen in-between
-loadpict(exp.image, exp.buffer.blank, exp.p.image_x, exp.p.image_y);
-
+% if ~exp.no_oldnew_ans
+%     loadpict(exp.image, exp.buffer.blank, exp.p.image_x, exp.p.image_y);
+% end
 
 %% Find out if image is old or new
 if sum(strcmp(exp.old_images, exp.mixed_images(trial)))

@@ -112,7 +112,7 @@ addpath(genpath('C:\Users\prokofiev\Dropbox\NSFSLCN\Tasks\ButterflyTask\Cogent20
 addpath(genpath('C:\Users\Amy\Desktop\butterflytask\Cogent2000v1.32'))
 addpath(genpath('C:\toolbox\Psychtoolbox'));
 % Configure display & keyboard
-config_display(0, 3, [0 0 0], [1 1 1], 'Helvetica', 28, exp.numb_of_buffers, 0);   % Configure display (0 = window mode; 5 = 1280x1024; [1 1 1] = white background; grey text; fontname; fontsize; nbuffers)
+config_display(1, 3, [0 0 0], [1 1 1], 'Helvetica', 28, exp.numb_of_buffers, 0);   % Configure display (0 = window mode; 5 = 1280x1024; [1 1 1] = white background; grey text; fontname; fontsize; nbuffers)
 config_keyboard;
 % Try to start cogent (else, wait for enter - to get matlab window)
 try

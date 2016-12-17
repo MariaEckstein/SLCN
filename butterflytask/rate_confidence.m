@@ -3,8 +3,8 @@ function rate_confidence
 global exp
 
 % Present picture and confidence of old/new rating
-exp.t_conf = drawpict(exp.buffer.mem_confidence);
-[exp.key_conf, exp.keytime_conf] = waitkeydown(exp.times.mem_test);
+% exp.t_conf = drawpict(exp.buffer.mem_confidence);
+% [exp.key_conf, exp.keytime_conf] = waitkeydown(exp.times.mem_test);
 % Blank screen
 if isempty(exp.key_conf)
     drawpict(exp.buffer.no_response);

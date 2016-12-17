@@ -49,6 +49,11 @@ else
         exp.BUTTERFLYdata.keytime_conf(trial)= exp.keytime_conf(1);
         exp.BUTTERFLYdata.RT_conf(trial)    = exp.keytime_conf(1) - exp.t_conf;
         exp.BUTTERFLYdata.ACC_conf(trial)   = exp.ACC_conf(1);
+    elseif exp.no_oldnew_ans
+        exp.BUTTERFLYdata.key_conf(trial)   = nan;
+        exp.BUTTERFLYdata.keytime_conf(trial)= nan;
+        exp.BUTTERFLYdata.RT_conf(trial)    = nan;
+        exp.BUTTERFLYdata.ACC_conf(trial)   = nan;
     else
         exp.BUTTERFLYdata.key_conf(trial)   = nan;
         exp.BUTTERFLYdata.keytime_conf(trial)= nan;

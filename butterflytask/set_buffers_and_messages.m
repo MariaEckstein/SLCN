@@ -11,19 +11,19 @@ end
 exp.buffer.butterfly                    = 1;
 exp.buffer.le_choice                    = 2;
 exp.buffer.ri_choice                    = 3;
-exp.buffer.break                        = 4;
+exp.buffer.break                        = 4; 
 exp.buffer.after_break                  = 5;
-exp.buffer.mem_oldnew                   = 6;
-exp.buffer.mem_confidence               = 7;
-exp.buffer.blank                        = 8;
+exp.buffer.mem_oldnew                   = 6; % recall task
+exp.buffer.mem_confidence               = 7; % recall task
+exp.buffer.blank                        = 8; % also recall task?
 exp.buffer.correct                      = 9;
 exp.buffer.incorrect                    =10;
-exp.buffer.wrong_key                    =11;
-exp.buffer.no_response                  =12;
-exp.buffer.response_reminder            =13;
-exp.buffer.butterfly_reminder           =14;
-exp.buffer.instructions                 =15;
-exp.buffer.final                        =16;
+exp.buffer.wrong_key                    =11; % also recall task
+exp.buffer.no_response                  =12; % also recall task
+exp.buffer.response_reminder            =13; % also recall task
+exp.buffer.butterfly_reminder           =14; % 
+exp.buffer.instructions                 =15; % also recall task
+exp.buffer.final                        =16; % also recall task
 
 
 %% Buffers
