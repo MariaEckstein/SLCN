@@ -21,9 +21,9 @@ import time
 
 try:
     import pygame
-    from pygame import joystick
+    # from pygame import joystick
     pygame.init()
-    joystick.init()
+    # joystick.init()
 
 except:
     print "Error: pygame not installed"
@@ -67,10 +67,10 @@ class EventManager(ShowBase):
                 elif self.go:
                     self.godisp()
                 else:
-                    if self.joystickon == 1:
-                        self.getjoystick()
-                    else:
-                        self.move()
+                    # if self.joystickon == 1:
+                    #     self.getjoystick()
+                    # else:
+                    self.move()
                     self.animate()
                     self.dig()
                     self.drag()
@@ -134,25 +134,25 @@ class EventManager(ShowBase):
             self.go = False
             self.t0 = time.time()
 	# not using the joystick so this doesn't work
-    def getjoystick(self):
-        dt = globalClock.getDt()
-        if self.canMove == True:
-            for event in pygame.event.get():
-                pass
-            self.isMoving = False
-            self.isTurning = False
-            if self.joystick.get_axis( 4 )<-0.8:
-                self.isMoving=True
-                self.get_move(dt)
-            if self.joystick.get_axis( 3 )<-0.8:
-                self.kiki.setH(self.kiki.getH() + 300 * dt)
-                self.isTurning = True
-            if self.joystick.get_axis( 3 )>0.8:
-                self.kiki.setH(self.kiki.getH() - 300 * dt)
-                self.isTurning = True
-        if self.joystick.get_button( 1 ) > 0.8:
-            if self.get_dig()>-1:
-                self.digging = True
+    # def getjoystick(self):
+     #    dt = globalClock.getDt()
+     #    if self.canMove == True:
+     #        for event in pygame.event.get():
+     #            pass
+     #        self.isMoving = False
+     #        self.isTurning = False
+     #        if self.joystick.get_axis( 4 )<-0.8:
+     #            self.isMoving=True
+     #            self.get_move(dt)
+     #        if self.joystick.get_axis( 3 )<-0.8:
+     #            self.kiki.setH(self.kiki.getH() + 300 * dt)
+     #            self.isTurning = True
+     #        if self.joystick.get_axis( 3 )>0.8:
+     #            self.kiki.setH(self.kiki.getH() - 300 * dt)
+     #            self.isTurning = True
+     #    if self.joystick.get_button( 1 ) > 0.8:
+     #        if self.get_dig()>-1:
+     #            self.digging = True
 
 
 
@@ -621,16 +621,16 @@ class EventManager(ShowBase):
         self.savelog = False
 		# we don't have the joystick version
 		# will always print error in console 
-        self.joystickon = 0
-
-        try:
-            if joystick.get_count() > 0:
-                self.joystickon = 1
-                self.joystick = joystick.Joystick(0)
-                self.joystick.init()
-        except:
-            print "Joystick Error" 
-            self.joystickon = 0
+        # self.joystickon = 0
+        #
+        # try:
+         #    if joystick.get_count() > 0:
+         #        self.joystickon = 1
+         #        self.joystick = joystick.Joystick(0)
+         #        self.joystick.init()
+        # except:
+         #    print "Joystick Error"
+         #    self.joystickon = 0
 
 	# parameters from the menu.py GUI 
 	# can change any of these manually via the gui 
