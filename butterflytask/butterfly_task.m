@@ -4,8 +4,8 @@ clear all;
 global exp;
 
 %% Add Cogent (MUST be an absolute path - relative paths do not stick after changing directory)
-addpath(genpath('C:\Users\Amy\Desktop\butterflytask\Cogent2000v1.32'))
-addpath('C:\Users\Amy\Desktop\butterflytask')
+addpath(genpath('C:\Users\prokofiev\Dropbox\NSFSLCN\Tasks\ButterflyTask\Cogent2000v1.32'))
+addpath('C:\Users\prokofiev\Dropbox\NSFSLCN\Tasks\ButterflyTask\')
 
 %% Define variables here during debugging
 exp.subj = input('Subject ID: \n');

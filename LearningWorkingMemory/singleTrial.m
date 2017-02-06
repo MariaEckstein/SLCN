@@ -23,7 +23,7 @@ gray = [0 0 0];%[127 127 127];
 white = [255 255 255];
     
 % 400 pixel rectangle for presentation. Adjust at will
-p400 = 2*min(rect(3:4))/4;
+p400 = 1.5 * min(rect(3:4))/4;
 crectP = CenterRectOnPoint([0 0 p400 p400],rect(3)/2,rect(4)/2);% 3: width; 4: height
 p200 = p400/3;
 for k=1:3

@@ -1,4 +1,4 @@
-Parameters for Reversal 3D. Saved on 15/12/2016 at 13:27:7
+Parameters for Reversal 3D. Saved on 3/2/2017 at 10:41:47
 View Height	60	
 #Correct before Reversal...	5	
 Approach distance	4.5	
@@ -6,7 +6,7 @@ Time-out time	120
 Negative feedback	Smoke-puff	
 Smoke-puff size	Large	
 Star size	Large	
-Box Colours	B	
+Box Colours	A	
 Wall Colours	A	
 Camera Rotation	Off	
 L/R buttons	Move	
