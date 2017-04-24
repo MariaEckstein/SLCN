@@ -108,11 +108,6 @@ try
             load(['imagesRLWM\images',num2str(Type),'\image',num2str(sordre(i))]);%%%load des stimuli
             SMat(:,:,:,i)=X;
         end
-        % load button images
-        for i=1:3
-            load(['imagesRLWM\images',num2str(Type),'\image',num2str(sordre(i))]);%%%load des stimuli
-            SMat(:,:,:,i)=X;
-        end
         
         %%%Get stim sequence for block b
         stimseq=stSeqs{b};
