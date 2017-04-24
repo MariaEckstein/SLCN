@@ -14,7 +14,7 @@ function RLWMtraining(subject_id,w,rect,Actions)
 debug = 1;
 load debugstate
 
-timing = [2 .2 .75 .5];% stim presentation, choice-FB, FB, ITI
+timing = [7 .2 .75 .5];% stim presentation, choice-FB, FB, ITI
 rand('twister',sum(100*clock));
 nA=3;
 

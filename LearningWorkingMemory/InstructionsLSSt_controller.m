@@ -60,7 +60,7 @@ RestrictKeysForKbCheck([]);
 % KbWait([],3); %Waits for keyboard(any) press
 % 
 imaget = SMat(:,:,:,1);
-timing = [3 0 0 .5];
+timing = [7 0 0 .5];
 acor = 0;
 % singleTrial(w,rect,Actions,imaget,acor,timing);
 
@@ -164,7 +164,7 @@ RestrictKeysForKbCheck([32]); % wait for space
 KbWait([],3); %Waits for keyboard(any) press
 RestrictKeysForKbCheck([]);
 
-timing = [2 .2 1 .5]; % change to 7 sec
+timing = [7 .2 1 .5]; % change to 7 sec
 for iter = 1:10
 imaget = SMat(:,:,:,1+rem(iter,2));
 acor = 2+rem(iter,2);
@@ -220,7 +220,6 @@ if repeat == -1
     done = 0;
 end
 end
-
 % textI = [text{23}];
 % DrawFormattedText(wPtr,textI,'center','center');
 % Screen(wPtr, 'Flip');

@@ -1,4 +1,0 @@
-pID	Age	Gender	TrialNumber	Reversal	Target	Choice	Correct	TotalScore	RunningTotal	TrialNumPhase	Visits0	Visits1	Visits2	Visits3	ResponseTime	
-Michelle17	x	Male	0	0	0	2	0	0	0	1	0	0	1	0	1.63339591026	
-Michelle17	x	Male	1	0	0	1	0	0	0	2	0	1	0	0	1.4667339325	
-Michelle17	x	Male	2	0	0	2	0	0	0	3	0	0	1	0	1.63341999054	

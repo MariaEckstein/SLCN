@@ -28,10 +28,6 @@ crectP = CenterRectOnPoint([0 0 p400 p400],rect(3)/2,rect(4)/2);% 3: width; 4: h
 p200 = p400/3;
 
 % rect for buttons
-lb=imread('extra_images/leftbutton','png');
-ub=imread('extra_images/upbutton','png');
-rb=imread('extra_images/rightbutton','png');
-button_img = [lb ub rb];
 for k=1:3
     x = rect(3)/2 + (k-2)*1.5*p200;
     y= (rect(4)/2+ p400/2)/2 + rect(4)/2;
@@ -44,11 +40,12 @@ end
 Screen(w,'FillPoly',gray, [0 0;0 rect(4);rect(3) rect(4);rect(3) 0]);%%Ecrean total noir
 Screen('PutImage',w,imaget,crectP);
 % commenting this out because other buttons were prepared
-for k = 1:3
-%     Screen(w,'FillRect',white,keys{k});
-%     Screen(w,'FrameRect',0,keys{k},2);
-    Screen('PutImage',w,button_img(k),[keys{k}(1) keys{k}(2) keys{k}(3) keys{k}(4)]);
-end
+b1=imread('extra_images/leftbutton','png');
+b2=imread('extra_images/upbutton','png');
+b3=imread('extra_images/rightbutton','png');
+Screen('PutImage',w,b1,keys{1});
+Screen('PutImage',w,b2,keys{2});
+Screen('PutImage',w,b3,keys{3});
 Screen('Flip', w);
 
 % wait for a key press
