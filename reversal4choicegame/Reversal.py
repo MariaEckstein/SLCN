@@ -261,6 +261,8 @@ class EventManager(ShowBase):
                             else:
                                 flipbook_2(self.kiki,self.losingframe,loop=1)
                     else:
+                        ex = 0
+                        self.presents[self.dug].detachNode()
                         self.digging = False
                         self.dragback= True
             else:

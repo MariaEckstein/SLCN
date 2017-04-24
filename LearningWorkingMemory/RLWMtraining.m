@@ -22,13 +22,13 @@ nA=3;
 % --------------- 
 % open the screen
 % ---------------
-
-text{1} = 'Block ';
-text{2} = 'Take some time to look at the images for this block.';
-text{3} = '[Press space to continue.]';
+% change 'block' to 'level'
+text{1} = 'Level ';
+text{2} = 'Take some time to look at the images for this level.';
+text{3} = ' '; % [Press any button to continue.]
 text{4} = '';
 text{5} = '0';
-text{6} = 'End of block ';
+text{6} = 'End of level ';
 text{8} = 'No valid answer';
 text{9} = 'End of training.';
 
@@ -60,7 +60,7 @@ try
     end
         
     % Give instructions
-    InstructionsLSSt(w,rect,Actions,SMat);
+    InstructionsLSSt_controller(w,rect,Actions,SMat);
     
     for i=1:nS
         load(['imagesRLWM/TrainingImages/image',num2str(i)]);%%%load des stimuli
@@ -190,3 +190,5 @@ end
 
 
 end
+
+    

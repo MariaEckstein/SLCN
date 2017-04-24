@@ -1,9 +1,9 @@
 function [RT,code,cor]=singleTrial(w,rect,Actions,imaget,acor,timing)
 
-prestime =timing(1);
+prestime =timing(1); 
 AFB = timing(2);% action-FB delay
 % FB presentation time 
-FBprestime = timing(3);
+FBprestime = timing(3); 
 % interstimulus interval
 ISI= timing(4);
 
@@ -26,6 +26,12 @@ white = [255 255 255];
 p400 = 1.5 * min(rect(3:4))/4;
 crectP = CenterRectOnPoint([0 0 p400 p400],rect(3)/2,rect(4)/2);% 3: width; 4: height
 p200 = p400/3;
+
+% rect for buttons
+lb=imread('extra_images/leftbutton','png');
+ub=imread('extra_images/upbutton','png');
+rb=imread('extra_images/rightbutton','png');
+button_img = [lb ub rb];
 for k=1:3
     x = rect(3)/2 + (k-2)*1.5*p200;
     y= (rect(4)/2+ p400/2)/2 + rect(4)/2;
@@ -37,9 +43,11 @@ end
 % present it
 Screen(w,'FillPoly',gray, [0 0;0 rect(4);rect(3) rect(4);rect(3) 0]);%%Ecrean total noir
 Screen('PutImage',w,imaget,crectP);
+% commenting this out because other buttons were prepared
 for k = 1:3
-    Screen(w,'FillRect',white,keys{k});
-    Screen(w,'FrameRect',0,keys{k},2);
+%     Screen(w,'FillRect',white,keys{k});
+%     Screen(w,'FrameRect',0,keys{k},2);
+    Screen('PutImage',w,button_img(k),[keys{k}(1) keys{k}(2) keys{k}(3) keys{k}(4)]);
 end
 Screen('Flip', w);
 

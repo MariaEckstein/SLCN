@@ -12,7 +12,7 @@ directory = 'GroupedExpeData';
 debug = 0;
 load debugstate
 
-timing = [2 .2 .75 .5];% stim presentation, choice-FB, FB, ITI
+timing = [7 .2 .75 .5];% stim presentation (change to 7s), choice-FB, FB, ITI
 %debug = 0;
 nA = 3;
 %load datatmp
@@ -29,12 +29,13 @@ Entrees.stimuli=stimuli;
 Entrees.rules=rules;
 dataT{length(blocks)+1}=Entrees;
 
-text{1} = 'Block ';
-text{2} = 'Take some time to look at the images for this block.';
-text{3} = '[Press space to continue.]';
+% change 'block' to 'level'
+text{1} = 'Level ';
+text{2} = 'Take some time to look at the images for this level.';
+text{3} = ''; % change back [press any button to continue.] 
 text{4} = '';
 text{5} = '0';
-text{6} = 'End of block ';
+text{6} = 'End of level ';
 text{7} = 'End of this experiment!';
 text{8} = 'No valid answer';
 
@@ -205,9 +206,11 @@ try
         Screen('TextSize', w, 32 );
         Screen('FillRect', w,0)
         textI = [text{6}, num2str(b),...
-            '\n\nYou chose correctly ',num2str(sum(DCor==1)),...
-            ' times out of ',num2str(t),' trials!',...
-            '\n\n\n\n\n\n\n',text{3}];
+%             '\n\nYou chose correctly ',num2str(sum(DCor==1)),...
+%             ' times out of ',num2str(t),' trials!',...
+%             '\n\n\n\n\n\n\n',text{3}]; % 'press key to continue
+            '\n\nYou got ',num2str(sum(DCor==1)),...
+            ' correct!'];
         DrawFormattedText(w,textI,'center','center');
         Screen('Flip', w);kdown=0;
         

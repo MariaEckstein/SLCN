@@ -41,7 +41,7 @@ loadpict('stimuli/box_empty.png', exp.buffer.no_coin_right, exp.p.box_x, exp.p.b
 loadpict('stimuli/box.png', exp.buffer.no_coin_right, -exp.p.box_x, exp.p.box_y);
 
 %% Load feedback into feedback buffers
-preparestring('wrong key! (Use the keys with stickers: "j" and "l")', exp.buffer.wrong_key);
+preparestring('wrong key! (Use the left and right buttons)', exp.buffer.wrong_key); % if keyboard then: keys with stickers: "j" and "l"
 preparestring('no response!', exp.buffer.no_response);
 
 %% Load fixation cross into buffer
@@ -56,7 +56,7 @@ preparestring(break2, exp.buffer.break);
 preparestring(break3, exp.buffer.break, 0, -100); 
 
 after_break1 = 'The break is over!';
-after_break2 = 'Press space to continue the task.';
+after_break2 = 'Press the "A button" to continue the task.'; % if keyboard, then press space bar
 preparestring(after_break1, exp.buffer.after_break, 0, 250); 
 preparestring(after_break2, exp.buffer.after_break); 
 

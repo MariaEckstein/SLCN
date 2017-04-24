@@ -1,6 +1,7 @@
 function recall_task
 
 global exp;
+clear trial;
 
 %% Define variables here during debugging
 exp.subj = input('Subject ID: \n');
@@ -16,7 +17,7 @@ addpath('C:\Users\Amy\Desktop\butterflytask')
 %% Surprise Memory test
 exp.no_oldnew_ans = false;
 pr_instructions('mem');
-for trial = 1:5%(1:exp.n_trials.memory/4) + exp.n_trials.learning + exp.n_trials.test
+for trial = (1:exp.n_trials.memory/4) + exp.n_trials.learning + exp.n_trials.test
     init_mem(trial);
     
     pr_old_new;
@@ -29,7 +30,7 @@ for trial = 1:5%(1:exp.n_trials.memory/4) + exp.n_trials.learning + exp.n_trials
         exp.no_oldnew_ans = true;
     end
     
-    rec_trial(trial, 'memory');
+    rec_recall_trial(trial);
 
     pr_break(trial);                                                        % Give a break after blocks of 30 trials
 end

@@ -56,6 +56,9 @@ end
 
 % Create butterfly & flower buffer
 for buffer = [exp.buffer.butterfly, exp.buffer.butterfly_reminder]
+    if exp.show_points;
+        preparestring(strcat('Points: ', num2str(exp.earned_points)), buffer,0,300)
+    end
     loadpict(exp.trial_butterfly, buffer,  exp.p.butter_x, exp.p.butter_y);
     loadpict(exp.trial_le_flower, buffer, -exp.p.flower_x, exp.p.flower_y);
     loadpict(exp.trial_ri_flower, buffer,  exp.p.flower_x, exp.p.flower_y);

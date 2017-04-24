@@ -5,7 +5,7 @@ global exp;
 %% Configure Cogent
 exp.numb_of_buffers = 15;
 % Add cogent to the path
-addpath(genpath('C:\Users\maria\MEGAsync\GSN\Wunderlich Lab\TrainingPlanningProject\Cogent2000v1.32'))
+addpath(genpath('C:\Users\maria\Dropbox\NSFSLCN\Tasks\butterflytask\Cogent2000v1.32'))
 addpath(genpath('C:\Cogent2000v1.33'));
 % Configure display & keyboard
 config_display(1, 3, [1 1 1], [0 0 0], 'Helvetica', 40, exp.numb_of_buffers, 0);   % Configure display (0 = window mode; 5 = 1280x1024; [1 1 1] = white background; grey text; fontname; fontsize; nbuffers)
@@ -19,7 +19,7 @@ exp.results_filepath = exp.wdir;
 exp.PROBSWITCHdata.switch_trial = [];
 exp.PROBSWITCHdata.reward = [];
 
-% Load run_length and coin_win randomizations (s1->r1; s2->r2, ..., s11->r1, s12->r12, ...)
+% Load run_length and coin_win randomizations (s1->r1; s2->r2, ..., s11->r1, s12->r2, ...)
 run_length_filename = sprintf('Prerandomized sequences/run_length%i', ...
     mod(str2num(exp.subj), 4));
 load(run_length_filename);
@@ -28,14 +28,18 @@ coin_win_filename = sprintf('Prerandomized sequences/coin_win%i', ...
     mod(str2num(exp.subj), 4));
 load(coin_win_filename);
 exp.coin_win = coin_win;
-exp.right_box_chosen_counter = 1;
+exp.right_box_chosen_counter = 0;
 % Set number of trials (practice and task)
-exp.numb_of_trials.prob_switch = 150;  % 150 trials plus instructions take exactly 10 minutes (13-year old)
-exp.numb_of_trials.practice_left = 7;
-exp.numb_of_trials.practice_switch1 = 6;
-exp.numb_of_trials.practice_switch2 = 7;
-exp.numb_of_trials.practice_stochastic1 = 12;
-exp.numb_of_trials.practice_stochastic2 = 8;
+if exp.subj == 0
+    exp.numb_of_trials.prob_switch = 15;   % Debug version with fewer trials
+else
+    exp.numb_of_trials.prob_switch = 150;  % 150 trials plus instructions take exactly 10 minutes (13-year old)
+end
+exp.numb_of_trials.practice_left = 10;
+exp.numb_of_trials.practice_switch1 = 8;
+exp.numb_of_trials.practice_switch2 = 8;
+exp.numb_of_trials.practice_stochastic1 = 15;
+exp.numb_of_trials.practice_stochastic2 = 10;
 
 % Keep track of which run we are currently at; start at 1
 exp.run = 1;

@@ -12,4 +12,3 @@ exp.key                 = [];
 exp.keytime             = [];
 exp.reward = 0;
 
-end
