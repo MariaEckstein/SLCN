@@ -40,9 +40,19 @@ end
 Screen(w,'FillPoly',gray, [0 0;0 rect(4);rect(3) rect(4);rect(3) 0]);%%Ecrean total noir
 Screen('PutImage',w,imaget,crectP);
 % commenting this out because other buttons were prepared
+<<<<<<< HEAD
 b1=imread('extra_images/leftbutton','png');
 b2=imread('extra_images/upbutton','png');
 b3=imread('extra_images/rightbutton','png');
+=======
+% for k = 1:3
+%     Screen(w,'FillRect',red,keys{k});
+%     Screen(w,'FrameRect',0,keys{k},2);
+% end
+b1=imread('extra_images/button1','png');
+b2=imread('extra_images/button2','png');
+b3=imread('extra_images/button3','png');
+>>>>>>> 0acae5fb6d80bfdcb27bc826cb7395dd92d45be6
 Screen('PutImage',w,b1,keys{1});
 Screen('PutImage',w,b2,keys{2});
 Screen('PutImage',w,b3,keys{3});

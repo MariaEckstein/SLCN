@@ -18,8 +18,6 @@ set_buffers_and_messages;
 
 %%% Training phase
 exp.start_trial = practice_phase + 1;
-% exp.start_trial = 1; % for debug
-% exp.better_box_left = 1; %; for debug - always start on left side
 
 %%% Loop through experimental trials
 for trial = exp.start_trial:(exp.start_trial + exp.numb_of_trials.prob_switch)
