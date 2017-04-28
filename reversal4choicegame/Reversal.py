@@ -17,6 +17,7 @@ from direct.gui.DirectGui import *
 from numpy import *
 import numpy as np
 from direct.task import Task
+from time import gmtime, strftime
 import time
 
 try:
@@ -116,6 +117,7 @@ class EventManager(ShowBase):
         for visit_no in self.visits:
             self.file.write("%s\t" % visit_no)
         self.file.write("%s\t" % self.RT)
+        self.file.write("%s\t" % strftime("%Y-%m-%d %H:%M:%S",gmtime()))
         self.file.close() #save the file
 		
 		
@@ -495,10 +497,10 @@ class EventManager(ShowBase):
 		
         self.file = open('logs/Reversal3D_end30_5of6_logfile_'+str(self.p_ID)+'.txt', 'w')
         # added two extra columns to the log file
-        self.file.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t" % 
+        self.file.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t" %
             ("pID","Age","Gender","TrialNumber","Reversal","Target",
             "Choice","Correct","TotalScore","RunningTotal", "Last6TrialsTotal", "TrialNumPhase", 
-            "Visits0","Visits1", "Visits2","Visits3","ResponseTime"))
+            "Visits0","Visits1", "Visits2","Visits3","ResponseTime","CurrentTime"))
         self.file.close()
 
         print "ID:", self.p_ID, "Gender:",self.p_gender,"Age:",self.p_age
