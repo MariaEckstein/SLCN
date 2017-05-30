@@ -1,3 +1,4 @@
+
 function butterfly_task
 
 clear all; 
@@ -46,8 +47,8 @@ end
 %% Test trials (without feedback)
 pr_instructions('test');
 exp.flyphase = 'test';
-exp.show_points=0;
-for trial = (1:exp.n_trials.test) + exp.n_trials.learning
+exp.show_points = 0;
+for trial = (trial+1):exp.n_trials.test
     init_trial(trial, 'exp', 'no_picture');                                % Initialize truth values; pick the butterfly to be presented
     
     pr_flower_and_butterfly;                                                % Show one butterfly and the flowers and let participant pick butterfly

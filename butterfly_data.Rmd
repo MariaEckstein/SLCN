@@ -1,0 +1,99 @@
+---
+title: "Butterfly analyses"
+output: html_notebook
+---
+
+# Set up parameters
+
+```{r Set up parameters}
+data_dir = ('C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/butterflytask/Results') # get 4choice data
+library("ggplot2"); theme_set(theme_bw())
+library("plyr")
+library("R.matlab")
+```
+
+```{r Read in data}
+all_files = data.frame()
+filenames = list.files(data_dir, pattern = "*.mat")
+filename = filenames[2] # debugging
+
+for (filename in filenames) {
+  mat_file = readMat(file.path(data_dir, filename))$exp[,,1]$BUTTERFLYdata[,,1]
+  subj_file = data.frame(t(mat_file$RT)); colnames(subj_file) = "RT"
+  subj_file$ACC = t(mat_file$ACC)  # change name to "ACC" for new datasets!
+  subj_file$key = t(mat_file$key)
+  subj_file$reward = t(mat_file$reward)
+  subj_file$missed = ifelse(is.nan(subj_file$ACC) | is.nan(subj_file$RT), 1, 0)
+  subj_file$butterfly = t(mat_file$butterfly)
+  subj_file$sID = as.numeric(strsplit(strsplit(filename, split = "BUTTERFLY_")[[1]][2], ".mat")[[1]])
+  subj_file$TrialID = 1:nrow(subj_file)
+  subj_file$block = 5
+  for (block in 0:4) {
+    subj_file$block[subj_file$TrialID > block * 30] = block + 1
+  }
+  subj_file$train = "train"
+  subj_file$train[subj_file$TrialID > 120] = "test"
+  all_files = as.data.frame(rbind(all_files, subj_file))
+}
+all_files = subset(all_files, !sID %in% c(11, 13, 14))
+summary(all_files)
+head(all_files)
+```
+
+```{r Summary statistics}
+
+train_trials = subset(all_files, train == "train")
+test_trials = subset(all_files, train == "test")
+
+# Missed trials
+ggplot(all_files, aes(block, missed)) +
+  stat_summary(fun.y = sum, geom = "point") +
+  facet_grid(~ sID)
+
+# ACC
+ggplot(all_files, aes(block, ACC, group = 1, color = train)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange")
+
+ggplot(all_files, aes(block, ACC, group = sID, color = train)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+  facet_grid(~ sID)
+
+# Response times
+ggplot(all_files, aes(block, RT, fill = train)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange")
+
+ggplot(all_files, aes(block, RT, color = train)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+  geom_point() +
+  facet_grid(~ sID)
+
+# Rewards
+ggplot(subset(all_files, block < 5), aes(block, reward, group = sID, color = sID)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+  facet_grid(~ sID)
+
+# ACC & Reward over time by butterfly
+all_files$butterfly = factor(all_files$butterfly)
+ggplot(all_files, aes(block, ACC, group = sID, color = train)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+  facet_grid(butterfly ~ sID)
+
+ggplot(subset(all_files, block < 5), aes(block, reward, group = sID, color = train)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+  facet_grid(butterfly ~ sID)
+```
+```{r}
+# Were butterflies rewarded for right key presses?
+all_files$ACC = factor(all_files$ACC, levels = c(1, 0), labels = c("cor", "incor"))
+all_files$reward = factor(all_files$reward, levels = c(1, 0), labels = c("rew", "norew"))
+with(subset(all_files, sID == 17), table(ACC, reward))
+
+```
+

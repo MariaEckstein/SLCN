@@ -1,0 +1,91 @@
+---
+title: "Prob switch analyses"
+output: html_notebook
+---
+
+# Set up parameters
+
+```{r Set up parameters}
+data_dir = ('C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results') # get probswitch data
+library("ggplot2"); theme_set(theme_bw())
+library("plyr")
+library("R.matlab")
+```
+
+```{r Read in data}
+all_files = data.frame()
+filenames = list.files(data_dir, pattern = "*.mat")
+filename = filenames[2] # debugging
+
+for(filename in filenames) {
+  mat_file = readMat(file.path(data_dir, filename))$exp[,,1]$PROBSWITCHdata[,,1]
+  subj_file = data.frame(t(mat_file$RT)); colnames(subj_file) = "RT"
+  subj_file$ACC = t(mat_file$ACC)  # change name to "ACC" for new datasets!
+  subj_file$key = t(mat_file$key)
+  subj_file$reward = t(mat_file$reward)
+  subj_file$switch_trial = t(mat_file$switch.trial)
+  subj_file$better_box_left = t(mat_file$better.box.left)
+  subj_file$sID = as.numeric(strsplit(strsplit(filename, split = "PROBSWITCH_")[[1]][2], ".mat")[[1]])
+  subj_file$rewardversion = subj_file$sID %% 4
+  subj_file$TrialID = 1:nrow(subj_file)
+  subj_file = subset(subj_file, TrialID > 47) # needs to be changed for future participants - 51
+  subj_file$TrialID = 1:nrow(subj_file)
+  block = 1
+  trialsinceswitch=1
+  for (t in subj_file$TrialID) {
+    block = block + subj_file$switch_trial[t]
+    subj_file$block[t] = block
+    trialsinceswitch = ifelse(subj_file$switch_trial[t]==1, 1, trialsinceswitch+1)
+    subj_file$trialsinceswitch[t] = trialsinceswitch
+  }
+  
+  all_files = as.data.frame(rbind(all_files, subj_file))
+}
+
+summary(all_files)
+head(all_files)
+```
+
+```{r Summary statistics}
+
+# Response times
+gg_RT = ggplot(all_files, aes(TrialID, RT, color = sID)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
+  # stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+  geom_point()
+gg_RT
+gg_RT + facet_grid(~ sID)
+
+gg_RTt = ggplot(all_files, aes(trialsinceswitch, RT, color = sID)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
+  # stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+  geom_point()
+gg_RTt
+gg_RTt + facet_grid(~ sID)
+
+# Missed trials -> did not miss trials
+
+
+# ACC over trials
+ggplot(all_files, aes(TrialID, ACC)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
+  geom_point() +
+  
+  facet_grid(~ rewardversion)
+
+# ACC over blocks
+gg_blockACC = ggplot(all_files, aes(trialsinceswitch, ACC)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange")
+gg_blockACC
+gg_blockACC + facet_grid(~ sID)
+
+# Rewards over trials
+ggplot(all_files, aes(TrialID, reward)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
+  geom_point() + 
+  facet_grid(~ rewardversion)
+
+
+```
+

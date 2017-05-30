@@ -1,0 +1,446 @@
+---
+title: "REVERSAL TASK PROCESSING"
+author: "Michelle.VanTieghem"
+date: "January 27, 2016"
+output: slidy_presentation
+---
+
+```{r, echo = FALSE}
+##########################################s
+# Making a list of file names and checking number
+#########################################
+
+setwd ("~/Documents/Documents/Columbia/LabDATA/Reversal_task/Reversal/analysis/")
+subject.files <- list.files(path="~/Documents/Documents/Columbia/LabDATA/Reversal_task/Reversal/logs/",
+                            pattern="logfile")
+length(subject.files) #64
+subject.list <-substr(subject.files, 1, 80)
+subject.list 
+
+
+##########################################
+# setting directory for data output files 
+#########################################
+output.directory <- ("~/Documents/Documents/Columbia/LabDATA/Reversal_task/Reversal/analysis/")
+
+
+#########################################
+# Load all files for each subject and loop 
+#########################################
+
+# create empty listto store each subjects data frame 
+data.list <- list()  
+
+for(i in (subject.list)){
+
+#  i <- subject.list[1]
+  # create file path to loop through all subjects 
+  filepath <- file.path("~/Documents/Documents/Columbia/LabDATA/Reversal_task/Reversal/logs",paste(i,sep=""))
+  # assign data frame for each subject 
+  data.file <- assign(i, read.table(filepath, stringsAsFactors=T, header=T))
+  data.file <- data.frame(data.file)
+  # add data for each subject to list of data frames 
+  data.list[[i]] <- data.file
+
+  }
+
+# check names and then split into chunks
+
+length(data.list) #64
+names(data.list)
+
+#############################################
+## make empty dataframe to store sub data
+#############################################
+
+compiled.data <-  data.frame("subject" = numeric(0),"Age" = numeric(0), "gender" = numeric(0), "Ave.choiceonseTime" = numeric(0),  "reversal.complete" = numeric(0),"trials.learn.aq" = numeric(0), "trials.learn.rev"= numeric(0), "persev.choice.rev"= numeric(0) , "error.choice.rev" = numeric(0))
+
+#############################################
+## start the data loop  for all subs
+#######################s######################
+for (i in 1:length(data.list)){
+#  i <- 1
+  #i < 26
+  data.set <- data.list[[i]]
+  subject <- subject.list[i]
+  Age <- as.numeric(data.set$Age[1])
+  gender <- as.character(data.set$Gender[1])
+  data.length <- nrow(data.set)
+ 
+#*#*#* need to add one here because Python starts at 0
+  TotalTrials <- data.set$TrialNumber[data.length]+1
+
+##################################################################
+## PROCESSING FOR AQ PHASE
+##################################################################
+  trials.learn.aq = 0
+  for (i in (1:TotalTrials)){
+    if(data.set$Reversal[i] == 0){
+      trials.learn.aq = trials.learn.aq+1
+    }
+  }
+trials.learn.aq
+## visits boxes - on average ... 
+target.aq <- data.set$Target[1]
+persev.prior.choice.aq  <- 0 
+error.choice.aq <- 0
+rewarded.choice.aq <- 0
+Visits0.aq <- 0
+Visits1.aq <- 0
+Visits2.aq <- 0
+Visits3.aq <- 0
+
+###################################################
+### while loop for AQ phase
+#######################################################
+k <-1
+while (k >= 1 & k<= trials.learn.aq){
+  print (k)
+  
+  #### VISITS 
+  # for each trial, add number of visits per box
+  Visits0.aq <- Visits0.aq + data.set$Visits0[k]
+   Visits1.aq <- Visits1.aq + data.set$Visits1[k]
+   Visits2.aq <- Visits2.aq + data.set$Visits2[k]
+  Visits3.aq <- Visits3.aq + data.set$Visits3[k]
+   
+
+  ### CHOICES 
+  if(data.set$Choice[k] == target.aq){
+    rewarded.choice.aq <- rewarded.choice.aq + 1
+   } 
+  if(data.set$Choice[k] != target.aq) {
+    error.choice.aq <- error.choice.aq +1 
+    }
+  if(k > 1){
+    j <- k-1
+    if(data.set$Choice[k] == data.set$Choice[j]){
+     persev.prior.choice.aq <- persev.prior.choice.aq + 1
+    }}
+  k <- k + 1
+  } 
+
+error.choice.aq
+rewarded.choice.aq
+persev.prior.choice.aq
+
+Visits0.aq
+Visits1.aq 
+Visits2.aq
+Visits3.aq 
+#######################################
+### calculating visit parameters
+####################################
+   total.reward.visits.aq <- 0
+   total.incorrect.visits.aq <- 0
+   total.visits.aq <- 0
+  
+ if (target.aq == 0){
+   total.reward.visits.aq <- Visits0.aq
+     total.incorrect.visits.aq <- Visits1.aq + Visits2.aq + Visits3.aq
+ } else if(target.aq == 1){
+   total.reward.visits.aq <- Visits1.aq
+     total.incorrect.visits.aq <- Visits0.aq + Visits2.aq + Visits3.aq
+ }else if(target.aq == 2){
+   total.reward.visits.aq <- Visits2.aq
+     total.incorrect.visits.aq <- Visits1.aq + Visits0.aq + Visits3.aq
+ }else if(target.aq == 3){
+   total.reward.visits.aq <- Visits3.aq
+     total.incorrect.visits.aq <- Visits1.aq + Visits2.aq + Visits0.aq
+ }
+
+                           
+visits.total.aq <- sum(Visits0.aq, Visits1.aq, Visits2.aq, Visits3.aq)
+visits.total.aq
+check <- ifelse((total.incorrect.visits.aq + total.reward.visits.aq) == visits.total.aq, "CHECK!", "ERROR!")
+check
+
+
+
+######################################################
+## find number of trials to learn REV 
+######################################################
+trials.learn.rev <- 0
+for (i in (1:TotalTrials)){
+  if(data.set$Reversal[i]== 1){
+    trials.learn.rev = trials.learn.rev+1
+  }
+}
+
+trials.learn.rev
+
+##########################################################
+## get rid of subjects who don't finish task and mark NAs
+######################################################
+
+## didn't finish REV 
+if (trials.learn.rev > 0  &  data.set$RunningTotal[TotalTrials] >= 4){
+  learned.rev <- "YES"
+} else {learned.rev <- "NO"}
+
+learned.rev
+
+## didn't finish AQ 
+if(trials.learn.rev == 0 | trials.learn.aq  > 30){
+  learned.aq <- "NO"
+  switch.trial <- "NA"
+  target.rev <- "NA"
+  persev.choice.rev  <- "NA"
+  error.choice.rev <- "NA"
+  rewarded.choice.rev <- "NA"
+  
+##########################################################
+## keep  subjects who did finish task and continue
+######################################################
+} else if(trials.learn.rev > 0){
+  
+  ### setting up all variable names 
+  learned.aq <- "YES"
+  switch.trial <- trials.learn.aq +1
+  Visits0.rev <- 0
+  Visits1.rev <- 0
+  Visits2.rev <- 0
+  Visits3.rev <- 0
+  target.rev <- data.set$Target[switch.trial] 
+  novel.rev <- 3 # always 3! 
+  novel.choice.rev <- 0
+  persev.choice.rev  <- 0 
+  error.choice.rev <- 0
+  rewarded.choice.rev <- 0
+  irrelevant.choice.rev <- 0
+
+  ######################################
+  ### starting while loop for reversal
+  ##########################################
+  p <- switch.trial
+  while (p >= switch.trial & p<= TotalTrials){
+   print (p)
+   
+  # for each trial, add number of visits per box
+  Visits0.rev <- Visits0.rev + data.set$Visits0[p]
+   Visits1.rev <- Visits1.rev + data.set$Visits1[p]
+   Visits2.rev <- Visits2.rev + data.set$Visits2[p]
+  Visits3.rev <- Visits3.rev + data.set$Visits3[p]
+   
+   ### Choices 
+  if(data.set$Choice[p] == target.rev){
+    rewarded.choice.rev <- rewarded.choice.rev + 1
+  } 
+  if(data.set$Choice[p] != target.rev) {
+    error.choice.rev <- error.choice.rev +1 
+    }
+  if(data.set$Choice[p] == target.aq){
+     persev.choice.rev <- persev.choice.rev + 1
+    } 
+  if (data.set$Choice[p] == 3){
+    novel.choice.rev <- novel.choice.rev + 1
+  }
+  if (data.set$Choice[p] != target.aq & data.set$Choice[p] != target.rev & data.set$Choice[p] != 3){
+    irrelevant.choice.rev <- irrelevant.choice.rev + 1
+  }
+  p <-p + 1
+  } 
+ }
+#######################################
+### calculating visit parameters
+####################################
+   total.reward.visits.rev <- 0
+   total.persev.visits.rev <- 0
+   total.irrelevant.visits.rev <- 0
+   total.novel.visits.rev <-0
+   total.visits.rev <- 0
+  
+ if (target.rev == 0){
+   total.reward.visits.rev <- Visits0.rev
+ } else if(target.rev == 1){
+   total.reward.visits.rev <- Visits1.rev
+ }else if(target.rev == 2){
+   total.reward.visits.rev <- Visits2.rev
+ }else if(target.rev == 3){
+   total.reward.visits.rev <- Visits3.rev
+ }
+
+ if (target.aq == 0){
+   total.persev.visits.rev <- Visits0.rev
+ } else if(target.aq == 1){
+   total.persev.visits.rev <- Visits1.rev
+ }else if(target.aq == 2){
+   total.persev.visits.rev <- Visits2.rev
+ }else if(target.aq == 3){
+   total.persev.visits.rev <- Visits3.rev
+ }
+  
+ 
+ if (novel.rev == 0){
+   total.novel.visits.rev <- Visits0.rev
+ } else if(novel.rev == 1){
+   total.novel.visits.rev <- Visits1.rev
+ }else if(novel.rev == 2){
+   total.novel.visits.rev <- Visits2.rev
+ }else if(novel.rev == 3){
+   total.novel.visits.rev <-Visits3.rev
+ }
+
+   # calculate irrelevant box number ... s
+   box.list <- cbind(1,2,3,4)
+   for (i in box.list){
+     current.i <- box.list[i]-1
+     if (current.i != (target.rev) & current.i != (target.aq) & current.i != (novel.rev)){
+       irrelevant.rev <- current.i
+     }
+   }
+
+ if (irrelevant.rev == 0){
+   total.irrelevant.visits.rev <- Visits0.rev
+ } else if(irrelevant.rev == 1){
+   total.irrelevant.visits.rev <- Visits1.rev
+ } else if(irrelevant.rev == 2){
+   total.irrelevant.visits.rev <- Visits2.rev
+ } else if(irrelevant.rev == 3){
+   total.irrelevant.visits.rev <- Visits3.rev
+ }
+
+visits.incorrect.rev <- sum(total.irrelevant.visits.rev, total.persev.visits.rev, total.novel.visits.rev)
+visits.incorrect.rev 
+total.reward.visits.rev 
+visits.total.rev <- sum(Visits0.rev, Visits1.rev, Visits2.rev, Visits3.rev)
+visits.total.rev 
+check <- ifelse((visits.incorrect.rev + total.reward.visits.rev) == visits.total.rev, "CHECK!", "ERROR!")
+check
+
+
+######################################################
+## calculating RT parameters
+#####################################################
+
+rt.aq <- mean(ifelse(data.set$Reversal == 0, data.set$ResponseTime, NA), na.rm = TRUE)
+rt.reward.aq <- mean(ifelse((data.set$Reversal == 0 & data.set$Choice == target.aq), data.set$ResponseTime, NA), na.rm = TRUE)
+rt.error.aq <- mean(ifelse((data.set$Reversal == 0 & data.set$Choice != target.aq), data.set$ResponseTime, NA), na.rm = TRUE)
+rt.rev <- mean(ifelse(data.set$Reversal == 1, data.set$ResponseTime, NA), na.rm = TRUE)
+rt.reward.rev <- mean(ifelse((data.set$Reversal == 1 & data.set$Choice == target.aq), data.set$ResponseTime, NA), na.rm = TRUE)
+rt.error.rev <- mean(ifelse((data.set$Reversal == 1 & data.set$Choice != target.aq), data.set$ResponseTime, NA), na.rm = TRUE)
+rt.average <- mean(data.set$ResponseTime, na.rm = TRUE)
+
+############################################################
+## combine all data and add to giant dataframe
+############################################################
+sub.row <- cbind(subject, Age, gender, TotalTrials, 
+target.aq, target.rev, novel.rev, irrelevant.rev,
+learned.aq,  trials.learn.aq, rewarded.choice.aq,error.choice.aq,  persev.prior.choice.aq, 
+learned.rev, trials.learn.rev, rewarded.choice.rev, error.choice.rev, persev.choice.rev, novel.choice.rev,
+Visits0.aq, Visits1.aq, Visits2.aq, Visits3.aq, 
+Visits0.rev, Visits1.rev, Visits2.rev, Visits3.rev, 
+total.reward.visits.aq, total.error.visits.aq, 
+total.reward.visits.rev, total.novel.visits.rev, total.persev.visits.rev, total.irrelevant.visits.rev,
+rt.aq, rt.reward.aq, rt.error.aq, rt.rev, rt.reward.rev, rt.error.rev, rt.average)
+sub.row  
+
+compiled.data <- data.frame(structure(rbind(compiled.data, sub.row)))
+#compiled.test <- data.frame(rbind(compiled.data, sub.row))
+}
+  
+head(compiled.data)
+nrow(compiled.data)
+file.name <- paste0(output.directory, "N64.Reversal.compiled.data.csv")
+write.csv(compiled.data, file.name)
+output.directory
+```
+
+############################################################
+## analysis with age!!
+############################################################
+
+```{r, echo = FALSE}
+head(compiled.data)
+nrow(compiled.data)
+# how many subjects completed the task.
+summary(as.factor(compiled.data$learned.aq))
+summary(as.factor(compiled.data$learned.rev)) #
+
+# average age and histogram check
+compiled.data$Age.real <- as.numeric(as.character(compiled.data$Age))
+hist(compiled.data$Age.real)
+summary((compiled.data$Age.real)) # min = 4, mean is 13
+```
+
+### Filter data for completed data 
+```{r, echo = FALSE}
+
+
+#### ONLY LOOKING AT COMLETED
+complete.rev <- subset(compiled.data, learned.rev == "YES")
+nrow(complete.rev)
+summary(complete.rev$Age.real) 
+hist(complete.rev$Age.real)
+
+```
+
+
+### number of trials to criterion for AQ  & REV 
+```{r, echo = FALSE }
+
+complete.rev$TotalTrials <- as.numeric(complete.rev$TotalTrials)
+hist(complete.rev$TotalTrials)
+summary(complete.rev$TotalTrials)
+
+complete.rev$trials.learn.aq
+hist(as.numeric(complete.rev$trials.learn.aq))
+summary(complete.rev$trials.learn.aq)
+
+complete.rev$trials.learn.rev <- as.numeric(complete.rev$trials.learn.rev)
+hist(complete.rev$trials.learn.rev)
+summary(complete.rev$trials.learn.rev)
+
+
+complete.rev$rewarded.choice.aq <- as.numeric(complete.rev$rewarded.choice.aq)
+hist(complete.rev$rewarded.choice.aq)
+summary(complete.rev$rewarded.choice.aq)
+
+complete.rev$error.choice.aq <- as.numeric(complete.rev$error.choice.aq)
+hist(complete.rev$error.choice.aq)
+summary(complete.rev$error.choice.aq)
+
+
+complete.rev$rewarded.choice.rev <- as.numeric(complete.rev$rewarded.choice.rev)
+hist(complete.rev$rewarded.choice.rev)
+summary(complete.rev$rewarded.choice.rev)
+
+complete.rev$error.choice.rev <- as.numeric(complete.rev$error.choice.rev)
+hist(complete.rev$error.choice.rev)
+summary(complete.rev$error.choice.rev)
+
+
+
+################################
+ # REVERSAL
+################################s
+
+compiled.data$trials.learn.rev <- as.numeric(as.character(compiled.data$trials.learn.rev))
+hist(compiled.data$trials.learn.rev) # minimum should be 5 
+summary(compiled.data$trials.learn.rev) # min shouldn't be zero?! there aren't any NA so this should be rewarded.
+
+compiled.data$rewarded.choice.rev <- as.numeric(as.character(compiled.data$rewarded.choice.rev))
+hist(compiled.data$rewarded.choice.rev) # minimum should be 5 
+summary(compiled.data$rewarded.choice.rev) # why is the max so large?!  
+
+compiled.data$error.choice.rev <- as.numeric(as.character(compiled.data$error.choice.rev))
+summary((compiled.data$error.choice.rev)) # minimum rewarded =5 , GOOD! 
+# and here there are NAs which means that worked.
+hist(compiled.data$error.choice.rev)
+
+
+compiled.data.incomplete.aq <- subset(compiled.data, learned.aq == "NO")
+compiled.data.complete.aq <- subset(compiled.data, learned.aq == "YES")
+compiled.data.incomplete.rev <- subset(compiled.data, learned.rev == "NO")
+hist(compiled.data.incomplete.rev$Age.real)
+hist(compiled.data.incomplete.aq$Age.real) # few kids older never learned rev.
+summary(compiled.data.incomplete.aq$Age.real)
+nrow(complete.rev)
+plot(complete.rev$Age.real, complete.rev$trials.learn.aq)
+plot(complete.rev$Age.real, complete.rev$trials.learn.rev)
+plot(complete.rev$Age.real, complete.rev$persev.prior.choice.aq)
+plot(complete.rev$Age.real, complete.rev$persev.choice.rev)
+
+complete.rev$age.bins <- ifelse(complete.rev$Age.real >= 30, "30-40", ifelse(complete.rev$Age.real >=25, "25-29", ifelse(complete.rev$Age.real >= 20, "20-24", ifelse(complete.rev$Age.real >= 15, "15-19", ifelse(complete.rev$Age.real >=10, "10-14",ifelse(complete.rev$Age.real >= 6, "6-9", NA) )))))
+summary(as.factor(complete.rev$age.bins))
+

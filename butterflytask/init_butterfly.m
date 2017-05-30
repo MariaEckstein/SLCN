@@ -29,7 +29,7 @@ if exp.subj == 0   % Debugging: type in "0" for subj.id
     exp.n_trials.test = 5;
     exp.n_trials.memory = 2 * exp.n_trials.learning;
 else
-    exp.n_trials.practice = 8;
+    exp.n_trials.practice = 10;
     exp.n_trials.learning = 120;
     exp.n_trials.test = 32;
     exp.n_trials.memory = 2 * exp.n_trials.learning;
