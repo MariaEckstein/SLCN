@@ -1,4 +1,3 @@
-
 function butterfly_task
 
 clear all; 
@@ -7,8 +6,7 @@ global exp;
 %% Define variables here during debugging
 exp.subj = input('Subject ID: \n');
 
-%% Run the task
-%%% Prepare things
+%% Prepare things
 init_butterfly;
 set_buffers_and_messages;
 
@@ -23,7 +21,7 @@ for trial = 1:exp.n_trials.practice
     
     pr_flower_and_butterfly;                                                % Show one butterfly and the flowers and let participant pick butterfly
     pr_choice(trial);                                                       % Show chosen flower and butterfly; determine if response was correct
-    pr_feedback(trial, 'deterministic');                                                     % Show CORRECT or INCORRECT plus random image
+    pr_feedback(trial, 'deterministic');                                    % Show CORRECT or INCORRECT plus random image
     
     rec_butterfly_trial(trial);                                             % Record trial data and save to file
 end
@@ -37,7 +35,7 @@ for trial = 1:exp.n_trials.learning
     
     pr_flower_and_butterfly;                                                % Show one butterfly and the flowers and let participant pick butterfly
     pr_choice(trial);                                                       % Show chosen flower and butterfly; determine if response was correct
-    pr_feedback(trial, 'stochastic');                                                     % Show CORRECT or INCORRECT (no random image)
+    pr_feedback(trial, 'stochastic');                                       % Show CORRECT or INCORRECT (no random image)
     
     rec_butterfly_trial(trial);                                             % Record trial data and save to file
     
@@ -45,7 +43,7 @@ for trial = 1:exp.n_trials.learning
 end
 
 %% Test trials (without feedback)
-pr_instructions('test');
+pr_instructions('test'); 
 exp.flyphase = 'test';
 exp.show_points = 0;
 for trial = (trial+1):exp.n_trials.test

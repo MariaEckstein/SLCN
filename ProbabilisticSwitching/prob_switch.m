@@ -1,6 +1,5 @@
 function prob_switch
 
-% clear all
 global exp
 clear trial;
 

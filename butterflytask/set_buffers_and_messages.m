@@ -27,7 +27,7 @@ exp.buffer.final                        =16; % also recall task
 
 
 %% Buffers
-preparestring('WRONG KEY (Use the left and right buttons)', exp.buffer.wrong_key);
+preparestring('WRONG KEY (Use the A and B buttons)', exp.buffer.wrong_key);
 preparestring('NO RESPONSE', exp.buffer.no_response);
 preparestring('PLEASE RESPOND', exp.buffer.response_reminder);
 preparestring('', exp.buffer.blank);
@@ -40,7 +40,7 @@ preparestring(break2, exp.buffer.break);
 preparestring(break3, exp.buffer.break, 0, -100); 
 
 after_break1 = 'The break is over!';
-after_break2 = 'Press the "A" button to continue the task.';
+after_break2 = ' ';
 preparestring(after_break1, exp.buffer.after_break, 0, 250); 
 preparestring(after_break2, exp.buffer.after_break); 
 

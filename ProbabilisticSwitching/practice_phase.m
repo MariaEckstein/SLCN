@@ -10,13 +10,13 @@ drawpict(exp.buffer.message)
 waitkeydown(inf, 71)   % Wait for spacebar
 
 clearpict(exp.buffer.message)
-preparestring('In this game, try to collect all the coins!', exp.buffer.message, 0, 300)
+preparestring(' ', exp.buffer.message, 0, 300)
 preparestring('The coins are hidden in magical boxes, like this one:', exp.buffer.message, 0, 250)
 loadpict('stimuli/box.png', exp.buffer.message, 50, 0);
 drawpict(exp.buffer.message)
 waitkeydown(inf, 71)
 preparestring('Can you open the box to see if it has a coin?', exp.buffer.message, 0, -200)
-preparestring('Press any button to open the box!', exp.buffer.message, 0, -250)
+preparestring('Press the A button to open the box!', exp.buffer.message, 0, -250)
 drawpict(exp.buffer.message)
 waitkeydown(inf)
 loadpict('stimuli/box_coin.png', exp.buffer.message, 50, 0);
@@ -30,8 +30,8 @@ waitkeydown(inf, 71)
 % Phase 1: Left box is magical; deterministic; 7 trials
 clearpict(exp.buffer.message)
 preparestring('In the game, there will be two boxes, but only one is magical.', exp.buffer.message, 0, 200)
-preparestring('Try finding the magical box. The left button opens the left box', exp.buffer.message, 0, 150)
-preparestring('and the right button opens the right box.', exp.buffer.message, 0, 100)
+preparestring('Try finding the magical box. The B button opens the left box', exp.buffer.message, 0, 150)
+preparestring('and the A button opens the right box.', exp.buffer.message, 0, 100)
 drawpict(exp.buffer.message)
 waitkeydown(inf, 71)
 

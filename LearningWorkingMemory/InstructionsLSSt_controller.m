@@ -67,7 +67,7 @@ acor = 0;
 
 %% Instructions 2
 text{1} = 'The aliens only use 3 buttons to communicate. Each time you see an picture, you need to press a button:';
-text{2} = 'you can see the three buttons (left, middle, right) drawn under each picture.';
+text{2} = 'you can see the three buttons (left, up, right) drawn under each picture.';
 text{3} = 'On the next screen, press one of the three buttons on the controller.';
 
 textI = [text{1},'\n\n\n',text{2},'\n\n\n',text{3},'\n\n\n\n\n\n\n',anykey];
@@ -153,7 +153,7 @@ end
 %% Instructions 6
 text{1} = 'Try to press the correct button as quickly as possible.';
 text{2} = 'If you do not choose quickly enough, you will not win points in this round.';
-text{3} = 'Try to find the correct buttons for two different pictures now!';
+text{3} = 'Try to find the correct buttons for both pictures now!';
 
 textI = [text{1},'\n\n\n',text{2},'\n\n\n',text{3},'\n\n\n\n\n\n\n',anykey];
 Screen('TextSize', w, 24 );
@@ -174,7 +174,7 @@ end
 
 %% Instructions 7
 text{1} = 'First, you will first get a practice game, then you will play 10 levels of this game.';
-text{2} = 'In each game, you will see new pictures,';
+text{2} = 'In each level, you will see new pictures,';
 text{3} = 'and your job is to find the correct button for each image!';
 text{4} = 'Sometimes you will see more than 3 pictures. Remember the aliens only use 3 buttons';
 text{5} = 'to communicate, so the same button might be used for more than one picture.';

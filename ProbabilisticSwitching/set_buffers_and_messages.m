@@ -41,7 +41,7 @@ loadpict('stimuli/box_empty.png', exp.buffer.no_coin_right, exp.p.box_x, exp.p.b
 loadpict('stimuli/box.png', exp.buffer.no_coin_right, -exp.p.box_x, exp.p.box_y);
 
 %% Load feedback into feedback buffers
-preparestring('wrong key! (Use the left and right buttons)', exp.buffer.wrong_key); % if keyboard then: keys with stickers: "j" and "l"
+preparestring('wrong key! (Use the A and B buttons)', exp.buffer.wrong_key); % if keyboard then: keys with stickers: "j" and "l"
 preparestring('no response!', exp.buffer.no_response);
 
 %% Load fixation cross into buffer
