@@ -87,6 +87,7 @@ exp.p.feedback_x =    0;
 exp.p.feedback_y =  150;
 exp.p.image_x    =    0;
 exp.p.image_y    = -100;
+exp.p.counter_x  =  450;
 
 
 %% Get date and time
