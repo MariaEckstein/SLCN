@@ -14,18 +14,18 @@ end
 
 % When participant did not press any key, or pressed a wrong key
 if isempty(exp.key) || (exp.key(1) ~= exp.nkey.le && exp.key(1) ~= exp.nkey.ri)
-    preparestring(strcat('Points: ', num2str(exp.earned_points)), exp.buffer.incorrect,exp.p.counter_x,300);
-    drawpict(exp.buffer.incorrect);                                             % Missing key presses are always wrong
+    buffer = exp.buffer.incorrect;
 % When participant will get a reward
 elseif (exp.correct_response && reward_if_correct) || ...      % Correct butterfly picked; reward in 80% of trials, according to pre-randomized list
       (~exp.correct_response && reward_if_incorrect)       % Incorrect butterfly picked; reward in 20% of trials, according to pre-randomized list
+    buffer = exp.buffer.correct;
     exp.earned_points = exp.earned_points + 1;
-    preparestring(strcat('Points: ', num2str(exp.earned_points)), exp.buffer.correct,exp.p.counter_x,300);
-    drawpict(exp.buffer.correct);
     exp.reward = 1;
 % When participant will not get a reward
 else
-    preparestring(strcat('Points: ', num2str(exp.earned_points)), exp.buffer.incorrect,exp.p.counter_x,300);
-    drawpict(exp.buffer.incorrect);
+    buffer = exp.buffer.incorrect;
 end
+
+preparestring(strcat('Points: ', num2str(exp.earned_points)), buffer, exp.p.counter_x,300);
+drawpict(buffer);
 wait(exp.times.reward);

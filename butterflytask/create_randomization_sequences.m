@@ -15,7 +15,7 @@ for r = 0:(n_randomizations-1)
 end
 
 %% Order of CORRECT and INCORRECT feedback for correct responses (80%)
-rewards = [ones(1, 8), zeros(1, 2)];
+rewards = [ones(1, 4), zeros(1, 1)];
 for r = 0:(n_randomizations-1)   % 4 randomization versions
     reward_sequences = [];
     for b = 1:4   % 4 butterflies
@@ -30,7 +30,7 @@ for r = 0:(n_randomizations-1)   % 4 randomization versions
 end
 
 %% Order of CORRECT and INCORRECT feedback for incorrect responses (20%)
-rewards_inc = [ones(1, 2), zeros(1, 8)];
+rewards_inc = [ones(1, 1), zeros(1, 4)];
 for r = 0:(n_randomizations-1)
     reward_sequences_inc = [];
     for b = 1:4   % 4 butterflies

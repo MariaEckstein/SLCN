@@ -29,11 +29,13 @@ if strcmp(phase, 'learn') % learning mode instructions
     clearkeys;
     clearpict(exp.buffer.instructions);
     preparestring('Here is a hint: Each butterfly has a favorite flower,', ...
-        exp.buffer.instructions, 0, 235);
+        exp.buffer.instructions, 0, 250);
     preparestring('which it will pick more often than the other.', ...
-        exp.buffer.instructions, 0, 210);
+        exp.buffer.instructions, 0, 220);
     preparestring('You will win more points if you figure out which flower each butterfly picks more often.', ...
-        exp.buffer.instructions, 0, 175);
+        exp.buffer.instructions, 0, 190);
+    preparestring('The same butterfly will not always pick the same flower, although it is its favorite.', ...
+        exp.buffer.instructions, 0, 160);        
     %%show four different butterflies
     if exp.version == 1 || exp.version == 3                                 % Experimental trials: Choise set of butterflies according to randomization group
         butterfly1 = 'stims/butterflyw1.jpg';
@@ -90,7 +92,8 @@ elseif strcmp(phase, 'test') % testing mode instructions
     clearpict(exp.buffer.instructions)    % refreshes the display buffer for instructions
     preparestring('This is the final level!', ...
         exp.buffer.instructions, 0, 280);
-    preparestring('In this level, can you tell us which flower each butterfly liked to pick the most.', exp.buffer.instructions, 0, 245);
+    preparestring('In this level, can you tell us which flower each butterfly liked to pick the most?', ...
+        exp.buffer.instructions, 0, 245);
     preparestring(' ', exp.buffer.instructions, 0, 210);
     preparestring('It is still important that you give an answer on each trial.', ...
         exp.buffer.instructions, 0, 140);

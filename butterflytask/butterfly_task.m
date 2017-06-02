@@ -10,12 +10,8 @@ exp.subj = input('Subject ID: \n');
 init_butterfly;
 set_buffers_and_messages;
 
-%% Instructions 
-exp.flyphase = '';
-
 %% Pre-task practice
 pr_instructions('learn');
-exp.flyphase = 'learn';
 for trial = 1:exp.n_trials.practice
     init_trial(trial, 'train', 'no_picture');                               % Initialize truth values; pick the butterfly to be presented
     
@@ -28,8 +24,9 @@ end
 
 %% Learning trials (with feedback)
 pr_instructions('train');
-exp.flyphase = 'train';
 exp.earned_points = 0;   % Reset point counter to 0
+exp.n_correct = ones(1, 4);
+exp.n_incorrect = ones(1, 4);
 for trial = 1:exp.n_trials.learning
     init_trial(trial, 'exp', 'no_picture');                                 % Initialize truth values; pick the butterfly to be presented
     
@@ -44,10 +41,9 @@ end
 
 %% Test trials (without feedback)
 pr_instructions('test'); 
-exp.flyphase = 'test';
 exp.show_points = 0;
-for trial = (trial+1):exp.n_trials.test
-    init_trial(trial, 'exp', 'no_picture');                                % Initialize truth values; pick the butterfly to be presented
+for trial = (1:exp.n_trials.test) + exp.n_trials.learning
+    init_trial(trial, 'exp', 'no_picture');                                 % Initialize truth values; pick the butterfly to be presented
     
     pr_flower_and_butterfly;                                                % Show one butterfly and the flowers and let participant pick butterfly
     pr_choice(trial);                                                       % Show chosen flower and butterfly; determine if response was correct
@@ -61,5 +57,4 @@ exp.trial = trial;
 
 %% Say goodbye
 say_goodbye;
-
 stop_cogent;

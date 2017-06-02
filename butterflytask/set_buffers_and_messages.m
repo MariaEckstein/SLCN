@@ -43,5 +43,3 @@ after_break1 = 'The break is over!';
 after_break2 = ' ';
 preparestring(after_break1, exp.buffer.after_break, 0, 250); 
 preparestring(after_break2, exp.buffer.after_break); 
-
-end

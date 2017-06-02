@@ -5,47 +5,39 @@ clearkeys;
 
 %% Check if participant chose a valid key and highlight choice if so
 trial_fly = exp.butterfly_sequence(trial);
+
 if ~isempty(exp.key)
     exp.key = exp.key(1);
+    % Participant pressed left key
     if exp.key == exp.nkey.le
-        if exp.show_points
-            preparestring(strcat('Points: ', num2str(exp.earned_points)), exp.buffer.le_choice, exp.p.counter_x,300);
-        end
-        drawpict(exp.buffer.le_choice);
-        wait(exp.times.display_choice);
-        % if that was the correct choice, mark that
-        if sum(trial_fly == exp.le_flower_butterflies)
-            exp.ACC = 1;
-            exp.correct_response = 1;
-        else
-            exp.ACC = 0;
-            exp.correct_response = 0;
-        end
-
-    % When participant picked the right flower, highlight the right flower
+        buffer = exp.buffer.le_choice;
+        correct_flys = exp.le_flower_butterflies;        
+    % Participant pressed right key
     elseif exp.key == exp.nkey.ri
-        if exp.show_points
-            preparestring(strcat('Points: ', num2str(exp.earned_points)), exp.buffer.ri_choice, exp.p.counter_x,300);
-        end
-        drawpict(exp.buffer.ri_choice);
-        wait(exp.times.display_choice);
-        % if that was the correct choice, mark that
-        if sum(trial_fly == exp.ri_flower_butterflies)
-            exp.ACC = 1;
-            exp.correct_response = 1;
-        else
-            exp.ACC = 0;
-            exp.correct_response = 0;
-        end
-    % When participant pressed a wrong key
+        buffer = exp.buffer.ri_choice;
+        correct_flys = exp.ri_flower_butterflies;        
+    % Participant pressed wrong key
     else
-        if exp.show_points
-            preparestring(strcat('Points: ', num2str(exp.earned_points)), exp.buffer.wrong_key,exp.p.counter_x300);
-        end
-        drawpict(exp.buffer.wrong_key);
-        wait(2 * exp.times.display_choice);
-        exp.ACC = nan;
+        buffer = exp.buffer.wrong_key;
+        correct_flys = 99;
     end
+
+    % Determine if choice was correct
+    if any(trial_fly == correct_flys)
+        exp.ACC = 1;
+        exp.correct_response = 1;
+    else
+        exp.ACC = 0;
+        exp.correct_response = 0;
+    end
+
+    % Update and show point counter
+    if exp.show_points
+        preparestring(strcat('Points: ', num2str(exp.earned_points)), buffer, exp.p.counter_x,300);
+    end
+    drawpict(buffer);
+    wait(exp.times.display_choice);
+    
 % When participants gave no response
 else
     if exp.show_points

@@ -102,6 +102,7 @@ exp.n_correct = ones(1, 4);                                                 % Co
 exp.n_incorrect = ones(1, 4);                                               % Count of incorrect choices; used to find right spot in the pre-randomized reward sequence
 exp.wdir = cd;                                                              % Working directory
 exp.results_filepath = exp.wdir;
+exp.flyphase = '';
 
 
 %% Initialize point counter

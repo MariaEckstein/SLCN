@@ -66,7 +66,7 @@ acor = 0;
 
 
 %% Instructions 2
-text{1} = 'The aliens only use 3 buttons to communicate. Each time you see an picture, you need to press a button:';
+text{1} = 'The aliens only use 3 buttons to communicate. Each time you see a picture, you need to press a button:';
 text{2} = 'you can see the three buttons (left, up, right) drawn under each picture.';
 text{3} = 'On the next screen, press one of the three buttons on the controller.';
 
@@ -173,7 +173,7 @@ end
 
 
 %% Instructions 7
-text{1} = 'First, you will first get a practice game, then you will play 10 levels of this game.';
+text{1} = 'First, you will get a practice game, then you will play 10 levels of this game.';
 text{2} = 'In each level, you will see new pictures,';
 text{3} = 'and your job is to find the correct button for each image!';
 text{4} = 'Sometimes you will see more than 3 pictures. Remember the aliens only use 3 buttons';

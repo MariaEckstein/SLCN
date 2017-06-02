@@ -7,6 +7,7 @@ output: html_notebook
 
 ```{r Set up parameters}
 data_dir = ('C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/butterflytask/Results') # get 4choice data
+data_dir = ('C:/Users/maria/Desktop/SLCN/butterflytask/Results') # get 4choice data
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
@@ -93,7 +94,7 @@ ggplot(subset(all_files, block < 5), aes(block, reward, group = sID, color = tra
 # Were butterflies rewarded for right key presses?
 all_files$ACC = factor(all_files$ACC, levels = c(1, 0), labels = c("cor", "incor"))
 all_files$reward = factor(all_files$reward, levels = c(1, 0), labels = c("rew", "norew"))
-with(subset(all_files, sID == 17), table(ACC, reward))
+with(subset(all_files, sID == 999), table(ACC, reward))
 
 ```
 
