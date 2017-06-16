@@ -93,35 +93,36 @@ preparestring('Can you still find the magical box?', exp.buffer.message, 0, 100)
 drawpict(exp.buffer.message)
 waitkeydown(inf, 71)
 
-for trial = start_trial:(start_trial + exp.numb_of_trials.practice_stochastic1-1)
-    exp.better_box_left = 1;                                                % Left box is magical
-    init_trial;                                                             % Initialize truth values
-    
-    pr_boxes;                                                               % Show boxes and let participant pick one
-    pr_feedback('probabilistic');                                           % Show reward or not
-    
-    rec_trial(trial);                                                       % Record trial data and save to file
-    
-    update_coin_counter(trial);
-end
-start_trial = trial + 1;
-for trial = start_trial:(start_trial + exp.numb_of_trials.practice_stochastic2-1)
-    exp.better_box_left = 0;                                                % Right box is magical
-    init_trial;                                                             % Initialize truth values
-    
-    pr_boxes;                                                               % Show boxes and let participant pick one
-    pr_feedback('probabilistic');                                           % Show reward or not
-    
-    rec_trial(trial);                                                       % Record trial data and save to file
-    
-    update_coin_counter(trial);
-end
-
-%% Instructions for the real task
-clearpict(exp.buffer.message)
-preparestring('Do you have any questions?', exp.buffer.message, 0, 200)
-drawpict(exp.buffer.message)
-waitkeydown(inf, 71)
-preparestring('Try your best to find as many coins as you can!', exp.buffer.message, 0, 100)
-drawpict(exp.buffer.message)
-waitkeydown(inf, 71)
+% Commented out on 6/16/17
+% for trial = start_trial:(start_trial + exp.numb_of_trials.practice_stochastic1-1)
+%     exp.better_box_left = 1;                                                % Left box is magical
+%     init_trial;                                                             % Initialize truth values
+%     
+%     pr_boxes;                                                               % Show boxes and let participant pick one
+%     pr_feedback('probabilistic');                                           % Show reward or not
+%     
+%     rec_trial(trial);                                                       % Record trial data and save to file
+%     
+%     update_coin_counter(trial);
+% end
+% start_trial = trial + 1;
+% for trial = start_trial:(start_trial + exp.numb_of_trials.practice_stochastic2-1)
+%     exp.better_box_left = 0;                                                % Right box is magical
+%     init_trial;                                                             % Initialize truth values
+%     
+%     pr_boxes;                                                               % Show boxes and let participant pick one
+%     pr_feedback('probabilistic');                                           % Show reward or not
+%     
+%     rec_trial(trial);                                                       % Record trial data and save to file
+%     
+%     update_coin_counter(trial);
+% end
+% 
+% %% Instructions for the real task
+% clearpict(exp.buffer.message)
+% preparestring('Do you have any questions?', exp.buffer.message, 0, 200)
+% drawpict(exp.buffer.message)
+% waitkeydown(inf, 71)
+% preparestring('Try your best to find as many coins as you can!', exp.buffer.message, 0, 100)
+% drawpict(exp.buffer.message)
+% waitkeydown(inf, 71)

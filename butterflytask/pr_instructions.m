@@ -65,7 +65,7 @@ if strcmp(phase, 'learn') % learning mode instructions
         exp.buffer.instructions, 0, 70);    
     preparestring('Use the A and B buttons to select the flower you think the butterfly will pick.', ...
         exp.buffer.instructions, 0, 35);
-    preparestring( 'Let''s start with a quick practice.', exp.buffer.instructions, 0, -265);
+    preparestring('Let''s start with a quick practice.', exp.buffer.instructions, 0, -265);
     drawpict(exp.buffer.instructions);
     waitkeydown(inf, 71);
 elseif strcmp(phase, 'train') % training mode with feedback
