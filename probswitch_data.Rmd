@@ -6,7 +6,8 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data_dir = ('C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results') # get probswitch data
+data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
+data_dir = "C:/Users/maria/Desktop/SLCN/ProbabilisticSwitching/Results" # get probswitch data
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
@@ -31,11 +32,11 @@ for(filename in filenames) {
   subj_file = subset(subj_file, TrialID > 47) # needs to be changed for future participants - 51
   subj_file$TrialID = 1:nrow(subj_file)
   block = 1
-  trialsinceswitch=1
+  trialsinceswitch = 1
   for (t in subj_file$TrialID) {
     block = block + subj_file$switch_trial[t]
     subj_file$block[t] = block
-    trialsinceswitch = ifelse(subj_file$switch_trial[t]==1, 1, trialsinceswitch+1)
+    trialsinceswitch = ifelse(subj_file$switch_trial[t] == 1, 1, trialsinceswitch + 1)
     subj_file$trialsinceswitch[t] = trialsinceswitch
   }
   
@@ -50,9 +51,9 @@ head(all_files)
 
 # Response times
 gg_RT = ggplot(all_files, aes(TrialID, RT, color = sID)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
-  # stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
-  geom_point()
+  geom_point() +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar")
+  # stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange")
 gg_RT
 gg_RT + facet_grid(~ sID)
 
@@ -70,7 +71,6 @@ gg_RTt + facet_grid(~ sID)
 ggplot(all_files, aes(TrialID, ACC)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
   geom_point() +
-  
   facet_grid(~ rewardversion)
 
 # ACC over blocks
