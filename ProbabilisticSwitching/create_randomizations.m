@@ -3,7 +3,7 @@ function create_randomizations(n_trials, n_randomizations, win_probability, poss
 %% Determine how rewards will be distributed if correct box is chosen
 
 % number_of_trials = 150;
-% win_probability = 0.80;  % used to be 0.75
+% win_probability = 0.75
 % possible_run_lengths = 7:15
 
 %%% Prepare the sequences that will be used to create the long vector
