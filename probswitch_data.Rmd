@@ -7,7 +7,7 @@ output: html_notebook
 
 ```{r Set up parameters}
 data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
-data_dir = "C:/Users/maria/Desktop/SLCN/ProbabilisticSwitching/Results" # get probswitch data
+# data_dir = "C:/Users/maria/Desktop/SLCN/ProbabilisticSwitching/Results" # get probswitch data
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
@@ -29,8 +29,8 @@ for(filename in filenames) {
   subj_file$sID = as.numeric(strsplit(strsplit(filename, split = "PROBSWITCH_")[[1]][2], ".mat")[[1]])
   subj_file$rewardversion = subj_file$sID %% 4
   subj_file$TrialID = 1:nrow(subj_file)
-  subj_file = subset(subj_file, TrialID > 47) # needs to be changed for future participants - 51
-  subj_file$TrialID = 1:nrow(subj_file)
+  # subj_file = subset(subj_file, TrialID > 47) # needs to be changed for future participants - 51
+  # subj_file$TrialID = 1:nrow(subj_file)
   block = 1
   trialsinceswitch = 1
   for (t in subj_file$TrialID) {
@@ -39,6 +39,9 @@ for(filename in filenames) {
     trialsinceswitch = ifelse(subj_file$switch_trial[t] == 1, 1, trialsinceswitch + 1)
     subj_file$trialsinceswitch[t] = trialsinceswitch
   }
+  
+  # outcome_1_back = c(NA, subj_file$reward[1:nrow(subj_file)- 1])
+  # subj_file$outcome_1_back = outcome_1_back
   
   all_files = as.data.frame(rbind(all_files, subj_file))
 }
