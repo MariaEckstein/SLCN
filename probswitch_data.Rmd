@@ -73,7 +73,6 @@ gg_RTt + facet_grid(~ sID)
 # ACC over trials
 ggplot(all_files, aes(TrialID, ACC)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
-  geom_point() +
   facet_grid(~ rewardversion)
 
 # ACC over blocks
