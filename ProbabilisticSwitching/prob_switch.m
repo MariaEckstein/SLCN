@@ -7,7 +7,7 @@ clear trial;
 % right away, but that they come up with pattern
 %% Goal: How do you deal with incidental absence from reward from chance
 % versus absence from shift?
-
+ 
 %% Define variables
 exp.subj = input('Subject ID: \n\n', 's');
 
