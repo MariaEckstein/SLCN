@@ -1,23 +1,37 @@
-#4choice/reversal files 
+---
+title: "Prob switch analyses"
+output: html_notebook
+---
 
-# Setting up parameters
+```{r Set up parameters}
 data_dir = 'C:/Users/maria/Desktop/SLCN/reversal4choicegame/logs'
-# plot(file_4ch$ResponseTime)
+data_dir = 'C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/reversal4choicegame/logs'
 filenames=list.files(data_dir, pattern = "*.txt")
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
-
-# Reading in all data files
+```
+```{r Read in data files}
 all_files = data.frame()
 
 for(filename in filenames) {
-  file=read.table(file.path(data_dir, filename), header = T)
+  file = read.table(file.path(data_dir, filename), header = T)
+  if (!"Date" %in% colnames(file)) {
+    file$Date = NA
+    file$CurrentTime = NA
+  }
+  file$trials_till_reversal = NA
+  counter = 1
+  for (trial in rev(file$TrialNumber)) {
+    if (file$Reversal[file$TrialNumber == trial] == 0) {
+      file$trials_till_reversal[file$TrialNumber == trial] = counter
+      counter = counter + 1
+    }
+  }
   all_files = rbind(all_files, file)
 }
 
-# Summary statistics
 all_files$pID = factor(all_files$pID)
-all_files$Reversal = factor(all_files$Reversal, levels = c(0, 1), labels = c("beforeReversal", "afterReversal"))
+all_files$Reversal = factor(all_files$Reversal, levels = c(0, 1), labels = c("fromStart", "afterReversal"))
 all_files$Choice = factor(all_files$Choice)
 all_files$age_bin = 7
 for (age_bin in seq(9, 30, 2)) {
@@ -25,12 +39,12 @@ for (age_bin in seq(9, 30, 2)) {
 }
 summary(all_files)
 head(all_files)
-
-# Do kids reach first criterion?
+```
+```{r Do kids reach criterion}
 all_files_sum = ddply(all_files, .(pID, Age, age_bin, Gender, Reversal), summarize,
                       ReversalTrial = max(TrialNumPhase))
 # Individual
-ggplot(all_files_sum, aes(pID, ReversalTrial, color = Reversal)) +
+ggplot(all_files_sum, aes(reorder(pID, ReversalTrial), ReversalTrial, color = Reversal)) +
   geom_point(size = 5) +
   coord_cartesian(y = c(0, 30)) +
   labs(x = "Participant ID", y = "# trials to / after reversal")
@@ -39,15 +53,20 @@ ggplot(all_files_sum, aes(age_bin, ReversalTrial, color = Reversal)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
   coord_cartesian(y = c(0, 30)) +
   labs(x = "Age", y = "# trials to / after reversal")
-
-# Which boxes do they pick?
+```
+```{r Learning curve}
 ggplot(all_files, aes(TrialNumPhase, Correct)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
   labs(x = "Trial") +
-  coord_cartesian(x = c(1, 9)) +
+  coord_cartesian(x = c(1, 8)) +
   facet_grid(~ Reversal)
 
-# RTs
+ggplot(subset(all_files, trials_till_reversal < 10), aes(reorder(trials_till_reversal, -trials_till_reversal), Correct)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+  labs(x = "Trials until reversal") +
+  coord_cartesian(x = c(1, 8))
+```
+```{r RTs}
 all_files$ResponseTime[all_files$ResponseTime > 50] = NA
 ggplot(all_files, aes(TrialNumPhase, ResponseTime)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
@@ -56,3 +75,15 @@ ggplot(all_files, aes(TrialNumPhase, ResponseTime)) +
   geom_point(alpha = .4) +
   labs(x = "Trial", y = "Response Time (sec)") +
   facet_grid(~ Reversal)
+```
+
+```{r Read in param data}
+# Reading in all data files
+params = read.csv('C:/Users/prokofiev/Desktop/4choice_rawdata/params.csv')
+par(mfrow=c(2,2))
+boxplot(params$alpha,ylim=c(0,1))
+boxplot(params$beta,ylim=c(0,1))
+boxplot(params$r.alpha,ylim=c(0,1))
+boxplot(params$r.beta,ylim=c(0,1))
+
+```

@@ -51,7 +51,13 @@ end
 
 % Count number of correct and incorrect responses (to move on in reward_sequence vector)
 if exp.ACC == 1  % correct response
+    'correct'
+    exp.n_correct
     exp.n_correct(trial_fly) = exp.n_correct(trial_fly) + 1;
+    exp.n_correct
 elseif exp.ACC == 0  % incorrect response
+    'incorrect'
+    exp.n_incorrect
     exp.n_incorrect(trial_fly) = exp.n_incorrect(trial_fly) + 1;
+    exp.n_incorrect
 end  % no response

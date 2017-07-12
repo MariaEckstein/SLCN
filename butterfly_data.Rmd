@@ -6,8 +6,8 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data_dir = ('C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/butterflytask/Results')
-data_dir = ('C:/Users/maria/Desktop/SLCN/butterflytask/Results')
+data_dir = 'C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/butterflytask/Results'
+# data_dir = 'C:/Users/maria/Desktop/SLCN/butterflytask/Results'
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
@@ -37,55 +37,60 @@ for (filename in filenames) {
   all_files = as.data.frame(rbind(all_files, subj_file))
 }
 all_files$butterfly = factor(all_files$butterfly)
+all_files$sID = factor(all_files$sID)
+all_files$two_trials = 1
+for (two_trials in seq(3, max(all_files$TrialID), 2)) {
+  all_files$two_trials[all_files$TrialID >= two_trials] = two_trials
+}
 all_files = subset(all_files, !sID %in% c(11, 13, 14))
 summary(all_files)
 head(all_files)
 ```
 
 ```{r Summary statistics}
-
-train_trials = subset(all_files, train == "train")
-test_trials = subset(all_files, train == "test")
-
 # Missed trials
-ggplot(all_files, aes(block, missed)) +
+ggplot(all_files, aes(reorder(sID, missed), missed)) +
   stat_summary(fun.y = sum, geom = "point") +
-  facet_grid(~ sID)
+  labs(x = "Subject", y = "Number of missed trials")
 
 all_files_sum = ddply(all_files, .(sID, block, train, butterfly), summarize,
                       RT = mean(RT, na.rm = T),
                       ACC = mean(ACC, na.rm = T))
 head(all_files_sum)
 
-# ACC
+# Randomization
+with(subset(all_files, sID == 56), table(ACC, reward))  # THIS DOES NOT WORK!!!! FIX IT!!!
+```
+```{r ACC}
 # Individuals
-ggplot(all_files, aes(block, ACC, group = sID, color = sID)) +
+ggplot(all_files, aes(block, ACC, group = sID)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange")
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+  labs(x = "Block", y = "% correct")
+
 # Group
 ggplot(all_files_sum, aes(block, ACC, group = butterfly, color = butterfly)) +
-  geom_point(alpha = 0.3) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
-  labs(x = "Block", y = "Correct butterly selected (%)", color = "Butterfly") +
+  labs(x = "Block", y = "% correct", color = "Butterfly") +
   coord_cartesian(y = c(0, 1))
 
-# Response times
-ggplot(all_files, aes(block, RT, fill = train)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange")
-
-ggplot(all_files, aes(block, RT, color = train)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
+ggplot(subset(all_files, block == 1), aes(two_trials, ACC)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
-  geom_point() +
-  facet_grid(~ sID)
+  labs(x = "Trial (block 1 only)", y = "Correct butterly selected (%)", color = "Butterfly") +
+  coord_cartesian(y = c(0, 1))
+```
+```{r Response times}
+ggplot(all_files_sum, aes(block, RT, color = train)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange")
 
 # Rewards
 ggplot(subset(all_files, block < 5), aes(block, reward, group = sID, color = sID)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
-  facet_grid(~ sID)
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") #+
+  # facet_grid(~ sID)
 
 # ACC & Reward over time by butterfly
 all_files$butterfly = factor(all_files$butterfly)
@@ -103,7 +108,7 @@ ggplot(subset(all_files, block < 5), aes(block, reward, group = sID, color = tra
 # Were butterflies rewarded for right key presses?
 all_files$ACC = factor(all_files$ACC, levels = c(1, 0), labels = c("cor", "incor"))
 all_files$reward = factor(all_files$reward, levels = c(1, 0), labels = c("rew", "norew"))
-with(subset(all_files, sID == 999), table(ACC, reward))
+with(subset(all_files, sID == 56), table(ACC, reward))
 
 ```
 

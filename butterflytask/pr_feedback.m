@@ -13,7 +13,7 @@ else
 end
 
 % When participant did not press any key, or pressed a wrong key
-if isempty(exp.key) || (exp.key(1) ~= exp.nkey.le && exp.key(1) ~= exp.nkey.ri)
+if isempty(exp.key) || ((exp.key(1) ~= exp.nkey.le) && (exp.key(1) ~= exp.nkey.ri))
     buffer = exp.buffer.incorrect;
 % When participant will get a reward
 elseif (exp.correct_response && reward_if_correct) || ...      % Correct butterfly picked; reward in 80% of trials, according to pre-randomized list

@@ -45,6 +45,10 @@ for(filename in filenames) {
   outcome_2_back = c(NA, NA, subj_file$reward[1:(nrow(subj_file) - 2)])
   subj_file$outcome_2_back = outcome_2_back
   
+  subj_file$choice_left = subj_file$key == 10
+  subj_file$choice_1_back = c(NA, subj_file$choice_left[1:(nrow(subj_file) - 1)])
+  subj_file$choice_2_back = c(NA, NA, subj_file$choice_left[1:(nrow(subj_file) - 2)])
+  
   subj_file$both_past_choices = NA
   for (t in 3:nrow(subj_file$key)) {
     if ((!is.na(subj_file$key[t-1])) && (!is.na(subj_file$key[t-2])) && (!is.na(subj_file$key[t]))) {
@@ -80,14 +84,21 @@ for(filename in filenames) {
   all_files = as.data.frame(rbind(all_files, subj_file))
 }
 
-all_files$choice_left = all_files$key == 10
-
-ddply(subset(all_files, !is.na(outcome_1_back) & !is.na(outcome_2_back)),
-      .(sID, outcome_1_back, outcome_2_back), summarize,
-      choice = mean(choice_left, na.rm = T))
+all_files$outcome_12_back = paste(all_files$outcome_1_back, all_files$outcome_2_back)
+all_files$same_choice = all_files$choice_1_back == all_files$choice_2_back
+all_files$choice_12_back = ifelse(all_files$choice_1_back, "left", "right")
+all_files$choice_12_back[!all_files$same_choice | is.na(all_files$same_choice)] = NA
 
 summary(all_files)
 head(all_files)
+
+all_files_sum = ddply(subset(all_files, !is.na(outcome_12_back)),
+                      .(sID, outcome_12_back, choice_12_back), summarize,
+                      choice = mean(choice_left, na.rm = T))
+
+summary(all_files_sum)
+head(all_files_sum)
+
 ```
 
 ```{r Summary statistics}
@@ -116,9 +127,11 @@ ggplot(all_files, aes(TrialID, ACC)) +
   facet_grid(~ rewardversion)
 
 # ACC over blocks
-gg_blockACC = ggplot(all_files, aes(trialsinceswitch, ACC)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange")
+gg_blockACC = ggplot(subset(all_files, !is.na(choice_left)), aes(trialsinceswitch, 100 * better_box_left, color = choice_left, group = choice_left)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
+  coord_cartesian(x = c(0, 10)) +
+  labs(x = "Trials since switch", y = "% choice left")
 gg_blockACC
 gg_blockACC + facet_grid(~ sID)
 
@@ -133,6 +146,14 @@ ggplot(all_files, aes(TrialID, reward)) +
 #also, figure out color axis
  ggplot(all_files, aes(reward_bin, choice_left, color = both_past_choices)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar")
+ 
+ 
+ggplot(subset(all_files_sum, !is.na(choice_12_back)),
+       aes(outcome_12_back, 100 * choice, color = choice_12_back, group = choice_12_back)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "line", fun.args = list(mult = 1)) +
+  coord_cartesian(y = c(0, 100)) +
+  labs(x = "Reward history (2 trials)", y = "% left choice", color = "Previous choices")
 
 ```
 
