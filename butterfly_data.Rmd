@@ -6,8 +6,8 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data_dir = ('C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/butterflytask/Results') # get 4choice data
-data_dir = ('C:/Users/maria/Desktop/SLCN/butterflytask/Results') # get 4choice data
+data_dir = ('C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/butterflytask/Results')
+data_dir = ('C:/Users/maria/Desktop/SLCN/butterflytask/Results')
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
@@ -36,6 +36,7 @@ for (filename in filenames) {
   subj_file$train[subj_file$TrialID > 120] = "test"
   all_files = as.data.frame(rbind(all_files, subj_file))
 }
+all_files$butterfly = factor(all_files$butterfly)
 all_files = subset(all_files, !sID %in% c(11, 13, 14))
 summary(all_files)
 head(all_files)
@@ -51,15 +52,23 @@ ggplot(all_files, aes(block, missed)) +
   stat_summary(fun.y = sum, geom = "point") +
   facet_grid(~ sID)
 
+all_files_sum = ddply(all_files, .(sID, block, train, butterfly), summarize,
+                      RT = mean(RT, na.rm = T),
+                      ACC = mean(ACC, na.rm = T))
+head(all_files_sum)
+
 # ACC
-ggplot(all_files, aes(block, ACC, group = 1, color = train)) +
+# Individuals
+ggplot(all_files, aes(block, ACC, group = sID, color = sID)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange")
-
-ggplot(all_files, aes(block, ACC, group = sID, color = train)) +
+# Group
+ggplot(all_files_sum, aes(block, ACC, group = butterfly, color = butterfly)) +
+  geom_point(alpha = 0.3) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
-  facet_grid(~ sID)
+  labs(x = "Block", y = "Correct butterly selected (%)", color = "Butterfly") +
+  coord_cartesian(y = c(0, 1))
 
 # Response times
 ggplot(all_files, aes(block, RT, fill = train)) +
