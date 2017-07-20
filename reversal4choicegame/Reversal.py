@@ -497,10 +497,10 @@ class EventManager(ShowBase):
 		
         self.file = open('logs/Reversal3D_end30_5of6_logfile_'+str(self.p_ID)+'.txt', 'w')
         # added two extra columns to the log file
-        self.file.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t" %
+        self.file.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t" %
             ("pID","Age","Gender","TrialNumber","Reversal","Target",
             "Choice","Correct","TotalScore","RunningTotal", "Last6TrialsTotal", "TrialNumPhase", 
-            "Visits0","Visits1", "Visits2","Visits3","ResponseTime","CurrentTime"))
+            "Visits0","Visits1", "Visits2","Visits3","ResponseTime","Date","CurrentTime"))
         self.file.close()
 
         print "ID:", self.p_ID, "Gender:",self.p_gender,"Age:",self.p_age
