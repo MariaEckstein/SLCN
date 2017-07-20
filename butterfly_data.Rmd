@@ -6,8 +6,8 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data_dir = 'C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/butterflytask/Results'
-# data_dir = 'C:/Users/maria/Desktop/SLCN/butterflytask/Results'
+# data_dir = 'C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/butterflytask/Results'
+data_dir = 'C:/Users/maria/Desktop/SLCN/butterflytask/Results'
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
@@ -59,7 +59,7 @@ all_files_sum = ddply(all_files, .(sID, block, train, butterfly), summarize,
 head(all_files_sum)
 
 # Randomization
-with(subset(all_files, sID == 56), table(ACC, reward))  # THIS DOES NOT WORK!!!! FIX IT!!!
+with(subset(all_files, block < 5), table(ACC, reward))  # block 5 has NO feedback!!
 ```
 ```{r ACC}
 # Individuals

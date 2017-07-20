@@ -6,8 +6,8 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
-# data_dir = "C:/Users/maria/Desktop/SLCN/ProbabilisticSwitching/Results" # get probswitch data
+# data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
+data_dir = "C:/Users/maria/Desktop/SLCN/ProbabilisticSwitching/Results" # get probswitch data
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
@@ -144,9 +144,14 @@ ggplot(all_files, aes(TrialID, reward)) +
 # Fraction left choice over past two reward outcomes
 #average choice_left over t/f values and take out NAs
 #also, figure out color axis
- ggplot(all_files, aes(reward_bin, choice_left, color = both_past_choices)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar")
- 
+all_files$reward_bin = factor(all_files$reward_bin, levels = c("nn", "yn", "ny", "yy"))
+# all_files[!is.na(all_files$reward_bin),]
+ggplot(subset(all_files, !is.na(reward_bin)),
+       aes(reward_bin, choice_left, fill = both_past_choices)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+  facet_grid(~ both_past_choices)
+
  
 ggplot(subset(all_files_sum, !is.na(choice_12_back)),
        aes(outcome_12_back, 100 * choice, color = choice_12_back, group = choice_12_back)) +
