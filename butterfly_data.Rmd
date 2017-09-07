@@ -45,6 +45,7 @@ for (two_trials in seq(3, max(all_files$TrialID), 2)) {
 all_files = subset(all_files, !sID %in% c(11, 13, 14))
 summary(all_files)
 head(all_files)
+length(unique(all_files$sID))
 ```
 
 ```{r Summary statistics}
@@ -63,28 +64,34 @@ with(subset(all_files, block < 5), table(ACC, reward))  # block 5 has NO feedbac
 ```
 ```{r ACC}
 # Individuals
-ggplot(all_files, aes(block, ACC, group = sID)) +
+ggplot(all_files, aes(block, ACC, group = sID, color = sID)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
   labs(x = "Block", y = "% correct")
 
 # Group
-ggplot(all_files_sum, aes(block, ACC, group = butterfly, color = butterfly)) +
+A = ggplot(all_files_sum, aes(block, ACC)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
   labs(x = "Block", y = "% correct", color = "Butterfly") +
-  coord_cartesian(y = c(0, 1))
+  coord_cartesian(y = c(0.5, 1))
+A
+A + aes(group = butterfly, color = butterfly)
 
-ggplot(subset(all_files, block == 1), aes(two_trials, ACC)) +
+B = ggplot(subset(all_files, block == 1), aes(two_trials, ACC)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
   labs(x = "Trial (block 1 only)", y = "Correct butterly selected (%)", color = "Butterfly") +
   coord_cartesian(y = c(0, 1))
+B
+B + aes(group = butterfly, color = butterfly)
 ```
 ```{r Response times}
-ggplot(all_files_sum, aes(block, RT, color = train)) +
+RT = ggplot(all_files_sum, aes(block, RT, color = train)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange")
+RT
+RT + aes(color = sID)
 
 # Rewards
 ggplot(subset(all_files, block < 5), aes(block, reward, group = sID, color = sID)) +

@@ -31,6 +31,8 @@ for(filename in filenames) {
   subj_file$TrialID = 1:nrow(subj_file)
   # subj_file = subset(subj_file, TrialID > 47) # needs to be changed for future participants - 51
   # subj_file$TrialID = 1:nrow(subj_file)
+  
+  # Get trials since last switch (forward pass -> numbers > 0)
   block = 1
   trialsinceswitch = 0
   for (t in subj_file$TrialID) {
@@ -38,6 +40,15 @@ for(filename in filenames) {
     subj_file$block[t] = block
     trialsinceswitch = ifelse(subj_file$switch_trial[t] == 1, 0, trialsinceswitch + 1)
     subj_file$trialsinceswitch[t] = trialsinceswitch
+  }
+  # Get trials since last switch (backward pass -> numbers < 0)
+  block = 1
+  trialsinceswitch = 0
+  for (t in rev(subj_file$TrialID)) {
+    trialsinceswitch = ifelse(subj_file$switch_trial[t] == 1, 0, trialsinceswitch - 1)
+    if (trialsinceswitch > -4) {
+      subj_file$trialsinceswitch[t] = trialsinceswitch
+    }
   }
   
   outcome_1_back = c(NA, subj_file$reward[1:(nrow(subj_file) - 1)])
@@ -49,42 +60,43 @@ for(filename in filenames) {
   subj_file$choice_1_back = c(NA, subj_file$choice_left[1:(nrow(subj_file) - 1)])
   subj_file$choice_2_back = c(NA, NA, subj_file$choice_left[1:(nrow(subj_file) - 2)])
   
-  subj_file$both_past_choices = NA
-  for (t in 3:nrow(subj_file$key)) {
-    if ((!is.na(subj_file$key[t-1])) && (!is.na(subj_file$key[t-2])) && (!is.na(subj_file$key[t]))) {
-      if ((subj_file$key[t-1] == 10) && (subj_file$key[t-2] == 10)) {
-        subj_file$both_past_choices[t] = "both_left"
-      } else if ((subj_file$key[t-1]== 12) && (subj_file$key[t-2] == 12)) {
-        subj_file$both_past_choices[t] = "both_right"
-      } 
-    }
-  }
+  # subj_file$both_past_choices = NA
+  # for (t in 3:nrow(subj_file$key)) {
+  #   if ((!is.na(subj_file$key[t-1])) && (!is.na(subj_file$key[t-2])) && (!is.na(subj_file$key[t]))) {
+  #     if ((subj_file$key[t-1] == 10) && (subj_file$key[t-2] == 10)) {
+  #       subj_file$both_past_choices[t] = "both_left"
+  #     } else if ((subj_file$key[t-1]== 12) && (subj_file$key[t-2] == 12)) {
+  #       subj_file$both_past_choices[t] = "both_right"
+  #     } 
+  #   }
+  # }
   #10 is j, 12 is L
   
-  subj_file$reward_bin = NA
-  subj_file$choice_left = NA
-  for (t in 3:nrow(subj_file$reward)) {
-    if (!is.na(subj_file$both_past_choices[t])) {
-      if ((outcome_2_back[t] == 0) & (outcome_1_back[t] == 0))  {
-        subj_file$reward_bin[t] = "nn"
-        subj_file$choice_left[t] = ifelse(subj_file$key[t] == 10, 1, 0)
-      } else if ((outcome_2_back[t] == 1) & (outcome_1_back[t] == 0)) {
-        subj_file$reward_bin[t] = "yn"
-        subj_file$choice_left[t] = ifelse(subj_file$key[t] == 10, 1, 0)
-      } else if ((outcome_2_back[t] == 0) & (outcome_1_back[t] == 1)){
-        subj_file$reward_bin[t] = "ny"
-        subj_file$choice_left[t] = ifelse(subj_file$key[t] == 10, 1, 0)
-      } else if ((outcome_2_back[t] == 1) & (outcome_1_back[t] == 1)) {
-        subj_file$reward_bin[t] = "yy"
-        subj_file$choice_left[t] = ifelse(subj_file$key[t] == 10, 1, 0)
-      }
-    }
-  }
+  # subj_file$reward_bin = NA
+  # subj_file$choice_left = NA
+  # for (t in 3:nrow(subj_file$reward)) {
+  #   if (!is.na(subj_file$both_past_choices[t])) {
+  #     if ((outcome_2_back[t] == 0) & (outcome_1_back[t] == 0))  {
+  #       subj_file$reward_bin[t] = "nn"
+  #       subj_file$choice_left[t] = ifelse(subj_file$key[t] == 10, 1, 0)
+  #     } else if ((outcome_2_back[t] == 1) & (outcome_1_back[t] == 0)) {
+  #       subj_file$reward_bin[t] = "yn"
+  #       subj_file$choice_left[t] = ifelse(subj_file$key[t] == 10, 1, 0)
+  #     } else if ((outcome_2_back[t] == 0) & (outcome_1_back[t] == 1)){
+  #       subj_file$reward_bin[t] = "ny"
+  #       subj_file$choice_left[t] = ifelse(subj_file$key[t] == 10, 1, 0)
+  #     } else if ((outcome_2_back[t] == 1) & (outcome_1_back[t] == 1)) {
+  #       subj_file$reward_bin[t] = "yy"
+  #       subj_file$choice_left[t] = ifelse(subj_file$key[t] == 10, 1, 0)
+  #     }
+  #   }
+  # }
 
   all_files = as.data.frame(rbind(all_files, subj_file))
 }
 
 all_files$outcome_12_back = paste(all_files$outcome_1_back, all_files$outcome_2_back)
+all_files$outcome_12_back = factor(all_files$outcome_12_back, levels = c("1 1", "1 0", "0 1", "0 0"))
 all_files$same_choice = all_files$choice_1_back == all_files$choice_2_back
 all_files$choice_12_back = ifelse(all_files$choice_1_back, "left", "right")
 all_files$choice_12_back[!all_files$same_choice | is.na(all_files$same_choice)] = NA
@@ -97,6 +109,7 @@ all_files_sum = ddply(subset(all_files, !is.na(outcome_12_back)),
                       choice = mean(choice_left, na.rm = T))
 
 summary(all_files_sum)
+length(unique(all_files_sum$sID))
 head(all_files_sum)
 
 ```
@@ -127,13 +140,13 @@ ggplot(all_files, aes(TrialID, ACC)) +
   facet_grid(~ rewardversion)
 
 # ACC over blocks
-gg_blockACC = ggplot(subset(all_files, !is.na(choice_left)), aes(trialsinceswitch, 100 * better_box_left, color = choice_left, group = choice_left)) +
+B = ggplot(subset(all_files, !is.na(choice_left)), aes(trialsinceswitch, 100 * better_box_left, color = choice_left, group = choice_left)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
-  coord_cartesian(x = c(0, 10)) +
+  coord_cartesian(x = c(-3, 5)) +
   labs(x = "Trials since switch", y = "% choice left")
-gg_blockACC
-gg_blockACC + facet_grid(~ sID)
+B
+B + facet_wrap(~ sID)
 
 # Rewards over trials
 ggplot(all_files, aes(TrialID, reward)) +
@@ -144,21 +157,23 @@ ggplot(all_files, aes(TrialID, reward)) +
 # Fraction left choice over past two reward outcomes
 #average choice_left over t/f values and take out NAs
 #also, figure out color axis
-all_files$reward_bin = factor(all_files$reward_bin, levels = c("nn", "yn", "ny", "yy"))
-# all_files[!is.na(all_files$reward_bin),]
-ggplot(subset(all_files, !is.na(reward_bin)),
-       aes(reward_bin, choice_left, fill = both_past_choices)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
-  facet_grid(~ both_past_choices)
+# all_files$reward_bin = factor(all_files$reward_bin, levels = c("nn", "yn", "ny", "yy"))
+# # all_files[!is.na(all_files$reward_bin),]
+# ggplot(subset(all_files, !is.na(reward_bin)),
+#        aes(reward_bin, choice_left, fill = both_past_choices)) +
+#   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
+#   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+#   facet_grid(~ both_past_choices)
 
  
-ggplot(subset(all_files_sum, !is.na(choice_12_back)),
-       aes(outcome_12_back, 100 * choice, color = choice_12_back, group = choice_12_back)) +
-  stat_summary(fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1)) +
-  stat_summary(fun.data = mean_cl_normal, geom = "line", fun.args = list(mult = 1)) +
+C = ggplot(subset(all_files_sum, !is.na(choice_12_back)),
+       aes(outcome_12_back, 100 * choice, fill = choice_12_back, group = choice_12_back)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "bar", fun.args = list(mult = 1), position = "dodge") +
+  stat_summary(fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), position = position_dodge(0.9)) +
   coord_cartesian(y = c(0, 100)) +
-  labs(x = "Reward history (2 trials)", y = "% left choice", color = "Previous choices")
-
+  labs(x = "Reward history (1 trial back, 2 trials back)", y = "% left choice", fill = "Previous two choices")
+C
+C + facet_wrap(~ sID)
 ```
-
+```{r}
+```
