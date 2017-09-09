@@ -44,6 +44,9 @@ head(all_files)
 all_files_sum = ddply(all_files, .(pID, Age, age_bin, Gender, Reversal), summarize,
                       ReversalTrial = max(TrialNumPhase),
                       ResponseTime = median(ResponseTime))
+all_files_sum_wide = reshape(all_files_sum,
+                             direction = "wide", timevar = "Reversal", idvar = c("pID", "Age", "age_bin", "Gender"))
+all_files_sum_wide$ReversalTrial.Diff = with(all_files_sum_wide, ReversalTrial.Reversal - ReversalTrial.Discrimination)
 # Individual
 ggplot(all_files_sum, aes(reorder(pID, ReversalTrial), ReversalTrial, color = Reversal)) +
   geom_point(size = 5) +
@@ -51,8 +54,14 @@ ggplot(all_files_sum, aes(reorder(pID, ReversalTrial), ReversalTrial, color = Re
   labs(x = "Participant ID", y = "# trials to / after reversal")
 # Summary
 ggplot(all_files_sum, aes(Reversal, ReversalTrial, color = Reversal)) +
+  geom_point(alpha = .3, position = "jitter") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
   coord_cartesian(y = c(0, 30))
+# Diff scores
+ggplot(all_files_sum_wide, aes(Gender, ReversalTrial.Diff, color = Gender)) +
+  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+  geom_point(alpha = .5, position = "jitter") +
+  labs(y = "# Reversal trials - # Discrimination trials")
 ```
 ```{r Learning curve}
 ggplot(all_files, aes(TrialNumPhase, Correct)) +
@@ -71,8 +80,8 @@ all_files$ResponseTime[all_files$ResponseTime > 50] = NA
 ggplot(all_files, aes(TrialNumPhase, ResponseTime)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
-  coord_cartesian(x = c(1, 9), y = c(0, 50)) +
-  geom_point(alpha = .4) +
+  coord_cartesian(x = c(1, 8), y = c(0, 50)) +
+  geom_point(alpha = .4, position = "jitter") +
   labs(x = "Trial", y = "Response Time (sec)") +
   facet_grid(~ Reversal)
 ```

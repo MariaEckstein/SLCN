@@ -11,6 +11,7 @@ data_dir = 'C:/Users/maria/Desktop/SLCN/butterflytask/Results'
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
+library("reshape")
 ```
 
 ```{r Read in data}
@@ -34,7 +35,18 @@ for (filename in filenames) {
   }
   subj_file$train = "train"
   subj_file$train[subj_file$TrialID > 120] = "test"
-  all_files = as.data.frame(rbind(all_files, subj_file))
+  
+  # Add fly_stay column (will participant select the same flower in the next trial with the same butterfly?)
+  dat = data.frame()
+  for (fly in 1:4) {
+    fly_dat = subset(subj_file, butterfly == fly)
+    key_this_trial = with(fly_dat, key)
+    key_next_trial = with(fly_dat, c(key[2:length(key)], NA))
+    fly_dat$fly_stay = key_this_trial == key_next_trial
+    dat = as.data.frame(rbind(dat, fly_dat))
+  }
+  
+  all_files = as.data.frame(rbind(all_files, dat[order(dat$TrialID),]))
 }
 all_files$butterfly = factor(all_files$butterfly)
 all_files$sID = factor(all_files$sID)
@@ -57,10 +69,19 @@ ggplot(all_files, aes(reorder(sID, missed), missed)) +
 all_files_sum = ddply(all_files, .(sID, block, train, butterfly), summarize,
                       RT = mean(RT, na.rm = T),
                       ACC = mean(ACC, na.rm = T))
+
+wsls_dat = ddply(all_files, .(sID, block, train, reward), summarize,
+                 stay = sum(fly_stay == T, na.rm = T),
+                 shift = sum(fly_stay == F, na.rm = T))
+wsls_dat_wide = melt(wsls_dat, id.vars = c("sID", "block", "train", "reward"))
+
 head(all_files_sum)
+head(wsls_dat)
 
 # Randomization
 with(subset(all_files, block < 5), table(ACC, reward))  # block 5 has NO feedback!!
+wsls_dat_sum = with(subset(all_files, block == 1), table(fly_stay, reward))
+plot(a)
 ```
 ```{r ACC}
 # Individuals
@@ -85,6 +106,13 @@ B = ggplot(subset(all_files, block == 1), aes(two_trials, ACC)) +
   coord_cartesian(y = c(0, 1))
 B
 B + aes(group = butterfly, color = butterfly)
+```
+```{r, Win-stay loose-shift}
+ggplot(subset(wsls_dat_wide, !is.na(reward)), aes(block, value, color = variable)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "pointrange") +
+  geom_point(alpha = .3, position = "jitter") +
+  labs(x = "Block", y = "# of stays / shifts", color = "") +
+  facet_wrap(~ factor(reward, levels = c(0, 1), labels = c("No reward in prev. trial", "Reward in prev. trial")))
 ```
 ```{r Response times}
 RT = ggplot(all_files_sum, aes(block, RT, color = train)) +
