@@ -1,6 +1,7 @@
 LearningWorkingMemory/GroupedExpeData
 LearningWorkingMemory/SummaryStats
 */*.pdf
+*.pdf
 ProbabilisticSwitching/Results
 reversal4choicegame/data
 reversal4choicegame/logs
@@ -11,3 +12,5 @@ reversal4choicegame/Anaconda*
 butterflytask/Results
 butterflytask/Cogent2000v1.32
 *.html
+*.Rhistory
+*.xlsx
