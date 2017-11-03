@@ -6,8 +6,14 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
+data = "agent"  # can be "agent" or "human"
 # data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
-data_dir = "C:/Users/maria/Desktop/SLCN/ProbabilisticSwitching/Results" # get probswitch data
+data_dir = ifelse(data == "human", "C:/Users/maria/MEGAsync/SLCNdata/PSResults", "C:/Users/maria/MEGAsync/SLCNdata/PSagents")
+plot_dir = file.path(data_dir, "plots")
+gg_save = T
+if (!dir.exists(plot_dir)) {
+  dir.create(plot_dir)
+}
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
@@ -15,22 +21,27 @@ library("R.matlab")
 
 ```{r Read in data}
 all_files = data.frame()
-filenames = list.files(data_dir, pattern = "*.mat")
+filenames = list.files(data_dir, pattern = ifelse(data == "human", "*.mat", ".csv"))
 filename = filenames[2] # debugging
 
 for(filename in filenames) {
-  mat_file = readMat(file.path(data_dir, filename))$exp[,,1]$PROBSWITCHdata[,,1]
-  subj_file = data.frame(t(mat_file$RT)); colnames(subj_file) = "RT"
-  subj_file$ACC = t(mat_file$ACC)  # change name to "ACC" for new datasets!
-  subj_file$key = t(mat_file$key)
-  subj_file$reward = t(mat_file$reward)
-  subj_file$switch_trial = t(mat_file$switch.trial)
-  subj_file$better_box_left = t(mat_file$better.box.left)
-  subj_file$sID = as.numeric(strsplit(strsplit(filename, split = "PROBSWITCH_")[[1]][2], ".mat")[[1]])
-  subj_file$rewardversion = subj_file$sID %% 4
+  if (data == "human") {
+    mat_file = readMat(file.path(data_dir, filename))$exp[,,1]$PROBSWITCHdata[,,1]
+    subj_file = data.frame(t(mat_file$RT)); colnames(subj_file) = "RT"
+    subj_file$ACC = t(mat_file$ACC)  # change name to "ACC" for new datasets!
+    subj_file$key = t(mat_file$key)
+    subj_file$reward = t(mat_file$reward)
+    subj_file$switch_trial = t(mat_file$switch.trial)
+    subj_file$better_box_left = t(mat_file$better.box.left)
+    subj_file$sID = as.numeric(strsplit(strsplit(filename, split = "PROBSWITCH_")[[1]][2], ".mat")[[1]])
+    subj_file$rewardversion = subj_file$sID %% 4
+    # subj_file = subset(subj_file, TrialID > 47) # needs to be changed for future participants - 51
+    # subj_file$TrialID = 1:nrow(subj_file)
+  } else {
+    subj_file = read.csv(file.path(data_dir, filename))
+    subj_file$X = NULL
+  }
   subj_file$TrialID = 1:nrow(subj_file)
-  # subj_file = subset(subj_file, TrialID > 47) # needs to be changed for future participants - 51
-  # subj_file$TrialID = 1:nrow(subj_file)
   
   # Get trials since last switch (forward pass -> numbers > 0)
   block = 1
@@ -56,7 +67,7 @@ for(filename in filenames) {
   outcome_2_back = c(NA, NA, subj_file$reward[1:(nrow(subj_file) - 2)])
   subj_file$outcome_2_back = outcome_2_back
   
-  subj_file$choice_left = subj_file$key == 10
+  subj_file$choice_left = subj_file$key == ifelse(data == "human", 10, 0)
   subj_file$choice_1_back = c(NA, subj_file$choice_left[1:(nrow(subj_file) - 1)])
   subj_file$choice_2_back = c(NA, NA, subj_file$choice_left[1:(nrow(subj_file) - 2)])
 
@@ -93,48 +104,52 @@ head(all_files_sum)
 gg_RT = ggplot(all_files, aes(TrialID, RT, color = sID)) +
   geom_point() +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar")
-  # stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange")
-gg_RT
 
 gg_RTt = ggplot(all_files_sum2, aes(trialsinceswitch, RT, color = sID)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
   coord_cartesian(x = c(-3, 5)) +
   geom_point(alpha = .3, position = "jitter")
-gg_RTt
 
 # Missed trials -> did not miss trials
 
 
 # ACC over trials
-ggplot(all_files, aes(TrialID, ACC)) +
+gg_ACC = ggplot(all_files, aes(TrialID, ACC)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
   facet_grid(~ rewardversion)
 
 # ACC over blocks
-B = ggplot(subset(all_files, !is.na(choice_left)),
+gg_ACC_blocks = ggplot(subset(all_files, !is.na(choice_left)),
            aes(trialsinceswitch, 100 * choice_left, color = reward_port, group = reward_port)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
   coord_cartesian(x = c(-3, 5)) +
   labs(x = "Trials since switch", y = "% choice left", color = "Reward port")
-B
-B + facet_wrap(~ sID)
+# gg_ACC_blocks + facet_wrap(~ sID)
 
 # Rewards over trials
-ggplot(all_files, aes(TrialID, reward)) +
+gg_rewards = ggplot(all_files, aes(TrialID, reward)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
   geom_point() + 
   facet_grid(~ rewardversion)
  
-C = ggplot(subset(all_files_sum, !is.na(choice_12_back)),
+gg_rewards2 = ggplot(subset(all_files_sum, !is.na(choice_12_back)),
        aes(outcome_12_back, 100 * choice, fill = choice_12_back, group = choice_12_back)) +
   stat_summary(fun.data = mean_cl_normal, geom = "bar", fun.args = list(mult = 1), position = "dodge") +
   stat_summary(fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), position = position_dodge(0.9)) +
   coord_cartesian(y = c(0, 100)) +
   labs(x = "Reward history (1 trial back, 2 trials back)", y = "% left choice", fill = "Previous two choices")
-C
-C + facet_wrap(~ sID)
+# gg_rewards2 + facet_wrap(~ sID)
+
+if (gg_save) {
+  ggsave(file.path(plot_dir, "gg_RT.png"), gg_RT)
+  ggsave(file.path(plot_dir, "gg_RTt.png"), gg_RTt)
+  ggsave(file.path(plot_dir, "gg_ACC.png"), gg_ACC)
+  ggsave(file.path(plot_dir, "gg_ACC_blocks.png"), gg_ACC_blocks)
+  ggsave(file.path(plot_dir, "gg_rewards.png"), gg_rewards)
+  ggsave(file.path(plot_dir, "gg_rewards2.png"), gg_rewards2)
+}
 ```
 ```{r}
 ```
