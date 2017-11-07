@@ -6,14 +6,14 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data = "agent"  # can be "agent" or "human"
+data = "Bayes"  # can be "RL", "Bayes", or "human"
 # data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
-data_dir = ifelse(data == "human", "C:/Users/maria/MEGAsync/SLCNdata/PSResults", "C:/Users/maria/MEGAsync/SLCNdata/PSagents")
+data_dir = ifelse(data == "human", "C:/Users/maria/MEGAsync/SLCNdata/PSResults", paste("C:/Users/maria/MEGAsync/SLCNdata/", data, sep = ""))
 plot_dir = file.path(data_dir, "plots")
 gg_save = T
-if (!dir.exists(plot_dir)) {
-  dir.create(plot_dir)
-}
+unlink(plot_dir, recursive=TRUE)
+dir.create(plot_dir)
+
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
@@ -21,7 +21,7 @@ library("R.matlab")
 
 ```{r Read in data}
 all_files = data.frame()
-filenames = list.files(data_dir, pattern = ifelse(data == "human", "*.mat", ".csv"))
+filenames = list.files(data_dir, pattern = ifelse(data == "human", "*.mat", "*.csv"))
 filename = filenames[2] # debugging
 
 for(filename in filenames) {

@@ -7,21 +7,30 @@ from history import History
 
 n_trials = 100
 n_agents = 30
-l_episodes = np.random.choice(range(7, 13), 50)
-agent_stuff = {'alpha': 1,
-               'beta': 0.2,
-               'epsilon': 0.2,
-               'prior': 1 / np.mean(l_episodes)}
+l_episodes = np.random.choice(range(7, 16), 50)
+model_type = 'Bayes'
+rl_agent_stuff = {'name': 'RL',
+                  'alpha': 0.5,
+                  'beta': 1,  # should be 1-20 or so
+                  'epsilon': 0.2,
+                  'perseverance': 1,
+                  'method': 'softmax'}
+bayes_agent_stuff = {'name': 'Bayes',
+                     'initial_switch_prob': 1 / np.mean(l_episodes),
+                     'impatience': 0.2}
 task_stuff = {'n_actions': 2,
               'reward_prob': 0.75,
-              'l_episodes': l_episodes}
+              'specifications': 'C:/Users/maria/MEGAsync/SLCN/ProbabilisticSwitching/Prerandomized sequences'}
 
 for ag in range(n_agents):
-    agent_stuff['id'] = ag
-    agent = RLAgent(agent_stuff)
-    # agent = BayesAgent(agent_stuff, task_stuff)
+    if model_type == 'RL':
+        rl_agent_stuff['id'] = ag
+        agent = RLAgent(rl_agent_stuff, task_stuff)
+    else:
+        bayes_agent_stuff['id'] = ag
+        agent = BayesAgent(bayes_agent_stuff, task_stuff)
     task = Task(task_stuff)
-    hist = History(task, n_trials)
+    hist = History(task, n_trials, agent.name)
 
     for trial in range(n_trials):
         action = agent.take_action()
