@@ -6,7 +6,7 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data = "Bayes"  # can be "RL", "Bayes", or "human"
+data = "RL"  # can be "RL", "Bayes", or "human"
 # data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
 data_dir = ifelse(data == "human", "C:/Users/maria/MEGAsync/SLCNdata/PSResults", paste("C:/Users/maria/MEGAsync/SLCNdata/", data, sep = ""))
 plot_dir = file.path(data_dir, "plots")
@@ -27,26 +27,33 @@ filename = filenames[2] # debugging
 for(filename in filenames) {
   if (data == "human") {
     mat_file = readMat(file.path(data_dir, filename))$exp[,,1]$PROBSWITCHdata[,,1]
-    subj_file = data.frame(t(mat_file$RT)); colnames(subj_file) = "RT"
-    subj_file$ACC = t(mat_file$ACC)  # change name to "ACC" for new datasets!
-    subj_file$key = t(mat_file$key)
+    subj_file = data.frame(RT = t(mat_file$RT))
+    subj_file$selected_box = (t(mat_file$key) - 10) / 2
     subj_file$reward = t(mat_file$reward)
-    subj_file$switch_trial = t(mat_file$switch.trial)
-    subj_file$better_box_left = t(mat_file$better.box.left)
-    subj_file$sID = as.numeric(strsplit(strsplit(filename, split = "PROBSWITCH_")[[1]][2], ".mat")[[1]])
-    subj_file$rewardversion = subj_file$sID %% 4
-    # subj_file = subset(subj_file, TrialID > 47) # needs to be changed for future participants - 51
-    # subj_file$TrialID = 1:nrow(subj_file)
+    subj_file$correct_box = 1 - t(mat_file$better.box.left)
+    sID = as.numeric(strsplit(strsplit(filename, split = "PROBSWITCH_")[[1]][2], ".mat")[[1]])
+    subj_file$sID = sID
+    print(filename)
+    subj_file = subset(subj_file, !is.nan(reward))
+    subj_file = subj_file[47:nrow(subj_file),]  # needs to be changed for future participants - 51
   } else {
     subj_file = read.csv(file.path(data_dir, filename))
     subj_file$X = NULL
   }
   subj_file$TrialID = 1:nrow(subj_file)
+  subj_file$rewardversion = subj_file$sID %% 4
+  subj_file$ACC = with(subj_file, selected_box == correct_box)
   
   # Get trials since last switch (forward pass -> numbers > 0)
+  subj_file$switch_trial = NA
+  box_prev_trial = subj_file$correct_box[1]
   block = 1
   trialsinceswitch = 0
   for (t in subj_file$TrialID) {
+    # Find switch trials
+    subj_file$switch_trial[t] = box_prev_trial != subj_file$correct_box[t]
+    box_prev_trial = subj_file$correct_box[t]
+    # Get blocks
     block = block + subj_file$switch_trial[t]
     subj_file$block[t] = block
     trialsinceswitch = ifelse(subj_file$switch_trial[t] == 1, 0, trialsinceswitch + 1)
@@ -67,10 +74,14 @@ for(filename in filenames) {
   outcome_2_back = c(NA, NA, subj_file$reward[1:(nrow(subj_file) - 2)])
   subj_file$outcome_2_back = outcome_2_back
   
-  subj_file$choice_left = subj_file$key == ifelse(data == "human", 10, 0)
+  subj_file$choice_left = subj_file$selected_box == 0
   subj_file$choice_1_back = c(NA, subj_file$choice_left[1:(nrow(subj_file) - 1)])
   subj_file$choice_2_back = c(NA, NA, subj_file$choice_left[1:(nrow(subj_file) - 2)])
 
+  if (data == "human") {
+    write.csv(subj_file, paste(data_dir, "/PS_", sID, ".csv", sep = ""), row.names = F)
+  }
+  
   all_files = as.data.frame(rbind(all_files, subj_file))
 }
 
@@ -79,10 +90,7 @@ all_files$outcome_12_back = factor(all_files$outcome_12_back, levels = c("1 1", 
 all_files$same_choice = all_files$choice_1_back == all_files$choice_2_back
 all_files$choice_12_back = ifelse(all_files$choice_1_back, "left", "right")
 all_files$choice_12_back[!all_files$same_choice | is.na(all_files$same_choice)] = NA
-all_files$reward_port = factor(all_files$better_box_left, levels = c(1, 0), labels = c("Left", "Right"))
-
-summary(all_files)
-head(all_files)
+all_files$reward_port = factor(all_files$correct_box, levels = c(0, 1), labels = c("Left", "Right"))
 
 all_files_sum = ddply(subset(all_files, !is.na(outcome_12_back)),
                       .(sID, outcome_12_back, choice_12_back), summarize,
@@ -91,11 +99,6 @@ all_files_sum2 = ddply(subset(all_files, !is.na(trialsinceswitch)),
                       .(sID, trialsinceswitch), summarize,
                       choice = mean(choice_left, na.rm = T),
                       RT = median(RT, na.rm = T))
-
-summary(all_files_sum)
-length(unique(all_files_sum$sID))
-head(all_files_sum)
-
 ```
 
 ```{r Summary statistics}
@@ -121,7 +124,7 @@ gg_ACC = ggplot(all_files, aes(TrialID, ACC)) +
 
 # ACC over blocks
 gg_ACC_blocks = ggplot(subset(all_files, !is.na(choice_left)),
-           aes(trialsinceswitch, 100 * choice_left, color = reward_port, group = reward_port)) +
+                       aes(trialsinceswitch, 100 * choice_left, color = reward_port, group = reward_port)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
   coord_cartesian(x = c(-3, 5)) +
@@ -149,6 +152,22 @@ if (gg_save) {
   ggsave(file.path(plot_dir, "gg_ACC_blocks.png"), gg_ACC_blocks)
   ggsave(file.path(plot_dir, "gg_rewards.png"), gg_rewards)
   ggsave(file.path(plot_dir, "gg_rewards2.png"), gg_rewards2)
+}
+```
+```{r Model stuff}
+if (data != "human") {
+  gg_trial_values = ggplot(all_files, aes(TrialID, values_l)) +  # , color = factor(correct_box), group = 1
+    stat_summary(fun.data = "mean_se", geom = "smooth") +
+    facet_grid(~ rewardversion)
+  
+  gg_switch_values = ggplot(all_files, aes(trialsinceswitch, values_l, color = reward_port, group = reward_port)) +
+    stat_summary(fun.data = "mean_se", geom = "smooth") +
+    coord_cartesian(x = c(-3, 5))
+  
+  if (gg_save) {
+    ggsave(file.path(plot_dir, "gg_trial_values.png"), gg_trial_values)
+    ggsave(file.path(plot_dir, "gg_gg_switch_values.png"), gg_switch_values)
+  }
 }
 ```
 ```{r}

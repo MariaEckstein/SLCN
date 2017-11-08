@@ -1,43 +1,42 @@
-import numpy as np
-
-from rl_agent import RLAgent
-from bayes_agent import BayesAgent
+from universal_agent import UniversalAgent
 from task import Task
 from history import History
+import numpy as np
 
-n_trials = 100
+goal = 'produce_data'  # can be 'model_data' or 'produce_data'
+n_trials = 150
 n_agents = 30
-l_episodes = np.random.choice(range(7, 16), 50)
-model_type = 'Bayes'
-rl_agent_stuff = {'name': 'RL',
-                  'alpha': 0.5,
-                  'beta': 1,  # should be 1-20 or so
-                  'epsilon': 0.2,
-                  'perseverance': 1,
-                  'method': 'softmax'}
-bayes_agent_stuff = {'name': 'Bayes',
-                     'initial_switch_prob': 1 / np.mean(l_episodes),
-                     'impatience': 0.2}
+data_files = np.array([15, 16, 17, 18, 19, 20, 22, 23, 24, 25, 31, 32, 33, 34, 35, 40, 42, 43, 44, 48, 49, 52, 53, 56,
+                       58, 60, 63, 65, 67])
+model_type = 'RL'  # can be 'RL' or 'Bayes'
+
 task_stuff = {'n_actions': 2,
-              'reward_prob': 0.75,
-              'specifications': 'C:/Users/maria/MEGAsync/SLCN/ProbabilisticSwitching/Prerandomized sequences'}
+              'p_reward': 0.75,
+              'path': 'C:/Users/maria/MEGAsync/SLCN/ProbabilisticSwitching/Prerandomized sequences'}
+agent_stuff = {'data_path': 'C:/Users/maria/MEGAsync/SLCNdata/PSResults',
+               'alpha': 0.5,
+               'beta': 1,  # should be 1-20 or so
+               'epsilon': 0.2,
+               'perseverance': 1,
+               'decay': 0.2,
+               'method': 'softmax'}
 
 for ag in range(n_agents):
+    task = Task(task_stuff, agent_stuff, goal, ag, n_trials)
+    agent_stuff['id'] = ag
     if model_type == 'RL':
-        rl_agent_stuff['id'] = ag
-        agent = RLAgent(rl_agent_stuff, task_stuff)
+        agent_stuff['name'] = 'RL'
+        agent = UniversalAgent(agent_stuff, task, goal)
     else:
-        bayes_agent_stuff['id'] = ag
-        agent = BayesAgent(bayes_agent_stuff, task_stuff)
-    task = Task(task_stuff)
-    hist = History(task, n_trials, agent.name)
+        agent_stuff['name'] = 'Bayes'
+        agent = UniversalAgent(agent_stuff, task, goal)
+    hist = History(task, agent)
 
-    for trial in range(n_trials):
-        action = agent.take_action()
-        reward = task.produce_reward(action)
-        switch = task.switch_box()
+    for trial in range(task.n_trials):
+        task.switch_box(trial)
+        action = agent.take_action(trial)
+        reward = task.produce_reward(action, trial)
         agent.learn(action, reward)
-        hist.update(agent, task, action, reward, switch, trial)
+        hist.update(agent, task, action, reward, trial)
 
-    hist.transform_into_human_format(agent.id)
     hist.save_csv(agent.id)

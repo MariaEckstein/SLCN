@@ -5,23 +5,25 @@ import numpy as np
 
 
 class RLAgent(object):
-        def __init__(self, agent_stuff, task_stuff):
+        def __init__(self, agent_stuff, task, goal):
+            self.goal = goal
+            # Task features
+            self.n_actions = task.n_actions
+            self.initial_value = 1 / self.n_actions
+            # Agent features
             self.name = agent_stuff['name']
             self.id = agent_stuff['id']
-            self.n_actions = task_stuff['n_actions']
-            self.initial_value = 1 / self.n_actions
             self.alpha = agent_stuff['alpha']  # learning rate
             self.epsilon = agent_stuff['epsilon']  # greediness
             self.beta = agent_stuff['beta']  # softmax temperature
-            self.perseverance = agent_stuff['perseverance']
-            self.method = agent_stuff['method']
-            self.q = self.initial_value * np.ones(self.n_actions)  # curiosity about basic actions and already-discovered options
+            self.perseverance = agent_stuff['perseverance']  # sticky choice
+            self.decay = agent_stuff['decay']  # how fast do values decay back to uniform?
+            self.method = agent_stuff['method']  # epsilon-greedy or softmax?
+            self.q = self.initial_value * np.ones(self.n_actions)
             self.previous_action = np.random.choice(range(self.n_actions))
-            self.just_switched = False
 
         def take_action(self):
             action = self.select_action()
-            self.just_switched = not action == self.previous_action
             self.previous_action = action
             return action
 
@@ -33,22 +35,20 @@ class RLAgent(object):
                     selected_actions = np.argwhere(~np.isnan(self.q))
                 select = np.random.randint(len(selected_actions))  # randomly select the index of one of the actions
                 action = selected_actions[select]  # pick that action
-            elif self.method == 'softmax':
+            else:  # self.method == 'softmax':
                 sticky_choice = np.zeros(self.n_actions)
                 sticky_choice[self.previous_action] = 1
                 p_left = 1 / (1 + np.exp(
                     self.beta * (self.q[1] - self.q[0]) +
                     self.perseverance * (sticky_choice[1] - sticky_choice[0])
                 ))
-                p_left = (1 - 0.001) * p_left + 0.001 / 2
-                if np.random.rand() < p_left:
-                    action = 0
-                else:
-                    action = 1
+                p_left = (1 - 0.001) * p_left + 0.001 / 2  # avoid 0's
+                action = int(np.random.rand() > p_left)  # select left ('0') when np.random.rand() < p_left
             return action
 
         def learn(self, action, reward):
-            self.q[action] += self.alpha * (reward - self.q[action])
+            self.q += self.decay * (1 / self.n_actions - self.q)  # decay values back to uniform
+            self.q[action] += self.alpha * (reward - self.q[action])  # update value of chosen action
 
         def __is_greedy(self):
             return np.random.rand() > self.epsilon

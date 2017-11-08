@@ -4,43 +4,28 @@ import os
 
 
 class History(object):
-    def __init__(self, task, n_trials, model_type):
-        self.correct_box = np.zeros(n_trials)
-        self.actions = np.zeros(n_trials)
-        self.reward = np.full(n_trials, np.nan)
-        self.values = np.zeros([n_trials, task.n_actions])
-        self.switch_trial = np.zeros(n_trials)
-        self.switch_prob = np.zeros(n_trials)
-        colnames = ['ACC', 'values_l', 'values_r', 'key', 'reward', 'switch_prob', 'switch_trial', 'better_box_left', 'sID', 'rewardversion', 'RT']
-        subj_file = np.zeros([n_trials, len(colnames)])
+    def __init__(self, task, agent):
+        self.agent_id = agent.id
+        colnames = ['values_l', 'values_r', 'selected_box', 'reward', 'p_switch', 'correct_box', 'sID', 'RT']
+        subj_file = np.zeros([task.n_trials, len(colnames)])
         self.subj_file = pd.DataFrame(data=subj_file, columns=colnames)
-        self.data_path = "C:/Users/maria/MEGAsync/SLCNdata/" + model_type
+        self.data_path = "C:/Users/maria/MEGAsync/SLCNdata/" + agent.name
 
-    def update(self, agent, task, action, reward, switch, trial):
-        self.correct_box[trial] = task.correct_box
-        self.actions[trial] = action
-        self.reward[trial] = reward
-        self.switch_trial[trial] = switch
+    def update(self, agent, task, action, reward, trial):
+        self.subj_file['selected_box'][trial] = action
+        self.subj_file['reward'][trial] = reward
+        self.subj_file['correct_box'][trial] = task.correct_box
         if agent.name == 'RL':
-            self.values[trial] = agent.q
+            self.subj_file['values_l'][trial] = agent.q[0]
+            self.subj_file['values_r'][trial] = agent.q[1]
         else:
-            self.values[trial] = agent.p_boxes
-            self.switch_prob[trial] = agent.switch_prob
-
-    def transform_into_human_format(self, agent_id):
-        self.subj_file['ACC'] = self.actions == self.correct_box  # not exactly true
-        self.subj_file['values_l'] = self.values[:, 0]
-        self.subj_file['values_r'] = self.values[:, 1]
-        self.subj_file['key'] = self.actions
-        self.subj_file['reward'] = self.reward
-        self.subj_file['switch_prob'] = self.switch_prob
-        self.subj_file['switch_trial'] = self.switch_trial
-        self.subj_file['better_box_left'] = 1 - self.correct_box
-        self.subj_file['sID'] = agent_id
-        self.subj_file['rewardversion'] = np.nan
-        self.subj_file['RT'] = np.nan
+            self.subj_file['values_l'][trial] = agent.p_boxes[0]
+            self.subj_file['values_r'][trial] = agent.p_boxes[1]
+            self.subj_file['p_switch'][trial] = agent.p_switch
 
     def save_csv(self, agent_id):
+        self.subj_file['sID'] = self.agent_id
+        self.subj_file['RT'] = np.nan
         if not os.path.isdir(self.data_path):
             os.makedirs(self.data_path)
         self.subj_file.to_csv(self.data_path + "/" + "/agent" + str(agent_id) + ".csv")
