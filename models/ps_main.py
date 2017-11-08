@@ -3,7 +3,7 @@ from task import Task
 from history import History
 import numpy as np
 
-goal = 'model_data'  # can be 'model_data' or 'produce_data'
+goal = 'produce_data'  # can be 'model_data' or 'produce_data'
 model_type = 'RL'  # can be 'RL' or 'Bayes'
 n_trials = 150
 if goal == 'model_data':
@@ -16,22 +16,18 @@ task_stuff = {'n_actions': 2,
               'p_reward': 0.75,
               'path': 'C:/Users/maria/MEGAsync/SLCN/ProbabilisticSwitching/Prerandomized sequences'}
 agent_stuff = {'data_path': 'C:/Users/maria/MEGAsync/SLCNdata/PSResults',
-               'alpha': 0.5,
-               'beta': 1,  # should be 1-20 or so
-               'epsilon': 0.2,
-               'perseverance': 1,
-               'decay': 0.2,
-               'method': 'softmax'}
+               'alpha': 0.7,
+               'beta': 1,  # 1 for neutral
+               'epsilon': 0,  # 0 for neutral
+               'perseverance': 0,  # 0 for neutral
+               'decay': 0,  # 0 for neutral
+               'method': 'direct'}  # 'direct' for neutral
 
 for ag in agents:
     print('agent', ag)
     agent_stuff['id'] = ag
     task = Task(task_stuff, agent_stuff, goal, ag, n_trials)
-    if model_type == 'RL':
-        agent_stuff['name'] = 'RL'
-    else:
-        agent_stuff['name'] = 'Bayes'
-    agent = UniversalAgent(agent_stuff, task, goal)
+    agent = UniversalAgent(agent_stuff, task, goal, model_type)
     hist = History(task, agent)
 
     for trial in range(1, task.n_trials):
@@ -43,11 +39,13 @@ for ag in agents:
 
     hist.save_csv()
 
-from calculate_NLL import ModelFitting
-from scipy.optimize import minimize
-model = ModelFitting()
-bounds = ((0, 1), (0, 30), (0, 1), (0, 30), (0, 1))
-params0 = [0.5, 10, 0.5, 15, 0.5]
-model.calculate_NLL(params0, 15, 'RL')
-# possible algos: L-BFGS-B; TNC; SLSQP -> give shitty results
-res = minimize(model.calculate_NLL, params0, (15, 'RL'), method='SLSQP', options={'disp': True}, bounds=bounds)
+# from calculate_NLL import ModelFitting
+# from scipy.optimize import minimize
+# import numpy as np
+# model = ModelFitting()
+# bounds = ((0, 1), (0, 30), (0, 1), (0, 30), (0, 1))
+# n_params = 5
+# params0 = 0.5 * np.ones(n_params)
+# model.calculate_NLL(params0, 15, 'RL')
+# # algos that can handle bounds: L-BFGS-B; TNC; SLSQP -> all give shitty results
+# res = minimize(model.calculate_NLL, params0, (15, 'RL'), method='Nelder-Mead', options={'disp': True})  # , bounds=bounds

@@ -35,14 +35,14 @@ class Task(object):
                 reward = self.coin_win[self.n_correct]  # get predetermined reward
                 if reward == 0 and self.switched:  # the first trial after a switch is always rewarded
                     reward = 1
-                    self.switch_rewards()
+                    self.exchange_rewards()
                 self.n_correct += 1
                 self.n_rewards += reward
             else:
                 reward = 0
         return reward
 
-    def switch_rewards(self):
+    def exchange_rewards(self):
         reward_indexes = np.argwhere(self.coin_win == 1)
         next_reward_index = reward_indexes[reward_indexes > self.n_correct][0]
         self.coin_win[next_reward_index] = 0
