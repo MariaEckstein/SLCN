@@ -6,7 +6,7 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data = "RL"  # can be "RL", "Bayes", or "human"
+data = "Bayes"  # can be "RL", "Bayes", or "human"
 # data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
 data_dir = ifelse(data == "human", "C:/Users/maria/MEGAsync/SLCNdata/PSResults", paste("C:/Users/maria/MEGAsync/SLCNdata/", data, sep = ""))
 plot_dir = file.path(data_dir, "plots")
@@ -33,8 +33,7 @@ for(filename in filenames) {
     subj_file$correct_box = 1 - t(mat_file$better.box.left)
     sID = as.numeric(strsplit(strsplit(filename, split = "PROBSWITCH_")[[1]][2], ".mat")[[1]])
     subj_file$sID = sID
-    print(filename)
-    subj_file = subset(subj_file, !is.nan(reward))
+    subj_file = subset(subj_file, !is.nan(reward) & selected_box %in% c(0, 1))
     subj_file = subj_file[47:nrow(subj_file),]  # needs to be changed for future participants - 51
   } else {
     subj_file = read.csv(file.path(data_dir, filename))

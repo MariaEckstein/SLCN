@@ -13,16 +13,18 @@ class Task(object):
             self.file_name = agent_stuff['data_path'] + '/PS_' + str(ag) + '.csv'
             agent_data = pd.read_csv(self.file_name)
             self.rewards = agent_data['reward']
-            self.switch_trial = agent_data['switch_trial']
-        self.n_trials = n_trials if goal == 'produce_data' else max(agent_data['TrialID'])
+            self.correct_boxes = agent_data['correct_box']
+            self.n_trials = len(agent_data['reward'])
+        else:
+            self.correct_box = np.random.rand() > 0.5
+            self.n_rewards = 0
+            self.n_correct = 0
+            self.i_episode = 0
+            self.switched = False
+            self.n_trials = n_trials
         self.reward_version = str(ag % 4)
         self.run_length = spio.loadmat(self.path + '/run_length' + self.reward_version + '.mat', squeeze_me=True)['run_length']
         self.coin_win = spio.loadmat(self.path + '/coin_win' + self.reward_version + '.mat', squeeze_me=True)['coin_win']
-        self.correct_box = np.random.rand() > 0.5
-        self.n_rewards = 0
-        self.n_correct = 0
-        self.i_episode = 0
-        self.switched = False
 
     def produce_reward(self, action, trial):
         if self.goal == 'model_data':
@@ -48,12 +50,11 @@ class Task(object):
 
     def switch_box(self, trial):
         if self.goal == 'model_data':
-            period_over = self.switch_trial[trial]
+            self.correct_box = self.correct_boxes[trial]
         else:
             period_over = self.n_rewards == self.run_length[self.i_episode]
-        if period_over:
-            self.correct_box = 1 - self.correct_box
-            self.switched = True
-            self.n_rewards = 0
-            self.i_episode += 1
-
+            if period_over:
+                self.correct_box = 1 - self.correct_box
+                self.switched = True
+                self.n_rewards = 0
+                self.i_episode += 1
