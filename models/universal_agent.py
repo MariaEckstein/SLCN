@@ -1,23 +1,26 @@
 import numpy as np
 import pandas as pd
+import os
 
 
 class UniversalAgent(object):
-    def __init__(self, agent_stuff, params, task, goal, id):
+    def __init__(self, agent_stuff, params, task, id):
         self.n_actions = task.n_actions  # 2
         self.learning_style = agent_stuff['learning_style']
         self.id = id
         # Parameters
-        self.alpha = params[0] if agent_stuff['free_par'][0] else agent_stuff['default_par'][0]  # learning rate
-        self.beta = 30 * params[1] if agent_stuff['free_par'][1] else agent_stuff['default_par'][1]  # softmax temperature
-        self.epsilon = params[2] if agent_stuff['free_par'][2] else agent_stuff['default_par'][2]  # greediness
-        self.perseverance = 30 * params[3] if agent_stuff['free_par'][3] else agent_stuff['default_par'][3]  # sticky choice
-        self.decay = params[4] if agent_stuff['free_par'][4] else agent_stuff['default_par'][4]  # how fast do values decay back to uniform?
+        self.free_par = agent_stuff['free_par']
+        default_par = agent_stuff['default_par']
+        self.alpha = params[0] if self.free_par[0] else default_par[0]  # learning rate
+        self.beta = 30 * params[1] if self.free_par[1] else default_par[1]  # softmax temperature
+        self.epsilon = params[2] if self.free_par[2] else default_par[2]  # greediness
+        self.perseverance = 30 * params[3] if self.free_par[3] else default_par[3]  # sticky choice
+        self.decay = params[4] if self.free_par[4] else default_par[4]  # how fast do values decay back to uniform?
         self.method = agent_stuff['method']  # epsilon-greedy, softmax, or direct?
         # Load participant data
-        if goal == 'model':
-            self.file_name = agent_stuff['data_path'] + '/PS_' + str(self.id) + '.csv'
-            self.actions = pd.read_csv(self.file_name)['selected_box']
+        file_name = agent_stuff['data_path'] + '/PS_' + str(self.id) + '.csv'
+        if os.path.isfile(file_name):
+            self.actions = pd.read_csv(file_name)['selected_box']
         # Keep track of things
         if self.learning_style == 'RL':
             self.initial_value = 1 / self.n_actions
@@ -47,7 +50,6 @@ class UniversalAgent(object):
         if method == 'epsilon-greedy':
             sticky_values = action_values + self.perseverance * self.previous_action
             best_actions = np.argwhere(sticky_values == np.nanmax(sticky_values))  # actions with highest value
-            print('best actions:', best_actions)
             n_best_actions = len(best_actions)
             n_other_actions = self.n_actions - n_best_actions
             epsilon = 0 if n_other_actions == 0 else self.epsilon / n_other_actions
@@ -58,7 +60,7 @@ class UniversalAgent(object):
                 self.beta * (action_values[1] - action_values[0]) +
                 self.perseverance * (self.previous_action[1] - self.previous_action[0])
             ))
-            p_actions = [p_left_box, 1 - p_left_box]
+            p_actions = np.array([p_left_box, 1 - p_left_box])
         elif method == 'direct':
             p_actions = action_values / np.sum(action_values)  # normalize
         return p_actions

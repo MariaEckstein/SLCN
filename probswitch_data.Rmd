@@ -6,7 +6,7 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data = "RL"  # can be "RL", "Bayes", or "human"
+data = "RL/epsilon-greedy_rand"  # can be "RL", "Bayes", or "human"
 # data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
 data_dir = ifelse(data == "human", "C:/Users/maria/MEGAsync/SLCNdata/PSResults", paste("C:/Users/maria/MEGAsync/SLCNdata/", data, sep = ""))
 plot_dir = file.path(data_dir, "plots")
@@ -126,7 +126,7 @@ gg_ACC_blocks = ggplot(subset(all_files, !is.na(choice_left)),
                        aes(trialsinceswitch, 100 * choice_left, color = reward_port, group = reward_port)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
-  coord_cartesian(x = c(-3, 5)) +
+  coord_cartesian(x = c(-3, 7)) +
   labs(x = "Trials since switch", y = "% choice left", color = "Reward port")
 # gg_ACC_blocks + facet_wrap(~ sID)
 
