@@ -1,39 +1,52 @@
+import numpy as np
+from universal_agent import UniversalAgent
+from task import Task
+from history import History
+
 
 class ModelFitting(object):
 
-    def calculate_NLL(self, params, agent_id, agent_name):
+    def __init__(self, task_stuff, agent_stuff):
+        self.agent_stuff = agent_stuff
+        self.task_stuff = task_stuff
 
-        import numpy as np
-        from universal_agent import UniversalAgent
-        from task import Task
+    def simulate_agents(self, params):
 
-        # if np.any(params > 1) or np.any(params < 0):
-        #     return np.inf
-        # else:
+        goal = 'simulate'
 
-        task_stuff = {'n_actions': 2,
-                      'p_reward': 0.75,
-                      'path': 'C:/Users/maria/MEGAsync/SLCN/ProbabilisticSwitching/Prerandomized sequences'}
-        agent_stuff = {'id': agent_id,
-                       'data_path': 'C:/Users/maria/MEGAsync/SLCNdata/PSResults',
-                       'alpha': params[0],
-                       'beta': 30 * params[1],
-                       'epsilon': params[2],
-                       'perseverance': 30 * params[3],
-                       'decay': params[4],
-                       'method': 'softmax'}
+        for id in range(self.agent_stuff['n_agents']):
+            task = Task(self.task_stuff, params, goal, id, 200)
+            agent = UniversalAgent(self.agent_stuff, params, task, goal, id)
+            hist = History(task, agent)
 
-        task = Task(task_stuff, agent_stuff, 'model_data', agent_id, 150)
-        agent = UniversalAgent(agent_stuff, task, 'model_data', agent_name)
+            for trial in range(1, task.n_trials):
+                task.switch_box(trial, goal)
+                action = agent.take_action(trial, goal)
+                reward = task.produce_reward(action, trial, goal)
+                agent.learn(action, reward)
+                hist.update(agent, task, action, reward, trial)
+
+            hist.save_csv()
+
+    def calculate_fit(self, params, id, only_NLL):
+
+        goal = 'model'
+
+        task = Task(self.task_stuff, params, goal, id, 200)
+        agent = UniversalAgent(self.agent_stuff, params, task, goal, id)
 
         for trial in range(1, task.n_trials):
-            task.switch_box(trial)
-            action = agent.take_action(trial)
-            reward = task.produce_reward(action, trial)
+            task.switch_box(trial, goal)
+            action = agent.take_action(trial, goal)
+            reward = task.produce_reward(action, trial, goal)
             agent.learn(action, reward)
 
-        n_params = sum([param == 0.5 for param in params])
-        BIC = - 2 * agent.LL + n_params * np.log(task.n_trials)
-        AIC = - 2 * agent.LL + n_params
+        n_fit_params = sum(self.agent_stuff['fit_params'])
 
-        return -agent.LL
+        BIC = - 2 * agent.LL + n_fit_params * np.log(task.n_trials)
+        AIC = - 2 * agent.LL + n_fit_params
+
+        if only_NLL:
+            return -agent.LL
+        else:
+            return [-agent.LL, BIC, AIC]

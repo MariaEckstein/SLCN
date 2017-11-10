@@ -4,30 +4,29 @@ import pandas as pd
 
 
 class Task(object):
-    def __init__(self, task_stuff, agent_stuff, goal, ag, n_trials):
-        self.goal = goal
+    def __init__(self, task_stuff, params, goal, ag, n_trials):
         self.n_actions = task_stuff['n_actions']
         self.p_reward = task_stuff['p_reward']
         self.path = task_stuff['path']
-        if self.goal == 'model_data':
-            self.file_name = agent_stuff['data_path'] + '/PS_' + str(ag) + '.csv'
+        if goal == 'model':
+            self.file_name = params['data_path'] + '/PS_' + str(ag) + '.csv'
             agent_data = pd.read_csv(self.file_name)
             self.rewards = agent_data['reward']
             self.correct_boxes = agent_data['correct_box']
             self.n_trials = len(agent_data['reward'])
-        else:
+        elif goal == 'simulate':
             self.correct_box = np.random.rand() > 0.5
             self.n_rewards = 0
             self.n_correct = 0
             self.i_episode = 0
             self.switched = False
             self.n_trials = n_trials
-        self.reward_version = str(ag % 4)
-        self.run_length = spio.loadmat(self.path + '/run_length' + self.reward_version + '.mat', squeeze_me=True)['run_length']
-        self.coin_win = spio.loadmat(self.path + '/coin_win' + self.reward_version + '.mat', squeeze_me=True)['coin_win']
+            self.reward_version = str(ag % 4)
+            self.run_length = spio.loadmat(self.path + '/run_length' + self.reward_version + '.mat', squeeze_me=True)['run_length']
+            self.coin_win = spio.loadmat(self.path + '/coin_win' + self.reward_version + '.mat', squeeze_me=True)['coin_win']
 
-    def produce_reward(self, action, trial):
-        if self.goal == 'model_data':
+    def produce_reward(self, action, trial, goal):
+        if goal == 'model':
             reward = int(self.rewards[trial])
         else:
             correct_choice = action == self.correct_box
@@ -48,8 +47,8 @@ class Task(object):
         self.coin_win[next_reward_index] = 0
         self.switched = False
 
-    def switch_box(self, trial):
-        if self.goal == 'model_data':
+    def switch_box(self, trial, goal):
+        if goal == 'model':
             self.correct_box = self.correct_boxes[trial]
         else:
             period_over = self.n_rewards == self.run_length[self.i_episode]
