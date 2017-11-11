@@ -6,7 +6,7 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data = "RL/epsilon-greedy"  # can be "RL", "Bayes", or "human"
+data = "Bayes/direct"  # can be "RL", "Bayes", or "human"
 # data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
 data_dir = ifelse(data == "human", "C:/Users/maria/MEGAsync/SLCNdata/PSResults", paste("C:/Users/maria/MEGAsync/SLCNdata/", data, sep = ""))
 plot_dir = file.path(data_dir, "plots")
@@ -176,6 +176,7 @@ if (data != "human") {
     ggsave(file.path(plot_dir, "gg_switch_values.png"), gg_switch_values)
     ggsave(file.path(plot_dir, "gg_genrec_a.png"), gg_genrec_a)
     ggsave(file.path(plot_dir, "gg_genrec_b.png"), gg_genrec_b)
+    ggsave(file.path(plot_dir, "gg_genrec_e.png"), gg_genrec_e)
   }
 }
 ```

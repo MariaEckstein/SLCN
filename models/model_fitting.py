@@ -3,7 +3,7 @@ import pandas as pd
 from universal_agent import UniversalAgent
 from task import Task
 from history import History
-from scipy.optimize import minimize, basinhopping
+from scipy.optimize import minimize
 
 
 class ModelFitting(object):
@@ -63,22 +63,20 @@ class ModelFitting(object):
         else:
             return [-agent.LL, BIC, AIC]
 
-    def get_fit_par(self, best_par):
-        fit_par = self.agent_stuff['default_par']
+    def get_fit_par(self, params):
+        pars = self.agent_stuff['default_par']
         j = 0
-        for i, par in enumerate(fit_par):
+        for i, par in enumerate(pars):
             if self.agent_stuff['free_par'][i]:
-                fit_par[i] = best_par[j]
+                pars[i] = params[j]
                 j += 1
-        return np.array(fit_par)
+        return np.array(pars)
 
     def minimize_NLL(self, ag, n_fit_par, n_iter):
         values = np.zeros([n_iter, n_fit_par + 1])
         for iter in range(n_iter):
             params0 = np.random.rand(n_fit_par)
-            minimization = minimize(self.calculate_fit,
-                                    params0, (ag, True),  # arguments calculate_fit: params, id, only_NLL
-                                    method='Nelder-Mead')
+            minimization = minimize(self.calculate_fit, x0=params0, args=(ag, True), method='Nelder-Mead')
             values[iter, :] = np.concatenate(([minimization.fun], minimization.x))
         minimum = values[:, 0] == min(values[:, 0])
         best_par = values[minimum][0]

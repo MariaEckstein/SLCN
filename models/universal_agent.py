@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
+from transform_pars import TransformPars
 
 
 class UniversalAgent(object):
@@ -8,7 +9,9 @@ class UniversalAgent(object):
         self.n_actions = task.n_actions  # 2
         self.learning_style = agent_stuff['learning_style']
         self.id = id
-        [self.alpha, self.beta, self.epsilon, self.perseverance, self.decay] = self._get_par(agent_stuff, params)
+        trans = TransformPars()
+        raw_pars = trans.get_pars(agent_stuff, params)
+        [self.alpha, self.beta, self.epsilon, self.perseverance, self.decay] = trans.transform_pars(raw_pars)
         self.method = agent_stuff['method']
         # Load participant data
         self.data_path = agent_stuff['data_path']
@@ -25,18 +28,6 @@ class UniversalAgent(object):
             self.p_boxes = np.ones(self.n_actions) / self.n_actions  # initialize prior uniformly over all actions
         self.previous_action = np.zeros(self.n_actions)
         self.LL = 0
-
-    @staticmethod
-    def _get_par(agent_stuff, params):
-        pars = np.array(agent_stuff['default_par'])
-        j = 0
-        for i, par in enumerate(pars):
-            if agent_stuff['free_par'][i]:
-                pars[i] = params[j]
-                if i == 1 or i == 3:  # beta & perseverance
-                    pars[i] = 20 * params[j]
-                j += 1
-        return np.array(pars)
 
     # Take action
     def take_action(self, trial, goal):
