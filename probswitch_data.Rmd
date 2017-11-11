@@ -6,7 +6,7 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data = "RL/epsilon-greedy_rand"  # can be "RL", "Bayes", or "human"
+data = "RL/softmax"  # can be "RL", "Bayes", or "human"
 # data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
 data_dir = ifelse(data == "human", "C:/Users/maria/MEGAsync/SLCNdata/PSResults", paste("C:/Users/maria/MEGAsync/SLCNdata/", data, sep = ""))
 plot_dir = file.path(data_dir, "plots")
@@ -21,7 +21,7 @@ library("R.matlab")
 
 ```{r Read in data}
 all_files = data.frame()
-filenames = list.files(data_dir, pattern = ifelse(data == "human", "*.mat", "*.csv"))
+filenames = list.files(data_dir, pattern = ifelse(data == "human", "*.mat", "PS_[0-9]*.csv"))
 filename = filenames[2] # debugging
 
 for(filename in filenames) {
@@ -163,9 +163,15 @@ if (data != "human") {
     stat_summary(fun.data = "mean_se", geom = "smooth") +
     coord_cartesian(x = c(-3, 5))
   
+  genrec = read.csv(file.path(data_dir, "genrec.csv"))
+  genrec$X = NULL
+  gg_genrec_a = ggplot(genrec, aes(alpha_gen, alpha_rec)) +
+    geom_point()
+  gg_genrec_b = gg_genrec_a + aes(beta_gen, beta_rec)
+  
   if (gg_save) {
     ggsave(file.path(plot_dir, "gg_trial_values.png"), gg_trial_values)
-    ggsave(file.path(plot_dir, "gg_gg_switch_values.png"), gg_switch_values)
+    ggsave(file.path(plot_dir, "gg_switch_values.png"), gg_switch_values)
   }
 }
 ```

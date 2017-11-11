@@ -15,7 +15,7 @@ class Task(object):
             self.correct_boxes = agent_data['correct_box']
             self.n_trials = len(agent_data['reward'])
         elif goal == 'simulate':
-            self.correct_box = np.random.rand() > 0.5
+            self.correct_box = int(np.random.rand() > 0.5)
             self.n_rewards = 0
             self.n_correct = 0
             self.i_episode = 0
