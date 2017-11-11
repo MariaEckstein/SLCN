@@ -5,13 +5,13 @@ class TransformPars(object):
 
     @staticmethod
     def get_pars(agent_stuff, params):
-        pars = np.array(agent_stuff['default_par'])  # 0's and 1's like before - no transformation
+        pars = agent_stuff['default_par']
         j = 0
         for i, par in enumerate(pars):
             if agent_stuff['free_par'][i]:
                 pars[i] = params[j]
                 j += 1
-        return pars
+        return np.array(pars)
 
     @staticmethod
     def transform_pars(pars):

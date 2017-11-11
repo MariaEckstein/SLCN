@@ -10,11 +10,6 @@ task_stuff = {'n_actions': 2,
               'path': 'C:/Users/maria/MEGAsync/SLCN/ProbabilisticSwitching/Prerandomized sequences'}
 trans = TransformPars()
 
-def transform_pars(pars):
-    pars = 1 / (1 + np.e ** -pars)  # sigmoid -> make -inf to inf into 0 to 1
-    pars = [20 * par if i == 1 or i == 3 else par for i, par in enumerate(pars)]  # beta & persev. are 0 to 20
-    return pars
-
 # Generate and recover
 n_par = 5
 agent_stuff = {'free_par': np.full(n_par, False, dtype=bool),   # which parameters are fitted (T) and fixed (F)?
@@ -52,10 +47,8 @@ for learning_style in ['RL', 'Bayes']:
 
         # Recover
             best_par = model.minimize_NLL(ag, n_fit_par, n_iter=n_iter)
-            # fit_par = trans.get_pars(agent_stuff, best_par)
-            # trans_par = trans.transform_pars(fit_par)
-            fit_par = model.get_fit_par(best_par)
-            trans_par = transform_pars(fit_par)
+            fit_par = trans.get_pars(agent_stuff, best_par)
+            trans_par = trans.transform_pars(fit_par)
             print('trans_par', trans_par)
             NLL, BIC, AIC = model.calculate_fit(trans_par, ag, False)
             model.update_genrec_and_save(np.concatenate(([ag, learning_style, method, NLL, BIC, AIC], sim_par, trans_par)),

@@ -6,7 +6,7 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data = "Bayes/direct"  # can be "RL", "Bayes", or "human"
+data = "RL/direct_few_params"  # can be "RL", "Bayes", or "human"
 # data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
 data_dir = ifelse(data == "human", "C:/Users/maria/MEGAsync/SLCNdata/PSResults", paste("C:/Users/maria/MEGAsync/SLCNdata/", data, sep = ""))
 plot_dir = file.path(data_dir, "plots")
@@ -166,10 +166,12 @@ if (data != "human") {
   genrec = read.csv(file.path(data_dir, "genrec.csv"))
   genrec$X = NULL
   gg_genrec_a = ggplot(genrec, aes(alpha_gen, alpha_rec)) +
-    geom_point()+
-    coord_cartesian(y = c(0, 1))
+    geom_point() #+
+    # coord_cartesian(y = c(-1, 1))
   gg_genrec_b = gg_genrec_a + aes(beta_gen, beta_rec)
   gg_genrec_e = gg_genrec_a + aes(epsilon_gen, epsilon_rec)
+  gg_genrec_p = gg_genrec_a + aes(perseverance_gen, perseverance_rec)
+  gg_genrec_d = gg_genrec_a + aes(decay_gen, decay_rec)
   
   if (gg_save) {
     ggsave(file.path(plot_dir, "gg_trial_values.png"), gg_trial_values)
@@ -177,6 +179,8 @@ if (data != "human") {
     ggsave(file.path(plot_dir, "gg_genrec_a.png"), gg_genrec_a)
     ggsave(file.path(plot_dir, "gg_genrec_b.png"), gg_genrec_b)
     ggsave(file.path(plot_dir, "gg_genrec_e.png"), gg_genrec_e)
+    ggsave(file.path(plot_dir, "gg_genrec_p.png"), gg_genrec_p)
+    ggsave(file.path(plot_dir, "gg_genrec_d.png"), gg_genrec_d)
   }
 }
 ```

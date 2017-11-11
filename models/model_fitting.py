@@ -63,15 +63,6 @@ class ModelFitting(object):
         else:
             return [-agent.LL, BIC, AIC]
 
-    def get_fit_par(self, params):
-        pars = self.agent_stuff['default_par']
-        j = 0
-        for i, par in enumerate(pars):
-            if self.agent_stuff['free_par'][i]:
-                pars[i] = params[j]
-                j += 1
-        return np.array(pars)
-
     def minimize_NLL(self, ag, n_fit_par, n_iter):
         values = np.zeros([n_iter, n_fit_par + 1])
         for iter in range(n_iter):
