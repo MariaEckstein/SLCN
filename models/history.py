@@ -4,7 +4,7 @@ import os
 
 
 class History(object):
-    def __init__(self, task, agent, path):
+    def __init__(self, task, agent):
         self.agent_id = agent.id
         # self.LL = agent.LL
         # self.n_free_par = sum(agent.free_par)
@@ -15,7 +15,7 @@ class History(object):
         self.subj_file = pd.DataFrame(data=subj_file, columns=colnames)
         self.subj_file[['alpha', 'beta', 'epsilon', 'perseverance', 'decay']] =\
             [agent.alpha, agent.beta, agent.epsilon, agent.perseverance, agent.decay]
-        self.data_path = agent.data_path + '/' + path
+        self.data_path = agent.data_path
 
     def update(self, agent, task, action, reward, trial):
         self.subj_file.loc[trial, 'selected_box'] = action

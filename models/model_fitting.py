@@ -21,13 +21,13 @@ class ModelFitting(object):
         self.genrec_row += 1
         self.genrec.to_csv(file_path)
 
-    def simulate_agents(self, ag, params, path):
+    def simulate_agents(self, ag, params):
 
         goal = 'simulate'
 
         task = Task(self.task_stuff, params, goal, ag, 200)
-        agent = UniversalAgent(self.agent_stuff, path, params, task, ag)
-        hist = History(task, agent, path)
+        agent = UniversalAgent(self.agent_stuff, params, task, ag)
+        hist = History(task, agent)
 
         for trial in range(1, task.n_trials):
             task.switch_box(trial, goal)
@@ -40,12 +40,12 @@ class ModelFitting(object):
 
         return np.array([agent.alpha, agent.beta, agent.epsilon, agent.perseverance, agent.decay])
 
-    def calculate_fit(self, params, ag, path, only_NLL):
+    def calculate_fit(self, params, ag, only_NLL):
 
         goal = 'model'
 
         task = Task(self.task_stuff, self.agent_stuff, goal, ag, 200)
-        agent = UniversalAgent(self.agent_stuff, path, params, task, ag)
+        agent = UniversalAgent(self.agent_stuff, params, task, ag)
 
         for trial in range(1, task.n_trials):
             task.switch_box(trial, goal)
@@ -77,7 +77,7 @@ class ModelFitting(object):
         for iter in range(n_iter):
             params0 = np.random.rand(n_fit_par)
             minimization = minimize(self.calculate_fit,
-                                    params0, (ag, '', True),  # arguments calculate_fit: params, id, path, only_NLL
+                                    params0, (ag, True),  # arguments calculate_fit: params, id, only_NLL
                                     method='Nelder-Mead')
             values[iter, :] = np.concatenate(([minimization.fun], minimization.x))
         minimum = values[:, 0] == min(values[:, 0])

@@ -4,7 +4,7 @@ import os
 
 
 class UniversalAgent(object):
-    def __init__(self, agent_stuff, path, params, task, id):
+    def __init__(self, agent_stuff, params, task, id):
         self.n_actions = task.n_actions  # 2
         self.learning_style = agent_stuff['learning_style']
         self.id = id
@@ -12,7 +12,7 @@ class UniversalAgent(object):
         self.method = agent_stuff['method']
         # Load participant data
         self.data_path = agent_stuff['data_path']
-        file_name = self.data_path + '/' + path + '/PS_' + str(self.id) + '.csv'
+        file_name = self.data_path + '/PS_' + str(self.id) + '.csv'
         if os.path.isfile(file_name):
             self.actions = pd.read_csv(file_name)['selected_box']
         # Keep track of things
