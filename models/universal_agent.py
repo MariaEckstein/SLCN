@@ -34,17 +34,18 @@ class UniversalAgent(object):
 
     # Take action
     def take_action(self, trial, goal):
-        self.calculate_p_actions(self.method)
+        self._calculate_p_actions(self.method)
         action = self._select_action(goal, trial)
         self._update_LL(action)
         return action
 
     # Get LL
     def _update_LL(self, action):
+        self.p_actions = (1 - 0.001) * self.p_actions + 0.001 / self.n_actions  # avoid 0's
         self.LL += np.log(self.p_actions[action])
 
     # Action helpers
-    def calculate_p_actions(self, method):
+    def _calculate_p_actions(self, method):
         action_values = self._get_action_values()
         if method == 'epsilon-greedy':
             sticky_values = action_values + self.perseverance * self.previous_action
@@ -63,7 +64,6 @@ class UniversalAgent(object):
         elif method == 'direct':
             sticky_values = action_values + self.perseverance * self.previous_action
             self.p_actions = sticky_values / np.sum(sticky_values)  # normalize
-        self.p_actions = (1 - 0.001) * self.p_actions + 0.001 / self.n_actions  # avoid 0's
 
     def _select_action(self, goal, trial):
         if goal == 'simulate':

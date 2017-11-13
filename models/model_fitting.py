@@ -5,6 +5,7 @@ from task import Task
 from history import History
 from scipy.optimize import minimize
 from transform_pars import TransformPars
+trans = TransformPars()
 
 
 class ModelFitting(object):
@@ -22,9 +23,6 @@ class ModelFitting(object):
     def adjust_free_par(self):
         if self.agent_stuff['learning_style'] == 'Bayes':
             self.agent_stuff['free_par'][0] = False  # alpha
-        else:
-            self.agent_stuff['free_par'][0] = True  # alpha
-
         if self.agent_stuff['method'] == 'epsilon-greedy':
             self.agent_stuff['free_par'][1:3] = [False, True]  # beta, epsilon
         elif self.agent_stuff['method'] == 'softmax':
@@ -32,10 +30,18 @@ class ModelFitting(object):
         elif self.agent_stuff['method'] == 'direct':
             self.agent_stuff['free_par'][1:3] = [False, False]  # beta, epsilon
 
-    def update_genrec(self, row, file_path):
+    def update_genrec(self, gen_par, rec_par, ag):
+        gen_pars = trans.get_pars(self.agent_stuff, gen_par)
+        rec_pars = trans.get_pars(self.agent_stuff, rec_par)
+        gen_pars_01 = trans.adjust_limits(trans.sigmoid(gen_pars))
+        rec_pars_01 = trans.adjust_limits(trans.sigmoid(rec_pars))
+        print('gen_pars:', gen_pars_01, '\nrec_pars:', rec_pars_01)
+        fit = self.simulate_agents(rec_par, ag, 'calculate_fit')
+        row = np.concatenate(([ag, self.agent_stuff['learning_style'], self.agent_stuff['method']],
+                              fit, gen_pars_01, rec_pars_01))
         self.genrec.loc[self.genrec_row, :] = row
         self.genrec_row += 1
-        self.genrec.to_csv(file_path)
+        self.genrec.to_csv(self.agent_stuff['data_path'] + '/genrec.csv')
 
     def simulate_agents(self, params, ag, goal='simulate'):
 
@@ -63,13 +69,13 @@ class ModelFitting(object):
         elif goal == 'simulate':
             hist.save_csv([-agent.LL, BIC, AIC])
 
-    def minimize_NLL(self, ag, n_fit_par, n_iter):
-        trans = TransformPars()
+    def minimize_NLL(self, ag, n_iter):
+        n_fit_par = sum(self.agent_stuff['free_par'])
         values = np.zeros([n_iter, n_fit_par + 1])
         for iter in range(n_iter):
             start_par = trans.inverse_sigmoid(np.random.rand(n_fit_par))  # make 0 to 1 into -inf to inf
             minimization = minimize(self.simulate_agents, x0=start_par, args=(ag, 'calculate_NLL'), method='Nelder-Mead')
             values[iter, :] = np.concatenate(([minimization.fun], minimization.x))
         minimum = values[:, 0] == min(values[:, 0])
-        best_par = values[minimum][0]
-        return best_par[1:]
+        rec_par = values[minimum][0]
+        return rec_par[1:]
