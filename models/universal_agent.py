@@ -11,7 +11,8 @@ class UniversalAgent(object):
         self.id = id
         trans = TransformPars()
         raw_pars = trans.get_pars(agent_stuff, params)
-        [self.alpha, self.beta, self.epsilon, self.perseverance, self.decay] = trans.transform_pars(raw_pars)
+        pars = trans.adjust_limits(trans.sigmoid(raw_pars))
+        [self.alpha, self.beta, self.epsilon, self.perseverance, self.decay] = pars
         self.method = agent_stuff['method']
         # Load participant data
         self.data_path = agent_stuff['data_path']
@@ -26,23 +27,24 @@ class UniversalAgent(object):
             self.p_switch = 1 / np.mean(task.run_length)  # true average switch probability
             self.p_reward = task.p_reward  # true reward probability
             self.p_boxes = np.ones(self.n_actions) / self.n_actions  # initialize prior uniformly over all actions
+            self.initial_value = self.p_boxes
         self.previous_action = np.zeros(self.n_actions)
         self.LL = 0
+        self.p_actions = 0.5 * np.ones(self.n_actions)
 
     # Take action
     def take_action(self, trial, goal):
-        p_actions = self._get_p_actions(self.method)
-        action = self._select_action(goal, p_actions, trial)
-        self._update_LL(action, p_actions)
+        self.calculate_p_actions(self.method)
+        action = self._select_action(goal, trial)
+        self._update_LL(action)
         return action
 
     # Get LL
-    def _update_LL(self, action, p_actions):
-        p_actions = (1 - 0.001) * p_actions + 0.001 / self.n_actions  # avoid 0's
-        self.LL += np.log(p_actions[action])
+    def _update_LL(self, action):
+        self.LL += np.log(self.p_actions[action])
 
     # Action helpers
-    def _get_p_actions(self, method):
+    def calculate_p_actions(self, method):
         action_values = self._get_action_values()
         if method == 'epsilon-greedy':
             sticky_values = action_values + self.perseverance * self.previous_action
@@ -50,25 +52,25 @@ class UniversalAgent(object):
             n_best_actions = len(best_actions)
             n_other_actions = self.n_actions - n_best_actions
             epsilon = 0 if n_other_actions == 0 else self.epsilon / n_other_actions
-            p_actions = epsilon * np.ones(self.n_actions)
-            p_actions[best_actions] = (1 - self.epsilon) / n_best_actions
+            self.p_actions = epsilon * np.ones(self.n_actions)
+            self.p_actions[best_actions] = (1 - self.epsilon) / n_best_actions
         elif method == 'softmax':
             p_left_box = 1 / (1 + np.exp(
                 self.beta * (action_values[1] - action_values[0]) +
                 self.perseverance * (self.previous_action[1] - self.previous_action[0])
             ))
-            p_actions = np.array([p_left_box, 1 - p_left_box])
+            self.p_actions = np.array([p_left_box, 1 - p_left_box])
         elif method == 'direct':
-            p_actions = action_values / np.sum(action_values)  # normalize
-        return p_actions
+            sticky_values = action_values + self.perseverance * self.previous_action
+            self.p_actions = sticky_values / np.sum(sticky_values)  # normalize
+        self.p_actions = (1 - 0.001) * self.p_actions + 0.001 / self.n_actions  # avoid 0's
 
-    def _select_action(self, goal, p_actions, trial):
+    def _select_action(self, goal, trial):
         if goal == 'simulate':
-            action = int(np.random.rand() > p_actions[0])  # select left ('0') when np.random.rand() < p_actions[0]
-        elif goal == 'model':
+            action = int(np.random.rand() > self.p_actions[0])  # select left ('0') when np.random.rand() < p_actions[0]
+        else:
             action = int(self.actions[trial])  # look up which action participant actually took
-        self.previous_action[:] = 0
-        self.previous_action[action] = 1
+        self.previous_action = np.array(range(self.n_actions)) == action
         return action
 
     def _get_action_values(self):
@@ -86,7 +88,7 @@ class UniversalAgent(object):
 
     # Learn helpers
     def _learn_bayes(self, action, reward):
-        self.p_boxes += self.decay * (1 / self.n_actions - self.p_boxes)  # decay values back to uniform
+        self.p_boxes += self.decay * (self.initial_value - self.p_boxes)  # decay values back to uniform
         if reward == 1:  # The probability of getting a reward is 0 for all actions except the correct one
             lik_boxes = np.zeros(self.n_actions) + 0.001  # avoid getting likelihoods of 0
             lik_boxes[action] = self.p_reward
@@ -98,7 +100,7 @@ class UniversalAgent(object):
         self.p_boxes = posterior * (1 - self.p_switch) + np.flipud(posterior) * self.p_switch
 
     def _learn_rl(self, action, reward):
-        self.q += self.decay * (1 / self.n_actions - self.q)  # decay values back to uniform
+        self.q += self.decay * (self.initial_value - self.q)  # decay values back to initla value
         self.q[action] += self.alpha * (reward - self.q[action])  # update value of chosen action
 
     # Little helpers

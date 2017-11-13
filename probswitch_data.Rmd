@@ -6,7 +6,7 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-data = "RL/direct_few_params"  # can be "RL", "Bayes", or "human"
+data = "RL/softmax_vary_perseverance"  # can be "RL", "Bayes", or "human"
 # data_dir = "C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/ProbabilisticSwitching/Results" # get probswitch data
 data_dir = ifelse(data == "human", "C:/Users/maria/MEGAsync/SLCNdata/PSResults", paste("C:/Users/maria/MEGAsync/SLCNdata/", data, sep = ""))
 plot_dir = file.path(data_dir, "plots")
@@ -17,6 +17,7 @@ dir.create(plot_dir)
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
+library("reshape2")
 ```
 
 ```{r Read in data}
@@ -99,7 +100,84 @@ all_files_sum2 = ddply(subset(all_files, !is.na(trialsinceswitch)),
                       choice = mean(choice_left, na.rm = T),
                       RT = median(RT, na.rm = T))
 ```
-
+```{r Model stuff}
+if (data != "human") {
+  # Plot values for one example session
+  gg_example_values = ggplot(all_files) +
+    geom_line(aes(TrialID, values_l), color="red") +
+    geom_line(aes(TrialID, values_r), color="blue") +
+    # geom_vline(xintercept = which(all_files$switch_trial)) +
+    # geom_point(aes(TrialID, reward - 0.5)) +
+    geom_point(aes(TrialID, 0.5, color = choice_left, size = factor(reward))) +
+    geom_point(aes(TrialID, as.numeric(as.character(factor(switch_trial, labels = c(-5, 0.5))))), shape = 8, size = 3, color = "darkgreen") +
+    scale_size_manual(values = c(0.1, 1)) +
+    scale_color_manual(values = c("blue", "red")) +
+    coord_cartesian(x = c(1, 100), y = c(0, 1)) +
+    labs(x = "Trial", y = "Values (left: red; right: blue)") +
+    theme(legend.position = 'none') +
+    facet_wrap(~ sID, ncol = 2)
+  
+  # Plot action probs for one example session
+  gg_example_probs = ggplot(all_files) +
+    geom_line(aes(TrialID, p_action_l), color="red") +
+    geom_line(aes(TrialID, p_action_r), color="blue") +
+    # geom_vline(xintercept = which(all_files$switch_trial)) +
+    # geom_point(aes(TrialID, reward - 0.5)) +
+    geom_point(aes(TrialID, 0.5, color = choice_left, size = factor(reward))) +
+    geom_point(aes(TrialID, as.numeric(as.character(factor(switch_trial, labels = c(-5, 0.5))))), shape = 8, size = 3, color = "darkgreen") +
+    scale_size_manual(values = c(0.1, 1)) +
+    scale_color_manual(values = c("blue", "red")) +
+    coord_cartesian(x = c(1, 100), y = c(0, 1)) +
+    labs(x = "Trial", y = "Action probs. (left: red; right: blue)") +
+    theme(legend.position = 'none') +
+    facet_wrap(~ sID, ncol = 2)
+  
+  if (gg_save) {
+    ggsave(file.path(plot_dir, "gg_example_values.png"), gg_example_values, width = 12, height = 8)
+    ggsave(file.path(plot_dir, "gg_example_probs.png"), gg_example_probs, width = 12, height = 8)
+  }
+  
+  gg_switch_values1 = ggplot(all_files) +
+    stat_summary(aes(trialsinceswitch, values_l), color = "red", fun.data = "mean_se", geom = "smooth") +
+    stat_summary(aes(trialsinceswitch, values_r), color = "blue", fun.data = "mean_se", geom = "smooth") +
+    coord_cartesian(x = c(-3, 5))
+  
+  gg_switch_values2 = ggplot(all_files, aes(trialsinceswitch, values_l, color = reward_port, group = reward_port)) +
+    stat_summary(fun.data = "mean_se", geom = "smooth") +
+    coord_cartesian(x = c(-3, 5))
+  
+  gg_trial_values = ggplot(all_files) +
+    stat_summary(aes(TrialID, values_l), color = "red", fun.data = "mean_se", geom = "smooth") +
+    stat_summary(aes(TrialID, values_r), color = "blue", fun.data = "mean_se", geom = "smooth") +
+    facet_grid(~ rewardversion)
+  
+  if (gg_save) {
+    ggsave(file.path(plot_dir, "gg_trial_values.png"), gg_trial_values)
+    ggsave(file.path(plot_dir, "gg_switch_values1.png"), gg_switch_values1)
+    ggsave(file.path(plot_dir, "gg_switch_values2.png"), gg_switch_values2)
+  }
+}
+```
+```{r Genrec stuff}
+if (data != "human") {
+  genrec = read.csv(file.path(data_dir, "genrec.csv"))
+  genrec$X = NULL
+  gg_genrec_a = ggplot(genrec, aes(alpha_gen, alpha_rec)) +  # , color=epsilon_gen
+    geom_point()
+  gg_genrec_b = gg_genrec_a + aes(beta_gen, beta_rec)
+  gg_genrec_e = gg_genrec_a + aes(epsilon_gen, epsilon_rec)
+  gg_genrec_p = gg_genrec_a + aes(perseverance_gen, perseverance_rec)
+  gg_genrec_d = gg_genrec_a + aes(decay_gen, decay_rec)
+  
+  if (gg_save) {
+    ggsave(file.path(plot_dir, "gg_genrec_a.png"), gg_genrec_a)
+    ggsave(file.path(plot_dir, "gg_genrec_b.png"), gg_genrec_b)
+    ggsave(file.path(plot_dir, "gg_genrec_e.png"), gg_genrec_e)
+    ggsave(file.path(plot_dir, "gg_genrec_p.png"), gg_genrec_p)
+    ggsave(file.path(plot_dir, "gg_genrec_d.png"), gg_genrec_d)
+  }
+}
+```
 ```{r Summary statistics}
 
 # Response times
@@ -145,44 +223,16 @@ gg_rewards2 = ggplot(subset(all_files_sum, !is.na(choice_12_back)),
 # gg_rewards2 + facet_wrap(~ sID)
 
 if (gg_save) {
-  ggsave(file.path(plot_dir, "gg_RT.png"), gg_RT)
-  ggsave(file.path(plot_dir, "gg_RTt.png"), gg_RTt)
-  ggsave(file.path(plot_dir, "gg_ACC.png"), gg_ACC)
+  if (data == "human") {
+    ggsave(file.path(plot_dir, "gg_RT.png"), gg_RT)
+    ggsave(file.path(plot_dir, "gg_RTt.png"), gg_RTt)
+    ggsave(file.path(plot_dir, "gg_ACC.png"), gg_ACC)
+  }
   ggsave(file.path(plot_dir, "gg_ACC_blocks.png"), gg_ACC_blocks)
   ggsave(file.path(plot_dir, "gg_rewards.png"), gg_rewards)
   ggsave(file.path(plot_dir, "gg_rewards2.png"), gg_rewards2)
 }
 ```
-```{r Model stuff}
-if (data != "human") {
-  gg_trial_values = ggplot(all_files, aes(TrialID, values_l)) +  # , color = factor(correct_box), group = 1
-    stat_summary(fun.data = "mean_se", geom = "smooth") +
-    facet_grid(~ rewardversion)
-  
-  gg_switch_values = ggplot(all_files, aes(trialsinceswitch, values_l, color = reward_port, group = reward_port)) +
-    stat_summary(fun.data = "mean_se", geom = "smooth") +
-    coord_cartesian(x = c(-3, 5))
-  
-  genrec = read.csv(file.path(data_dir, "genrec.csv"))
-  genrec$X = NULL
-  gg_genrec_a = ggplot(genrec, aes(alpha_gen, alpha_rec)) +
-    geom_point() #+
-    # coord_cartesian(y = c(-1, 1))
-  gg_genrec_b = gg_genrec_a + aes(beta_gen, beta_rec)
-  gg_genrec_e = gg_genrec_a + aes(epsilon_gen, epsilon_rec)
-  gg_genrec_p = gg_genrec_a + aes(perseverance_gen, perseverance_rec)
-  gg_genrec_d = gg_genrec_a + aes(decay_gen, decay_rec)
-  
-  if (gg_save) {
-    ggsave(file.path(plot_dir, "gg_trial_values.png"), gg_trial_values)
-    ggsave(file.path(plot_dir, "gg_switch_values.png"), gg_switch_values)
-    ggsave(file.path(plot_dir, "gg_genrec_a.png"), gg_genrec_a)
-    ggsave(file.path(plot_dir, "gg_genrec_b.png"), gg_genrec_b)
-    ggsave(file.path(plot_dir, "gg_genrec_e.png"), gg_genrec_e)
-    ggsave(file.path(plot_dir, "gg_genrec_p.png"), gg_genrec_p)
-    ggsave(file.path(plot_dir, "gg_genrec_d.png"), gg_genrec_d)
-  }
-}
-```
+
 ```{r}
 ```

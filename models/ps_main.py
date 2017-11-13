@@ -3,101 +3,69 @@ from model_fitting import ModelFitting
 from transform_pars import TransformPars
 
 
+# Set parameters
 n_agents = 50
 n_iter = 10
+
+# Info about task and agent
 task_stuff = {'n_actions': 2,
               'p_reward': 0.75,
               'path': 'C:/Users/maria/MEGAsync/SLCN/ProbabilisticSwitching/Prerandomized sequences'}
+pars = ['alpha', 'beta', 'epsilon', 'perseverance', 'decay']
+n_par = 5
 trans = TransformPars()
 
-# Generate and recover
-n_par = 5
-agent_stuff = {'free_par': np.full(n_par, False, dtype=bool),   # which parameters are fitted (T) and fixed (F)?
-               'default_par': [-10, -5, -10, -10, -10],  # parameter values if fixed (after transform: 0, 0.13, 0, 0, 0)
+# Check that parameters are working
+agent_stuff = {'default_par': [-1, -3, -100, -100, -100],  # after transform: [0.27, 0.47, 0, 0, 0]
                'n_agents': 1}  # number of simulated agents
-
-for learning_style in ['RL', 'Bayes']:
-
-    agent_stuff['learning_style'] = learning_style
-    if learning_style == 'Bayes':
-        agent_stuff['free_par'][0] = False  # alpha
+def check_paramters(param_name, agent_stuff, task_stuff):
+    if param_name == 'perseverance':
+        default_epsilon = 0
     else:
-        agent_stuff['free_par'][0] = True  # alpha
+        default_epsilon = -100
+    agent_stuff['default_par'][2] = default_epsilon
+    trans = TransformPars()
+    agent_stuff['free_par'] = [par == param_name for par in pars]
+    for learning_style in ['RL', 'Bayes']:
+        agent_stuff['learning_style'] = learning_style
+        for method in ['direct', 'epsilon-greedy', 'softmax']:
+            agent_stuff['method'] = method
+            model = ModelFitting(agent_stuff, task_stuff, '_vary_' + param_name)
+            for ag, alpha in enumerate(np.arange(0.01, 0.99, 0.15)):
+                print(alpha)
+                alpha_gen = trans.inverse_sigmoid(alpha)
+                model.simulate_agents([alpha_gen], 4 * ag)  # 4 * ag to get the same randomization for everyone
 
-    for method in ['direct', 'softmax', 'epsilon-greedy']:
-        if method == 'epsilon-greedy':
-            agent_stuff['free_par'][1:3] = [False, True]  # beta, epsilon
-        elif method == 'softmax':
-            agent_stuff['free_par'][1:3] = [True, False]  # beta, epsilon
-        elif method == 'direct':
-            agent_stuff['free_par'][1:3] = [False, False]  # beta, epsilon
-        agent_stuff['method'] = method
-        agent_stuff['data_path'] = 'C:/Users/maria/MEGAsync/SLCNdata/' + agent_stuff['learning_style'] +\
-                                   '/' + agent_stuff['method'] + '_few_params'
-        print('Learning:', learning_style, '\nMethod:', method)
+for param_name in pars:
+    print(param_name)
+    # check_paramters(param_name, agent_stuff, task_stuff)
 
-        # Generate
-        model = ModelFitting(agent_stuff, task_stuff)
-        n_fit_par = sum(agent_stuff['free_par'])
-        for ag in range(n_agents):
-            print('agent', ag)
-            rand_par = -np.log(1 / np.random.rand(n_fit_par) - 1)  # inverse sigmoid -> make 0 to 1 into -inf to inf
-            sim_par = model.simulate_agents(ag, rand_par)
-            print('sim_par', sim_par)
-
-        # Recover
-            best_par = model.minimize_NLL(ag, n_fit_par, n_iter=n_iter)
-            fit_par = trans.get_pars(agent_stuff, best_par)
-            trans_par = trans.transform_pars(fit_par)
-            print('trans_par', trans_par)
-            NLL, BIC, AIC = model.calculate_fit(trans_par, ag, False)
-            model.update_genrec_and_save(np.concatenate(([ag, learning_style, method, NLL, BIC, AIC], sim_par, trans_par)),
-                                         agent_stuff['data_path'] + '/genrec.csv')
-
-        # Generate and recover
-        n_par = 5
-        agent_stuff = {'free_par': np.full(n_par, True, dtype=bool),  # which parameters are fitted (T) and fixed (F)?
-                       'default_par': [-10, -5, -10, -10, -10],
-                       # parameter values if fixed (after transform: 0, 0.13, 0, 0, 0)
-                       'n_agents': 1}  # number of simulated agents
-
+# Generate and recover
+agent_stuff['free_par'] = [True, False, False, False, False]  # number of simulated agents
 for learning_style in ['RL', 'Bayes']:
-
     agent_stuff['learning_style'] = learning_style
-    if learning_style == 'Bayes':
-        agent_stuff['free_par'][0] = False  # alpha
-    else:
-        agent_stuff['free_par'][0] = True  # alpha
-
     for method in ['direct', 'softmax', 'epsilon-greedy']:
-        if method == 'epsilon-greedy':
-            agent_stuff['free_par'][1:3] = [False, True]  # beta, epsilon
-        elif method == 'softmax':
-            agent_stuff['free_par'][1:3] = [True, False]  # beta, epsilon
-        elif method == 'direct':
-            agent_stuff['free_par'][1:3] = [False, False]  # beta, epsilon
         agent_stuff['method'] = method
-        agent_stuff['data_path'] = 'C:/Users/maria/MEGAsync/SLCNdata/' + agent_stuff['learning_style'] + \
-                                   '/' + agent_stuff['method'] + '_all_params'
-        print('Learning:', learning_style, '\nMethod:', method)
+        model = ModelFitting(agent_stuff, task_stuff, '_fit_alpha')
+        model.adjust_free_par()
 
-        # Generate
-        model = ModelFitting(agent_stuff, task_stuff)
-        n_fit_par = sum(agent_stuff['free_par'])
         for ag in range(n_agents):
-            print('agent', ag)
-            rand_par = 10 * np.random.rand(n_fit_par) - 5
-            sim_par = model.simulate_agents(ag, rand_par)
-            print('sim_par', sim_par)
-
+            n_fit_par = sum(agent_stuff['free_par'])
+            print('Learning:', learning_style, '  Method:', method, '  Agent:', ag, '  n_fit_par:', n_fit_par)
+            # Generate
+            rand_par_gen = trans.inverse_sigmoid(np.random.rand(n_fit_par))  # make 0 to 1 into -inf to inf
+            model.simulate_agents(rand_par_gen, ag)
             # Recover
-            best_par = model.minimize_NLL(ag, n_fit_par, n_iter=n_iter)
-            fit_par = trans.get_pars(agent_stuff, best_par)
-            trans_par = trans.transform_pars(fit_par)
-            print('trans_par', trans_par)
-            NLL, BIC, AIC = model.calculate_fit(trans_par, ag, False)
-            model.update_genrec_and_save(
-                np.concatenate(([ag, learning_style, method, NLL, BIC, AIC], sim_par, trans_par)),
+            best_par = model.minimize_NLL(ag, n_fit_par, n_iter)
+            # Print and save
+            gen_par = trans.get_pars(agent_stuff, rand_par_gen)
+            rec_par = trans.get_pars(agent_stuff, best_par)
+            gen_par_01 = trans.adjust_limits(trans.sigmoid(gen_par))
+            rec_par_01 = trans.adjust_limits(trans.sigmoid(rec_par))
+            print('gen_par:', gen_par_01, '\nrec_par:', rec_par_01)
+            NLL, BIC, AIC = model.simulate_agents(rec_par, ag, 'calculate_fit')
+            model.update_genrec(
+                np.concatenate(([ag, learning_style, method, NLL, BIC, AIC], gen_par_01, rec_par_01)),
                 agent_stuff['data_path'] + '/genrec.csv')
 
 # Fit parameters to actual data
