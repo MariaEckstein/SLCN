@@ -85,9 +85,9 @@ model_plots = function() {
     # geom_point(aes(TrialID, reward - 0.5)) +
     geom_point(aes(TrialID, 0.5, color = choice_left, size = factor(reward))) +
     geom_point(aes(TrialID, as.numeric(as.character(factor(switch_trial, labels = c(-5, 0.5))))), shape = 8, size = 3, color = "darkgreen") +
-    scale_size_manual(values = c(0.1, 1)) +
+    scale_size_manual(values = c(0.5, 1)) +
     scale_color_manual(values = c("blue", "red")) +
-    coord_cartesian(x = c(1, 100), y = c(0, 1)) +
+    coord_cartesian(x = c(1, 80), y = c(0, 1)) +
     labs(x = "Trial", y = "Values (left: red; right: blue)") +
     theme(legend.position = 'none') +
     facet_wrap(~ sID, ncol = 2)

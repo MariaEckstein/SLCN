@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 from transform_pars import TransformPars
+trans = TransformPars()
 
 
 class UniversalAgent(object):
@@ -9,7 +10,6 @@ class UniversalAgent(object):
         self.n_actions = task.n_actions  # 2
         self.learning_style = agent_stuff['learning_style']
         self.id = id
-        trans = TransformPars()
         raw_pars = trans.get_pars(agent_stuff, params)
         pars = trans.adjust_limits(trans.sigmoid(raw_pars))
         [self.alpha, self.beta, self.epsilon, self.perseverance, self.decay] = pars
@@ -47,8 +47,9 @@ class UniversalAgent(object):
     # Action helpers
     def _calculate_p_actions(self, method):
         action_values = self._get_action_values()
+        sticky_values = action_values + self.perseverance * self.previous_action
+        sticky_values[sticky_values <= 0] = 0.001
         if method == 'epsilon-greedy':
-            sticky_values = action_values + self.perseverance * self.previous_action
             best_actions = np.argwhere(sticky_values == np.nanmax(sticky_values))  # actions with highest value
             n_best_actions = len(best_actions)
             n_other_actions = self.n_actions - n_best_actions
@@ -57,12 +58,10 @@ class UniversalAgent(object):
             self.p_actions[best_actions] = (1 - self.epsilon) / n_best_actions
         elif method == 'softmax':
             p_left_box = 1 / (1 + np.exp(
-                self.beta * (action_values[1] - action_values[0]) +
-                self.perseverance * (self.previous_action[1] - self.previous_action[0])
+                self.beta * (sticky_values[1] - sticky_values[0])
             ))
             self.p_actions = np.array([p_left_box, 1 - p_left_box])
         elif method == 'direct':
-            sticky_values = action_values + self.perseverance * self.previous_action
             self.p_actions = sticky_values / np.sum(sticky_values)  # normalize
 
     def _select_action(self, goal, trial):

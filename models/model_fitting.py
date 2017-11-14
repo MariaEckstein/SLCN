@@ -30,13 +30,12 @@ class ModelFitting(object):
         elif self.agent_stuff['method'] == 'direct':
             self.agent_stuff['free_par'][1:3] = [False, False]  # beta, epsilon
 
-    def update_genrec(self, gen_par, rec_par, ag):
+    def update_genrec(self, gen_par, rec_par, fit, ag):
         gen_pars = trans.get_pars(self.agent_stuff, gen_par)
         rec_pars = trans.get_pars(self.agent_stuff, rec_par)
         gen_pars_01 = trans.adjust_limits(trans.sigmoid(gen_pars))
         rec_pars_01 = trans.adjust_limits(trans.sigmoid(rec_pars))
-        print('gen_pars:', gen_pars_01, '\nrec_pars:', rec_pars_01)
-        fit = self.simulate_agents(rec_par, ag, 'calculate_fit')
+        print('gen_pars:', np.round(gen_pars_01, 2), '\nrec_pars:', np.round(rec_pars_01, 2))
         row = np.concatenate(([ag, self.agent_stuff['learning_style'], self.agent_stuff['method']],
                               fit, gen_pars_01, rec_pars_01))
         self.genrec.loc[self.genrec_row, :] = row

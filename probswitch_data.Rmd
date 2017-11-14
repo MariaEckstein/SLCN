@@ -6,11 +6,11 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-for (learning_style in c("RL", "Bayes")) {
-  for (method in c("direct", "epsilon-greedy", "softmax")) {
-    for (param_name in c("alpha", "beta", "epsilon", "perseverance", "decay", "alphabetaepsilonperseverancedecay")) {
+for (learning_style in c("RL")) {#, "Bayes"
+  for (method in c("softmax")) {#, "direct", "epsilon-greedy"
+    for (param_name in c("_fit_alphabetaepsilonperseverancedecay")) {#, "_vary_alpha", "_vary_beta", "_vary_epsilon", "_vary_perseverance", "_vary_decay", "_fit_alpha", "_fit_beta", "_fit_epsilon", "_fit_perseverance", "_fit_decay"
             
-      data = paste(learning_style, "/", method, "_fit_", param_name, sep = "")
+      data = paste(learning_style, "/", method, param_name, sep = "")
       data_dir = ifelse(data == "human", "C:/Users/maria/MEGAsync/SLCNdata/PSResults", paste("C:/Users/maria/MEGAsync/SLCNdata/", data, sep = ""))
       plot_dir = file.path(data_dir, "plots")
       gg_save = T
@@ -24,19 +24,23 @@ for (learning_style in c("RL", "Bayes")) {
       source("functions.R")
       
       all_files = read_in_files()
-      all_files_sum = ddply(subset(all_files, !is.na(outcome_12_back)),
-                            .(sID, outcome_12_back, choice_12_back), summarize,
-                            choice = mean(choice_left, na.rm = T))
-      all_files_sum2 = ddply(subset(all_files, !is.na(trialsinceswitch)),
-                            .(sID, trialsinceswitch), summarize,
-                            choice = mean(choice_left, na.rm = T),
-                            RT = median(RT, na.rm = T))
-      
-      if (data != "human") {
-        model_plots()
-        genrec_plots()
+      if (dim(all_files)[1] > 0) {
+        all_files_sum = ddply(subset(all_files, !is.na(outcome_12_back)),
+                              .(sID, outcome_12_back, choice_12_back), summarize,
+                              choice = mean(choice_left, na.rm = T))
+        all_files_sum2 = ddply(subset(all_files, !is.na(trialsinceswitch)),
+                              .(sID, trialsinceswitch), summarize,
+                              choice = mean(choice_left, na.rm = T),
+                              RT = median(RT, na.rm = T))
+        
+        if (data != "human") {
+          model_plots()
+          if (grepl("fit", param_name)) {
+            genrec_plots()
+          }
+        }
+        paper_plots()
       }
-      paper_plots()
     }
   }
 }

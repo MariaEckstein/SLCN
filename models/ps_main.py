@@ -4,8 +4,8 @@ from transform_pars import TransformPars
 
 
 # Set parameters
-n_agents = 50
-n_iter = 15
+n_agents = 40
+n_iter = 10
 
 # Info about task and agent
 task_stuff = {'n_actions': 2,
@@ -16,7 +16,7 @@ n_par = 5
 trans = TransformPars()
 
 # Check that parameters are working
-agent_stuff = {'default_par': [-1, -3, -100, -100, -100],  # after transform: [0.27, 0.47, 0, 0, 0]
+agent_stuff = {'default_par': [-1, -100, -100, 0, -100],  # after transform: [0.27, 1, 0, 0, 0]
                'n_agents': 1}  # number of simulated agents
 def check_parameters(param_name, agent_stuff, task_stuff, learning_style, method):
     agent_stuff['free_par'] = [par == param_name for par in pars]
@@ -43,26 +43,26 @@ def generate_and_recover(param_names, learning_style, method):
     print(model.agent_stuff['free_par'])
     for ag in range(n_agents):
         n_fit_par = sum(agent_stuff['free_par'])
-        print('Par:', param_names, '  Learning:', learning_style, '  Method:', method, '  Agent:', ag,
-              '  n_fit_par:', n_fit_par)
+        print('Fitted parameters:', param_names, '(', n_fit_par, '), ' 'Model:', learning_style, ',', method, ', Agent:', ag)
         # Generate
         gen_par = trans.inverse_sigmoid(np.random.rand(n_fit_par))  # make 0 to 1 into -inf to inf
         model.simulate_agents(gen_par, ag)
         # Recover
         rec_par = model.minimize_NLL(ag, n_iter)
+        fit = model.simulate_agents(rec_par, ag, 'calculate_fit')
         # Print and save
-        model.update_genrec(gen_par, rec_par, ag)
+        model.update_genrec(gen_par, rec_par, fit, ag)
 
 for learning_style in ['RL', 'Bayes']:
     for method in ['direct', 'softmax', 'epsilon-greedy']:
         generate_and_recover(pars, learning_style, method)
 
-# for learning_style in ['RL', 'Bayes']:
-#     for method in ['direct', 'softmax', 'epsilon-greedy']:
-#         for param_name in pars:
-#             print(param_name)
-#             # check_parameters(param_name, agent_stuff, task_stuff, learning_style, method)
-#             generate_and_recover([param_name], learning_style, method)
+for learning_style in ['RL', 'Bayes']:
+    for method in ['direct', 'softmax', 'epsilon-greedy']:
+        for param_name in pars:
+            print(param_name)
+            # check_parameters(param_name, agent_stuff, task_stuff, learning_style, method)
+            generate_and_recover([param_name], learning_style, method)
 
 
 # Fit parameters to actual data

@@ -14,15 +14,26 @@ class TransformPars(object):
         return np.array(pars)
 
     @staticmethod
-    def adjust_limits(pars):
-        pars = [10 * par if i == 1 or i == 3 else par for i, par in enumerate(pars)]  # beta & persev. are 0 to 20
-        pars[2] = 0.5 * pars[2]  # large epsilon makes it impossible to recover anything
-        return pars
-
-    @staticmethod
     def inverse_sigmoid(pars):
+        """
+        Produce parameters that go INTO the simulation -> [-inf, inf] because that is what Nelder-Mead likes
+        """
         return -np.log(1 / pars - 1)  # transform [0, 1] into [-inf, inf]
 
     @staticmethod
     def sigmoid(pars):
+        """"
+        Apply to parameters WITHIN universal_agent -> [0, 1] because fixed ranges are what the agent likes
+        """
         return 1 / (1 + np.e ** -pars)  # transform [-inf, inf] into [0, 1]
+
+    @staticmethod
+    def adjust_limits(pars):
+        """
+        Get the specific ranges of each parameter
+        """
+        pars[1] = 1 + pars[1] * 5  # beta [1, 6]
+        pars[2] = pars[2] / 4  # epsilon [0, 0.15]
+        pars[3] = 0.6 * pars[3] - 0.3  # perseverance [-0.3, 0.3]
+        pars[4] = 0.3 * pars[4]  # decay [0, 0.3]
+        return pars
