@@ -6,11 +6,13 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
-for (learning_style in c("RL")) {#, "Bayes"
-  for (method in c("softmax")) {#, "direct", "epsilon-greedy"
-    for (param_name in c("_fit_alphabetaepsilonperseverancedecay")) {#, "_vary_alpha", "_vary_beta", "_vary_epsilon", "_vary_perseverance", "_vary_decay", "_fit_alpha", "_fit_beta", "_fit_epsilon", "_fit_perseverance", "_fit_decay"
-            
+for (learning_style in c("RL", "Bayes")) {
+  for (method in c("direct", "softmax", "epsilon-greedy")) {
+    for (param_name in c("_vary_alpha", "_vary_beta", "_vary_epsilon", "_vary_perseverance", "_vary_decay", "_fit_alphabetaepsilonperseverancedecay", "_fit_alpha", "_fit_beta", "_fit_epsilon", "_fit_perseverance", "_fit_decay")) {
+      print(paste(learning_style, method, param_name))
+      
       data = paste(learning_style, "/", method, param_name, sep = "")
+      data = "human"
       data_dir = ifelse(data == "human", "C:/Users/maria/MEGAsync/SLCNdata/PSResults", paste("C:/Users/maria/MEGAsync/SLCNdata/", data, sep = ""))
       plot_dir = file.path(data_dir, "plots")
       gg_save = T
@@ -32,6 +34,7 @@ for (learning_style in c("RL")) {#, "Bayes"
                               .(sID, trialsinceswitch), summarize,
                               choice = mean(choice_left, na.rm = T),
                               RT = median(RT, na.rm = T))
+        paper_plots()
         
         if (data != "human") {
           model_plots()
@@ -39,7 +42,6 @@ for (learning_style in c("RL")) {#, "Bayes"
             genrec_plots()
           }
         }
-        paper_plots()
       }
     }
   }

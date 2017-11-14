@@ -18,7 +18,11 @@ class UniversalAgent(object):
         self.data_path = agent_stuff['data_path']
         file_name = self.data_path + '/PS_' + str(self.id) + '.csv'
         if os.path.isfile(file_name):
-            self.actions = pd.read_csv(file_name)['selected_box']
+            agent_data = pd.read_csv(file_name)
+            self.actions = agent_data['selected_box']
+            self.RTs = agent_data['RT']
+        else:
+            self.RTs = np.nan
         # Keep track of things
         if self.learning_style == 'RL':
             self.initial_value = 1 / self.n_actions

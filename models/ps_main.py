@@ -3,9 +3,11 @@ from model_fitting import ModelFitting
 from transform_pars import TransformPars
 
 
+# TD: first trial is missing in the fitted data!
+
 # Set parameters
 n_agents = 40
-n_iter = 10
+n_iter = 15
 
 # Info about task and agent
 task_stuff = {'n_actions': 2,
@@ -31,48 +33,47 @@ def check_parameters(param_name, agent_stuff, task_stuff, learning_style, method
     for ag, par in enumerate(np.arange(0.01, 0.99, 0.15)):
         print(par)
         par_gen = trans.inverse_sigmoid(par)
-        model.simulate_agents([par_gen], ag)
+        model.simulate_agent([par_gen], ag)
 
 # Generate and recover
-def generate_and_recover(param_names, learning_style, method):
+def generate_and_recover(param_names, learning_style, method, agents, use='fit_human_data'):
     agent_stuff['free_par'] = [np.any(par == np.array(param_names)) for par in pars]
     agent_stuff['learning_style'] = learning_style
     agent_stuff['method'] = method
     model = ModelFitting(agent_stuff, task_stuff, '_fit_' + ''.join(param_names))
     model.adjust_free_par()
-    print(model.agent_stuff['free_par'])
-    for ag in range(n_agents):
+    for ag in agents:
         n_fit_par = sum(agent_stuff['free_par'])
         print('Fitted parameters:', param_names, '(', n_fit_par, '), ' 'Model:', learning_style, ',', method, ', Agent:', ag)
         # Generate
-        gen_par = trans.inverse_sigmoid(np.random.rand(n_fit_par))  # make 0 to 1 into -inf to inf
-        model.simulate_agents(gen_par, ag)
+        if use == 'generate_and_recover':
+            gen_par = trans.inverse_sigmoid(np.random.rand(n_fit_par))  # make 0 to 1 into -inf to inf
+            model.simulate_agent(gen_par, ag)
+        else:
+            gen_par = np.full(n_fit_par, np.nan)
         # Recover
         rec_par = model.minimize_NLL(ag, n_iter)
-        fit = model.simulate_agents(rec_par, ag, 'calculate_fit')
+        fit = model.simulate_agent(rec_par, ag, 'calculate_fit')
         # Print and save
         model.update_genrec(gen_par, rec_par, fit, ag)
 
-for learning_style in ['RL', 'Bayes']:
-    for method in ['direct', 'softmax', 'epsilon-greedy']:
-        generate_and_recover(pars, learning_style, method)
-
-for learning_style in ['RL', 'Bayes']:
-    for method in ['direct', 'softmax', 'epsilon-greedy']:
-        for param_name in pars:
-            print(param_name)
-            # check_parameters(param_name, agent_stuff, task_stuff, learning_style, method)
-            generate_and_recover([param_name], learning_style, method)
+# for learning_style in ['RL', 'Bayes']:
+#     for method in ['direct', 'softmax', 'epsilon-greedy']:
+#         generate_and_recover(pars, learning_style, method, range(n_agents), 'generate_and_recover')
+#
+# for learning_style in ['RL', 'Bayes']:
+#     for method in ['direct', 'softmax', 'epsilon-greedy']:
+#         for param_name in pars:
+#             print(param_name)
+#             # check_parameters(param_name, agent_stuff, task_stuff, learning_style, method)
+#             generate_and_recover([param_name], learning_style, method, range(n_agents), 'generate_and_recover')
 
 
 # Fit parameters to actual data
-# agents = np.array([15, 16, 17, 18, 20, 22, 23, 24, 25, 31, 32, 33, 34, 35, 40, 42, 43, 44, 48, 49, 52, 53, 56, 60, 63, 65, 67])
-#
-# params0 = 0.5 * np.ones(len(agent_stuff['free_par']))
-# NLL, BIC, AIC = model.calculate_fit(params0, agents[0], False)
-# minimization = minimize(model.calculate_fit,
-#                         params0, (agents[0], True),  # arguments to model.calculate_fit: id, only_NLL
-#                         method='Nelder-Mead', options={'disp': True})
-# fit_par = model.get_fit_par(minimization)
-# NLL, BIC, AIC = model.calculate_fit(fit_par, agents[0], False)
-# model.simulate_agents(fit_par)
+agents = np.array([15, 16, 17, 18, 19, 20, 22, 23, 24, 25, 27, 30, 31, 32, 33, 34, 35, 37, 40, 42, 43, 44, 46, 48,
+                   49, 52, 53, 56, 60, 63, 65, 67, 69, 70, 73, 74, 77, 80, 87,
+                   300, 301, 302, 304, 305, 306, 308, 309, 310, 311, 314, 316])
+
+for learning_style in ['RL', 'Bayes']:
+    for method in ['direct', 'softmax', 'epsilon-greedy']:
+        generate_and_recover(pars, learning_style, method, agents)

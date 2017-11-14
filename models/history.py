@@ -6,6 +6,7 @@ import os
 class History(object):
     def __init__(self, task, agent):
         self.agent_id = agent.id
+        self.RTs = agent.RTs
         colnames = ['NLL', 'BIC', 'AIC', 'LL', 'values_l', 'values_r', 'p_action_l', 'p_action_r',
                     'alpha', 'beta', 'epsilon', 'perseverance', 'decay',
                     'selected_box', 'reward', 'p_switch', 'correct_box', 'sID', 'RT']
@@ -13,7 +14,7 @@ class History(object):
         self.subj_file = pd.DataFrame(data=subj_file, columns=colnames)
         self.subj_file[['alpha', 'beta', 'epsilon', 'perseverance', 'decay']] =\
             [agent.alpha, agent.beta, agent.epsilon, agent.perseverance, agent.decay]
-        self.data_path = agent.data_path
+        self.data_path = agent.data_path + '/' + agent.learning_style + '/' + agent.method
 
     def update(self, agent, task, action, reward, trial):
         self.subj_file.loc[trial, 'selected_box'] = action
@@ -30,7 +31,7 @@ class History(object):
     def save_csv(self, fit):
         self.subj_file[['NLL', 'BIC', 'AIC']] = fit
         self.subj_file['sID'] = self.agent_id
-        self.subj_file['RT'] = np.nan
+        self.subj_file['RT'] = self.RTs
         self.subj_file = self.subj_file.drop(0)
         if not os.path.isdir(self.data_path):
             os.makedirs(self.data_path)
