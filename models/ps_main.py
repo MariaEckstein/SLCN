@@ -4,6 +4,7 @@ from transform_pars import TransformPars
 
 
 # TD: first trial is missing in the fitted data!
+# Note: The code will now not work for simulation; I changed the file paths and some other things
 
 # Set parameters
 n_agents = 40
