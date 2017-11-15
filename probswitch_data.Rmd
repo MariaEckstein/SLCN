@@ -25,8 +25,8 @@ dir.create(plot_dir)
 
 all_params = data.frame()
 
-for (learning_style in c("RL")) {#, "Bayes"
-  for (method in c("direct", "softmax", "epsilon-greedy")) {#
+for (learning_style in c("Bayes")) {#, "Bayes"
+  for (method in c("direct", "softmax")) {#, "epsilon-greedy"
     # for (param_name in c("_vary_alpha", "_vary_beta", "_vary_epsilon", "_vary_perseverance", "_vary_decay", "_fit_alphabetaepsilonperseverancedecay", "_fit_alpha", "_fit_beta", "_fit_epsilon", "_fit_perseverance", "_fit_decay")) {
       print(paste(learning_style, method)) #, param_name
       

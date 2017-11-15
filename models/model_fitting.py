@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 
 class ModelFitting(object):
 
-    def __init__(self, agent_stuff, task_stuff, parameters, path_extension=''):
+    def __init__(self, agent_stuff, task_stuff, parameters):
         self.agent_stuff = agent_stuff
         self.parameters = parameters
         self.task_stuff = task_stuff
@@ -16,7 +16,6 @@ class ModelFitting(object):
         self.genrec = pd.DataFrame(columns=['sID', 'learning_style', 'method', 'NLL', 'BIC', 'AIC'] +
                                            [par + '_gen' for par in self.pars] + [par + '_rec' for par in self.pars])
         self.genrec_row = 0
-        self.agent_stuff['data_path'] = 'C:/Users/maria/MEGAsync/SLCNdata/' + path_extension
 
     def simulate_agent(self, params, ag, goal='simulate'):
 

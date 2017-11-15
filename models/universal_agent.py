@@ -13,6 +13,7 @@ class UniversalAgent(object):
         [self.alpha, self.beta, self.epsilon, self.perseverance, self.decay] = pars
         # Load participant data
         self.data_path = agent_stuff['data_path']
+        self.hist_path = agent_stuff['hist_path']
         if goal == 'simulate':
             self.RTs = np.nan
         else:  # goal == 'calculate_fit' or 'calculate_NLL'

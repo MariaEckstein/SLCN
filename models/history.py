@@ -14,7 +14,7 @@ class History(object):
         self.subj_file = pd.DataFrame(data=subj_file, columns=colnames)
         self.subj_file[['alpha', 'beta', 'epsilon', 'perseverance', 'decay']] =\
             [agent.alpha, agent.beta, agent.epsilon, agent.perseverance, agent.decay]
-        self.data_path = agent.data_path + '/' + agent.learning_style + '/' + agent.method
+        self.data_path = agent.hist_path
 
     def update(self, agent, task, action, reward, trial):
         self.subj_file.loc[trial, 'selected_box'] = action
