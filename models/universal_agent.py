@@ -1,28 +1,25 @@
 import numpy as np
 import pandas as pd
-import os
-from transform_pars import TransformPars
-trans = TransformPars()
 
 
 class UniversalAgent(object):
-    def __init__(self, agent_stuff, params, task, id):
-        self.n_actions = task.n_actions  # 2
+    def __init__(self, agent_stuff, goal, params, task, trans, id):
+        self.n_actions = task.n_actions
         self.learning_style = agent_stuff['learning_style']
         self.id = id
-        raw_pars = trans.get_pars(agent_stuff, params)
-        pars = trans.adjust_limits(trans.sigmoid(raw_pars))
-        [self.alpha, self.beta, self.epsilon, self.perseverance, self.decay] = pars
         self.method = agent_stuff['method']
+        raw_pars = trans.get_pars(agent_stuff, params)
+        pars = trans.constrain_limits(trans.sigmoid(raw_pars))  # only simulate in reasonable range
+        [self.alpha, self.beta, self.epsilon, self.perseverance, self.decay] = pars
         # Load participant data
         self.data_path = agent_stuff['data_path']
-        file_name = self.data_path + '/PS_' + str(self.id) + '.csv'
-        if os.path.isfile(file_name):
+        if goal == 'simulate':
+            self.RTs = np.nan
+        else:  # goal == 'calculate_fit' or 'calculate_NLL'
+            file_name = self.data_path + '/PS_' + str(self.id) + '.csv'
             agent_data = pd.read_csv(file_name)
             self.actions = agent_data['selected_box']
             self.RTs = agent_data['RT']
-        else:
-            self.RTs = np.nan
         # Keep track of things
         if self.learning_style == 'RL':
             self.initial_value = 1 / self.n_actions
