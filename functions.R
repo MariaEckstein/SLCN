@@ -70,6 +70,8 @@ read_in_files = function() {
   all_files$choice_12_back = ifelse(all_files$choice_1_back, "left", "right")
   all_files$choice_12_back[!all_files$same_choice | is.na(all_files$same_choice)] = NA
   all_files$reward_port = factor(all_files$correct_box, levels = c(0, 1), labels = c("Left", "Right"))
+  all_files$age_group = "Children"
+  all_files$age_group[all_files$sID >= 300] = "Adults"
   
   return(all_files)
 }
@@ -108,8 +110,8 @@ model_plots = function() {
     facet_wrap(~ sID, ncol = 2)
   
   if (gg_save) {
-    ggsave(file.path(plot_dir, "gg_example_values.png"), gg_example_values, width = 12, height = 8)
-    ggsave(file.path(plot_dir, "gg_example_probs.png"), gg_example_probs, width = 12, height = 8)
+    ggsave(file.path(plot_dir, paste("gg_example_values", learning_style, method, ".png", sep = "")), gg_example_values, width = 12, height = 8)
+    ggsave(file.path(plot_dir, paste("gg_example_probs", learning_style, method, ".png", sep = "")), gg_example_probs, width = 12, height = 8)
   }
   
   gg_switch_values1 = ggplot(all_files) +
@@ -127,9 +129,9 @@ model_plots = function() {
     facet_grid(~ rewardversion)
   
   if (gg_save) {
-    ggsave(file.path(plot_dir, "gg_trial_values.png"), gg_trial_values)
-    ggsave(file.path(plot_dir, "gg_switch_values1.png"), gg_switch_values1)
-    ggsave(file.path(plot_dir, "gg_switch_values2.png"), gg_switch_values2)
+    ggsave(file.path(plot_dir, "gg_trial_values", learning_style, method, ".png", sep = ""), gg_trial_values)
+    ggsave(file.path(plot_dir, "gg_switch_values1", learning_style, method, ".png", sep = ""), gg_switch_values1)
+    ggsave(file.path(plot_dir, "gg_switch_values2", learning_style, method, ".png", sep = ""), gg_switch_values2)
   }
 }
 
@@ -144,11 +146,11 @@ genrec_plots = function() {
   gg_genrec_d = gg_genrec_a + aes(decay_gen, decay_rec)
   
   if (gg_save) {
-    ggsave(file.path(plot_dir, "gg_genrec_a.png"), gg_genrec_a)
-    ggsave(file.path(plot_dir, "gg_genrec_b.png"), gg_genrec_b)
-    ggsave(file.path(plot_dir, "gg_genrec_e.png"), gg_genrec_e)
-    ggsave(file.path(plot_dir, "gg_genrec_p.png"), gg_genrec_p)
-    ggsave(file.path(plot_dir, "gg_genrec_d.png"), gg_genrec_d)
+    ggsave(file.path(plot_dir, "gg_genrec_a", learning_style, method, ".png", sep = ""), gg_genrec_a)
+    ggsave(file.path(plot_dir, "gg_genrec_b", learning_style, method, ".png", sep = ""), gg_genrec_b)
+    ggsave(file.path(plot_dir, "gg_genrec_e", learning_style, method, ".png", sep = ""), gg_genrec_e)
+    ggsave(file.path(plot_dir, "gg_genrec_p", learning_style, method, ".png", sep = ""), gg_genrec_p)
+    ggsave(file.path(plot_dir, "gg_genrec_d", learning_style, method, ".png", sep = ""), gg_genrec_d)
   }
 }
 
@@ -156,13 +158,15 @@ paper_plots = function() {
   # Response times
   gg_RT = ggplot(all_files, aes(TrialID, RT, color = sID)) +
     geom_point() +
-    stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar")
+    stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
+    facet_grid(~ age_group)
   
   gg_RTt = ggplot(all_files_sum2, aes(trialsinceswitch, RT, color = sID)) +
     stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
     stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
     coord_cartesian(x = c(-3, 5)) +
-    geom_point(alpha = .3, position = "jitter")
+    geom_point(alpha = .3, position = "jitter") +
+    facet_grid(~ age_group)
   
   # Missed trials -> did not miss trials
   
@@ -170,7 +174,8 @@ paper_plots = function() {
   # ACC over trials
   gg_ACC = ggplot(all_files, aes(TrialID, ACC)) +
     stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
-    facet_grid(~ rewardversion)
+    facet_grid(~ rewardversion) +
+    facet_grid(~ age_group)
   
   # ACC over blocks
   gg_ACC_blocks = ggplot(subset(all_files, !is.na(choice_left)),
@@ -178,31 +183,47 @@ paper_plots = function() {
     stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
     stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
     coord_cartesian(x = c(-3, 7)) +
-    labs(x = "Trials since switch", y = "% choice left", color = "Reward port")
+    labs(x = "Trials since switch", y = "% choice left", color = "Reward port") +
+    facet_grid(~ age_group)
   # gg_ACC_blocks + facet_wrap(~ sID)
   
   # Rewards over trials
   gg_rewards = ggplot(all_files, aes(TrialID, reward)) +
     stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
     geom_point() + 
-    facet_grid(~ rewardversion)
+    facet_grid(~ rewardversion) +
+    facet_grid(~ age_group)
   
   gg_rewards2 = ggplot(subset(all_files_sum, !is.na(choice_12_back)),
                        aes(outcome_12_back, 100 * choice, fill = choice_12_back, group = choice_12_back)) +
     stat_summary(fun.data = mean_cl_normal, geom = "bar", fun.args = list(mult = 1), position = "dodge") +
     stat_summary(fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), position = position_dodge(0.9)) +
     coord_cartesian(y = c(0, 100)) +
-    labs(x = "Reward history (1 trial back, 2 trials back)", y = "% left choice", fill = "Previous two choices")
+    labs(x = "Reward history (1 trial back, 2 trials back)", y = "% left choice", fill = "Previous two choices") +
+    facet_grid(~ age_group)
   # gg_rewards2 + facet_wrap(~ sID)
   
+  # Fitted parameter values
+  gg_params = ggplot(fitted_paramsl, aes(parameter, value, color = age_group, fill = age_group)) +
+    stat_summary(fun.data = "mean_se", geom = "pointrange") + #, position = position_dodge(width = 0.8)) +
+    geom_point(position = "jitter", alpha = 0.3)
+  
+  # Simple win-stay loose-shift
+  gg_wsls = ggplot(wsls, aes(reward, stay, color = reward)) +
+    stat_summary(fun.data = "mean_se", geom = "pointrange") +
+    geom_point(alpha = 0.5, position = "jitter") +
+    facet_grid(~ age_group)
+  
   if (gg_save) {
-    if (data == "human") {
-      ggsave(file.path(plot_dir, "gg_RT.png"), gg_RT)
-      ggsave(file.path(plot_dir, "gg_RTt.png"), gg_RTt)
-      ggsave(file.path(plot_dir, "gg_ACC.png"), gg_ACC)
+    if (data %in% c("human", "fitted_human")) {
+      ggsave(paste(plot_dir, "/gg_RT.png", sep = ""), gg_RT)
+      ggsave(paste(plot_dir, "/gg_RTt.png", sep = ""), gg_RTt)
+      ggsave(paste(plot_dir, "/gg_ACC.png", sep = ""), gg_ACC)
     }
-    ggsave(file.path(plot_dir, "gg_ACC_blocks.png"), gg_ACC_blocks)
-    ggsave(file.path(plot_dir, "gg_rewards.png"), gg_rewards)
-    ggsave(file.path(plot_dir, "gg_rewards2.png"), gg_rewards2)
+    ggsave(paste(plot_dir, "/gg_params_", learning_style, method, ".png", sep = ""), gg_params)
+    ggsave(paste(plot_dir, "/gg_wsls.png", sep = ""), gg_wsls)
+    ggsave(paste(plot_dir, "/gg_ACC_blocks.png", sep = ""), gg_ACC_blocks)
+    ggsave(paste(plot_dir, "/gg_rewards.png", sep = ""), gg_rewards)
+    ggsave(paste(plot_dir, "/gg_rewards2.png", sep = ""), gg_rewards2)
   }
 }
