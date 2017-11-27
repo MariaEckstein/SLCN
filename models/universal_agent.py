@@ -3,17 +3,17 @@ import pandas as pd
 
 
 class UniversalAgent(object):
-    def __init__(self, agent_stuff, goal, params, task, trans, id):
+    def __init__(self, model, goal, params, task, id):
         self.n_actions = task.n_actions
-        self.learning_style = agent_stuff['learning_style']
+        self.learning_style = model.agent_stuff['learning_style']
         self.id = id
-        self.method = agent_stuff['method']
-        raw_pars = trans.get_pars(agent_stuff, params)
-        pars = trans.constrain_limits(trans.sigmoid(raw_pars))  # only simulate in reasonable range
+        self.method = model.agent_stuff['method']
+        raw_pars = model.parameters.get_pars(model.agent_stuff, params)
+        pars = model.parameters.constrain_limits(model.parameters.sigmoid(raw_pars))  # only simulate in reasonable range
         [self.alpha, self.beta, self.epsilon, self.perseverance, self.decay] = pars
         # Load participant data
-        self.data_path = agent_stuff['data_path']
-        self.hist_path = agent_stuff['hist_path']
+        self.data_path = model.agent_stuff['data_path']
+        self.hist_path = model.agent_stuff['hist_path']
         if goal == 'simulate':
             self.RTs = np.nan
         else:  # goal == 'calculate_fit' or 'calculate_NLL'
@@ -26,7 +26,7 @@ class UniversalAgent(object):
             self.initial_value = 1 / self.n_actions
             self.q = self.initial_value * np.ones(self.n_actions)
         elif self.learning_style == 'Bayes':
-            self.p_switch = 1 / np.mean(task.run_length)  # true average switch probability
+            self.p_switch = 1 / np.mean(task.run_length / task.p_reward)  # true average switch probability
             self.p_reward = task.p_reward  # true reward probability
             self.p_boxes = np.ones(self.n_actions) / self.n_actions  # initialize prior uniformly over all actions
             self.initial_value = self.p_boxes

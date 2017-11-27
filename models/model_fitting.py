@@ -12,15 +12,15 @@ class ModelFitting(object):
         self.agent_stuff = agent_stuff
         self.parameters = parameters
         self.task_stuff = task_stuff
-        self.pars = ['alpha', 'beta', 'epsilon', 'perseverance', 'decay']
         self.genrec = pd.DataFrame(columns=['sID', 'learning_style', 'method', 'NLL', 'BIC', 'AIC'] +
-                                           [par + '_gen' for par in self.pars] + [par + '_rec' for par in self.pars])
+                                           [par + '_gen' for par in self.parameters.par_names] +
+                                           [par + '_rec' for par in self.parameters.par_names])
         self.genrec_row = 0
 
     def simulate_agent(self, params, ag, goal='simulate'):
 
         task = Task(self.task_stuff, goal, ag, 200, self.agent_stuff)
-        agent = UniversalAgent(self.agent_stuff, goal, params, task, self.parameters, ag)
+        agent = UniversalAgent(self, goal, params, task, ag)
         if not goal == 'calculate_NLL':
             hist = History(task, agent)
 
@@ -39,10 +39,10 @@ class ModelFitting(object):
         if goal == 'calculate_NLL':
             return -agent.LL
         elif goal == 'calculate_fit':
-            hist.save_csv([-agent.LL, BIC, AIC])
+            hist.save_csv([-agent.LL, BIC, AIC], agent.hist_path)
             return [-agent.LL, BIC, AIC]
         elif goal == 'simulate':
-            hist.save_csv([-agent.LL, BIC, AIC])
+            hist.save_csv([-agent.LL, BIC, AIC], agent.hist_path)
 
     def minimize_NLL(self, ag, n_iter):
         n_fit_par = sum(self.agent_stuff['free_par'])

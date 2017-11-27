@@ -14,7 +14,6 @@ class History(object):
         self.subj_file = pd.DataFrame(data=subj_file, columns=colnames)
         self.subj_file[['alpha', 'beta', 'epsilon', 'perseverance', 'decay']] =\
             [agent.alpha, agent.beta, agent.epsilon, agent.perseverance, agent.decay]
-        self.data_path = agent.hist_path
 
     def update(self, agent, task, action, reward, trial):
         self.subj_file.loc[trial, 'selected_box'] = action
@@ -28,11 +27,11 @@ class History(object):
             self.subj_file.loc[trial, ['values_l', 'values_r']] = agent.p_actions
             self.subj_file.loc[trial, 'p_switch'] = agent.p_switch
 
-    def save_csv(self, fit):
+    def save_csv(self, fit, hist_path):
         self.subj_file[['NLL', 'BIC', 'AIC']] = fit
         self.subj_file['sID'] = self.agent_id
         self.subj_file['RT'] = self.RTs
         self.subj_file = self.subj_file.drop(0)
-        if not os.path.isdir(self.data_path):
-            os.makedirs(self.data_path)
-        self.subj_file.to_csv(self.data_path + "/PS_" + str(self.agent_id) + ".csv")
+        if not os.path.isdir(hist_path):
+            os.makedirs(hist_path)
+        self.subj_file.to_csv(hist_path + "/PS_" + str(self.agent_id) + ".csv")
