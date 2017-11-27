@@ -8,7 +8,7 @@ from gen_rec import GenRec
 
 
 # Set parameters
-n_iter = 1
+n_iter = 15
 n_agents = 30
 task_stuff = {'n_actions': 2,
               'p_reward': 0.75,

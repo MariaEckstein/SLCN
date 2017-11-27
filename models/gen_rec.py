@@ -13,9 +13,6 @@ class GenRec(object):
         model = ModelFitting(agent_stuff, task_stuff, self.parameters)
         model.adjust_free_par()
         for ag in agents:
-            print('Fitted pars:', fit_pars,
-                  'Model:', agent_stuff['learning_style'], agent_stuff['method'], ', ',
-                  'Agent:', ag)
             # Generate
             if use == 'generate_and_recover':
                 gen_par = self.parameters.inverse_sigmoid(np.random.rand(n_fit_par))  # get random values [-inf to inf]
@@ -25,6 +22,9 @@ class GenRec(object):
             fit = model.simulate_agent(rec_par, ag, 'calculate_fit')
             # Print and save
             model.update_genrec(gen_par, rec_par, fit, ag)
+            print('Fitted pars:', fit_pars,
+                  'Model:', agent_stuff['learning_style'], agent_stuff['method'], ', ',
+                  'Agent:', ag)
 
     def vary_parameters(self, param_name, agent_stuff, task_stuff):
         agent_stuff['data_path'] = 'C:/Users/maria/MEGAsync/SLCNdata/' + '_vary_' + param_name

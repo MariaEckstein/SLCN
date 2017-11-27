@@ -75,4 +75,4 @@ class ModelFitting(object):
                               fit, gen_pars_01, rec_pars_01))
         self.genrec.loc[self.genrec_row, :] = row
         self.genrec_row += 1
-        self.genrec.to_csv(self.agent_stuff['data_path'] + '/genrec.csv')
+        self.genrec.to_csv(self.agent_stuff['hist_path'] + '/genrec.csv')
