@@ -7,7 +7,7 @@ class GenRec(object):
         self.parameters = parameters
 
     def generate_and_recover(self, fit_pars, agents, n_iter, agent_stuff, task_stuff, use='fit_human_data'):
-        agent_stuff = self.__update_agent_stuff(agent_stuff, fit_pars, use='fit_human_data')
+        agent_stuff = self.__update_agent_stuff(agent_stuff, fit_pars, use)
         n_fit_par = sum(agent_stuff['free_par'])
         gen_par = np.full(n_fit_par, np.nan)
         model = ModelFitting(agent_stuff, task_stuff, self.parameters)
@@ -33,7 +33,7 @@ class GenRec(object):
             gen_par = self.parameters.inverse_sigmoid(par)
             model.simulate_agent([gen_par], ag)
 
-    def __update_agent_stuff(self, agent_stuff, fit_pars, use='fit_human_data'):
+    def __update_agent_stuff(self, agent_stuff, fit_pars, use):
         agent_stuff['free_par'] = [np.any(par == np.array(fit_pars)) for par in self.parameters.par_names]
         if use == 'generate_and_recover':
             data_path_extension = agent_stuff['learning_style'] + '/' + agent_stuff['method'] + '_fit_' + ''.join(fit_pars)
