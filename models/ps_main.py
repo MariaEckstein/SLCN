@@ -44,6 +44,6 @@ for learning_style in ['RL', 'Bayes']:
         genrec.generate_and_recover(genrec.parameters.par_names, range(n_agents), n_iter,
                                     agent_stuff, task_stuff, 'generate_and_recover')
         for param_name in genrec.parameters.par_names:
-            genrec.vary_parameters(param_name, agent_stuff, task_stuff)
+            # genrec.vary_parameters(param_name, agent_stuff, task_stuff)
             genrec.generate_and_recover([param_name], range(n_agents), n_iter,
                                         agent_stuff, task_stuff, 'generate_and_recover')
