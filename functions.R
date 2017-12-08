@@ -209,6 +209,9 @@ paper_plots = function() {
     geom_point(alpha = 0.5, position = "jitter") +
     facet_grid(~ age_group)
   
+  # Response times
+  gg_RT_blocks = gg_ACC_blocks + aes(y = RT) + coord_cartesian(x = c(-3, 7), y = c(250, 550))
+  
   if (gg_save) {
     if (data %in% c("human", "fitted_human")) {
       ggsave(paste(plot_dir, "/gg_RT.png", sep = ""), gg_RT)
@@ -216,8 +219,9 @@ paper_plots = function() {
       ggsave(paste(plot_dir, "/gg_ACC.png", sep = ""), gg_ACC)
     }
     ggsave(paste(plot_dir, "/gg_wsls.png", sep = ""), gg_wsls)
-    ggsave(paste(plot_dir, "/gg_ACC_blocks.png", sep = ""), gg_ACC_blocks)
+    ggsave(paste(plot_dir, "/gg_ACC_blocks.png", sep = ""), gg_ACC_blocks, width = 8, height = 3)
+    ggsave(paste(plot_dir, "/gg_RT_blocks.png", sep = ""), gg_RT_blocks, width = 8, height = 3)
     ggsave(paste(plot_dir, "/gg_rewards.png", sep = ""), gg_rewards)
-    ggsave(paste(plot_dir, "/gg_rewards2.png", sep = ""), gg_rewards2)
+    ggsave(paste(plot_dir, "/gg_rewards2.png", sep = ""), gg_rewards2, width = 8, height = 3)
   }
 }

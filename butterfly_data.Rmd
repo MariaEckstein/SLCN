@@ -8,6 +8,11 @@ output: html_notebook
 ```{r Set up parameters}
 # data_dir = 'C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/butterflytask/Results'
 data_dir = 'C:/Users/maria/MEGAsync/SLCNdata/BFResults'
+plot_dir = file.path(data_dir, "plots")
+if (!dir.exists(plot_dir)) {
+  dir.create(plot_dir)
+}
+gg_save = T
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
@@ -48,6 +53,9 @@ for (filename in filenames) {
   
   all_files = as.data.frame(rbind(all_files, dat[order(dat$TrialID),]))
 }
+all_files$age_group = "Children"
+all_files$age_group[as.numeric(as.character(all_files$sID)) >= 300] = "Adults"
+all_files$age_group = factor(all_files$age_group)
 all_files$butterfly = factor(all_files$butterfly)
 all_files$sID = factor(all_files$sID)
 all_files$two_trials = 1
@@ -62,18 +70,19 @@ length(unique(all_files$sID))
 
 ```{r Summary statistics}
 # Missed trials
-ggplot(all_files, aes(reorder(sID, missed), missed)) +
+gg_missed_trials = ggplot(all_files, aes(reorder(sID, missed), missed)) +
   stat_summary(fun.y = sum, geom = "point") +
   labs(x = "Subject", y = "Number of missed trials")
 
-all_files_sum = ddply(all_files, .(sID, block, train, butterfly), summarize,
+all_files_sum = ddply(all_files, .(sID, age_group, block, train, butterfly), summarize,
                       RT = mean(RT, na.rm = T),
                       ACC = mean(ACC, na.rm = T))
 
-wsls_dat = ddply(all_files, .(sID, block, train, reward), summarize,
+wsls_dat = ddply(all_files, .(sID, age_group, block, train, reward), summarize,
                  stay = sum(fly_stay == T, na.rm = T),
                  shift = sum(fly_stay == F, na.rm = T))
-wsls_dat_wide = melt(wsls_dat, id.vars = c("sID", "block", "train", "reward"))
+wsls_dat_wide = melt(wsls_dat, id.vars = c("sID", "age_group", "block", "train", "reward"))
+wsls_dat_wide$reward[wsls_dat_wide$block == 5] = "Testing block"
 
 head(all_files_sum)
 head(wsls_dat)
@@ -81,62 +90,88 @@ head(wsls_dat)
 # Randomization
 with(subset(all_files, block < 5), table(ACC, reward))  # block 5 has NO feedback!!
 wsls_dat_sum = with(subset(all_files, block == 1), table(fly_stay, reward))
+
+if (gg_save) {
+  ggsave(file.path(plot_dir, "0gg_missed_trials.png"), gg_missed_trials)
+}
 ```
 ```{r ACC}
 # Individuals
-ggplot(all_files, aes(block, ACC, group = sID, color = sID)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
-  labs(x = "Block", y = "% correct")
+gg_indiv_learning = ggplot(all_files, aes(block, ACC, group = sID, color = sID)) +
+  stat_summary(fun.data = mean_se, geom = "line") +
+  stat_summary(fun.data = mean_se, geom = "pointrange") +
+  labs(x = "Block", y = "% correct") +
+  theme(legend.position = "none") +
+  facet_grid(~ age_group)
 
 # Group
-A = ggplot(all_files_sum, aes(block, ACC)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
+gg_ACC_over_blocks = ggplot(all_files_sum, aes(block, 100 * ACC)) +
+  stat_summary(fun.data = mean_se, geom = "line") +
+  stat_summary(fun.data = mean_se, geom = "pointrange") +
   labs(x = "Block", y = "% correct", color = "Butterfly") +
-  coord_cartesian(y = c(0.5, 1))
-A
-A + aes(group = butterfly, color = butterfly)
+  coord_cartesian(y = c(50, 100)) +
+  facet_grid(~ age_group)
+gg_ACC_over_blocks_fly = gg_ACC_over_blocks + aes(group = butterfly, color = butterfly)
 
-B = ggplot(subset(all_files, block == 1), aes(two_trials, ACC)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
-  labs(x = "Trial (block 1 only)", y = "Correct butterly selected (%)", color = "Butterfly") +
-  coord_cartesian(y = c(0, 1))
-B
-B + aes(group = butterfly, color = butterfly)
+gg_ACC_block1 = ggplot(subset(all_files, block == 1), aes(two_trials, 100 * ACC)) +
+  stat_summary(fun.data = mean_se, geom = "line") +
+  stat_summary(fun.data = mean_se, geom = "pointrange") +
+  labs(x = "Trial (block 1 only)", y = "Correct flower selected (%)", color = "Butterfly") +
+  coord_cartesian(y = c(0, 100)) +
+  facet_grid(~ age_group)
+gg_ACC_block1_fly = gg_ACC_block1 + aes(group = butterfly, color = butterfly)
+
+if (gg_save) {
+  ggsave(file.path(plot_dir, "1gg_indiv_learning.png"), gg_indiv_learning, width = 5, height = 3)
+  ggsave(file.path(plot_dir, "1gg_ACC_over_blocks.png"), gg_ACC_over_blocks, width = 4, height = 3)
+  ggsave(file.path(plot_dir, "1gg_ACC_over_blocks_fly.png"), gg_ACC_over_blocks_fly, width = 5, height = 3)
+  ggsave(file.path(plot_dir, "1gg_ACC_block1.png"), gg_ACC_block1, width = 6, height = 3)
+  ggsave(file.path(plot_dir, "1gg_ACC_block1_fly.png"), gg_ACC_block1_fly, width = 7, height = 3)
+}
 ```
 ```{r, Win-stay loose-shift}
-ggplot(subset(wsls_dat_wide, !is.na(reward)), aes(block, value, color = variable)) +
+gg_wsls = ggplot(subset(wsls_dat_wide, reward != "NaN"), aes(factor(block), value, color = variable)) +
   stat_summary(fun.data = mean_cl_normal, geom = "pointrange") +
-  geom_point(alpha = .3, position = "jitter") +
+  # geom_point(alpha = .3, position = "jitter") +
   labs(x = "Block", y = "# of stays / shifts", color = "") +
-  facet_wrap(~ factor(reward, levels = c(0, 1), labels = c("No reward in prev. trial", "Reward in prev. trial")))
+  facet_grid(age_group ~ factor(reward, levels = c(0, 1, "Testing block"), labels = c("No reward in prev. trial", "Reward in prev. trial", "Testing block")), scales = "free_x")
+
+if (gg_save) {
+  ggsave(file.path(plot_dir, "2gg_wsls.png"), gg_wsls, width = 7, height = 5)
+}
 ```
 ```{r Response times}
-RT = ggplot(all_files_sum, aes(block, RT, color = train)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange")
-RT
-RT + aes(color = sID)
+gg_RT = ggplot(all_files_sum, aes(block, RT / 1000, color = train)) +
+  stat_summary(fun.data = mean_se, geom = "line") +
+  stat_summary(fun.data = mean_se, geom = "pointrange") +
+  labs(x = "Block", y = "Response time (msec)") +
+  facet_grid(~ age_group)
 
 # Rewards
-ggplot(subset(all_files, block < 5), aes(block, reward, group = sID, color = sID)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") #+
-  # facet_grid(~ sID)
+gg_rewards = ggplot(subset(all_files, block < 5), aes(block, reward, group = age_group, color = age_group)) +
+  stat_summary(fun.data = mean_se, geom = "line") +
+  stat_summary(fun.data = mean_se, geom = "pointrange") +
+  facet_grid(~ age_group)
 
 # ACC & Reward over time by butterfly
 all_files$butterfly = factor(all_files$butterfly)
-ggplot(all_files, aes(block, ACC, group = sID, color = train)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
-  facet_grid(butterfly ~ sID)
+gg_ACC_rewards = ggplot(all_files, aes(block, 100 * ACC, group = age_group, color = train)) +
+  stat_summary(fun.data = mean_se, geom = "line") +
+  stat_summary(fun.data = mean_se, geom = "pointrange") +
+  theme(legend.position = "none") +
+  facet_grid( ~ age_group)
 
-ggplot(subset(all_files, block < 5), aes(block, reward, group = sID, color = train)) +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
-  stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
-  facet_grid(butterfly ~ sID)
+gg_ACC_rewards2 = ggplot(subset(all_files, block < 5), aes(block, reward)) +
+  stat_summary(fun.data = mean_se, geom = "line") +
+  stat_summary(fun.data = mean_se, geom = "pointrange") +
+  facet_grid( ~ age_group)
+
+if (gg_save) {
+  ggsave(file.path(plot_dir, "3gg_RT.png"), gg_RT, width = 7, height = 5)
+  ggsave(file.path(plot_dir, "3gg_rewards.png"), gg_rewards, width = 7, height = 5)
+  ggsave(file.path(plot_dir, "3gg_ACC_rewards.png"), gg_ACC_rewards, width = 4, height = 5)
+  ggsave(file.path(plot_dir, "3gg_ACC_rewards2.png"), gg_ACC_rewards2, width = 5, height = 5)
+}
 ```
 ```{r}
 # Were butterflies rewarded for right key presses?
