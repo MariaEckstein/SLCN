@@ -203,11 +203,6 @@ paper_plots = function() {
     facet_grid(~ age_group)
   # gg_rewards2 + facet_wrap(~ sID)
   
-  # Fitted parameter values
-  gg_params = ggplot(fitted_paramsl, aes(parameter, value, color = age_group, fill = age_group)) +
-    stat_summary(fun.data = "mean_se", geom = "pointrange") + #, position = position_dodge(width = 0.8)) +
-    geom_point(position = "jitter", alpha = 0.3)
-  
   # Simple win-stay loose-shift
   gg_wsls = ggplot(wsls, aes(reward, stay, color = reward)) +
     stat_summary(fun.data = "mean_se", geom = "pointrange") +
@@ -220,7 +215,6 @@ paper_plots = function() {
       ggsave(paste(plot_dir, "/gg_RTt.png", sep = ""), gg_RTt)
       ggsave(paste(plot_dir, "/gg_ACC.png", sep = ""), gg_ACC)
     }
-    ggsave(paste(plot_dir, "/gg_params_", learning_style, method, ".png", sep = ""), gg_params)
     ggsave(paste(plot_dir, "/gg_wsls.png", sep = ""), gg_wsls)
     ggsave(paste(plot_dir, "/gg_ACC_blocks.png", sep = ""), gg_ACC_blocks)
     ggsave(paste(plot_dir, "/gg_rewards.png", sep = ""), gg_rewards)

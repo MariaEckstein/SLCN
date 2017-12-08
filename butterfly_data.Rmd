@@ -7,7 +7,7 @@ output: html_notebook
 
 ```{r Set up parameters}
 # data_dir = 'C:/Users/prokofiev/Desktop/SLCN Tasks/SLCN/butterflytask/Results'
-data_dir = 'C:/Users/maria/Desktop/SLCN/butterflytask/Results'
+data_dir = 'C:/Users/maria/MEGAsync/SLCNdata/BFResults'
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
@@ -56,7 +56,7 @@ for (two_trials in seq(3, max(all_files$TrialID), 2)) {
 }
 all_files = subset(all_files, !sID %in% c(11, 13, 14))
 summary(all_files)
-head(all_files)
+all_files
 length(unique(all_files$sID))
 ```
 
@@ -81,7 +81,6 @@ head(wsls_dat)
 # Randomization
 with(subset(all_files, block < 5), table(ACC, reward))  # block 5 has NO feedback!!
 wsls_dat_sum = with(subset(all_files, block == 1), table(fly_stay, reward))
-plot(a)
 ```
 ```{r ACC}
 # Individuals

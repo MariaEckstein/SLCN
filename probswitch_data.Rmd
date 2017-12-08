@@ -25,13 +25,17 @@ dir.create(plot_dir)
 
 all_params = data.frame()
 
-for (learning_style in c("Bayes")) {#, "Bayes"
-  for (method in c("direct", "softmax")) {#, "epsilon-greedy"
+for (learning_style in c("Bayes", "RL")) {
+  for (method in c("direct", "softmax", "epsilon-greedy")) {
     # for (param_name in c("_vary_alpha", "_vary_beta", "_vary_epsilon", "_vary_perseverance", "_vary_decay", "_fit_alphabetaepsilonperseverancedecay", "_fit_alpha", "_fit_beta", "_fit_epsilon", "_fit_perseverance", "_fit_decay")) {
       print(paste(learning_style, method)) #, param_name
       
       learning_dir = file.path(base_dir, learning_style)
       data_dir = file.path(learning_dir, method)#, param_name
+      
+      if (data == "human") {
+        data_dir = base_dir
+      }
       
       all_files = read_in_files()
       if (dim(all_files)[1] > 0) {
@@ -44,20 +48,29 @@ for (learning_style in c("Bayes")) {#, "Bayes"
                                choice = mean(choice_left, na.rm = T),
                                RT = median(RT, na.rm = T))
         # Parameters
-        fitted_params = ddply(all_files,
-                              .(sID, age_group), summarize,
-                              alpha = mean(alpha),
-                              beta = mean(beta),
-                              epsilon = mean(epsilon),
-                              perseverance = mean(perseverance),
-                              decay = mean(decay),
-                              BIC = mean(BIC),
-                              AIC = mean(AIC))
-        fitted_params$learning_style = learning_style
-        fitted_params$learning_style = factor(fitted_params$learning_style)
-        fitted_params$method = method
-        fitted_params$method = factor(fitted_params$method)
-        fitted_paramsl = melt(fitted_params, measure.vars = c("alpha", "beta", "epsilon", "perseverance", "decay"), variable.name = "parameter")
+        if (data != "human") {
+          fitted_params = ddply(all_files,
+                                .(sID, age_group), summarize,
+                                alpha = mean(alpha),
+                                beta = mean(beta),
+                                epsilon = mean(epsilon),
+                                perseverance = mean(perseverance),
+                                decay = mean(decay),
+                                BIC = mean(BIC),
+                                AIC = mean(AIC))
+          fitted_params$learning_style = learning_style
+          fitted_params$learning_style = factor(fitted_params$learning_style)
+          fitted_params$method = method
+          fitted_params$method = factor(fitted_params$method)
+          fitted_paramsl = melt(fitted_params, measure.vars = c("alpha", "beta", "epsilon", "perseverance", "decay"), variable_name = "parameter")
+          all_params = rbind(all_params, fitted_params)
+          # Fitted parameter values
+          gg_params = ggplot(fitted_paramsl, aes(parameter, value, color = age_group, fill = age_group)) +
+            stat_summary(fun.data = "mean_se", geom = "pointrange") + #, position = position_dodge(width = 0.8)) +
+            geom_point(position = "jitter", alpha = 0.3)
+          ggsave(paste(plot_dir, "/gg_params_", learning_style, method, ".png", sep = ""), gg_params)
+  
+        }
         
         # Win-stay loose-shift
         stay = with(all_files, c(choice_left == choice_1_back))
@@ -66,7 +79,6 @@ for (learning_style in c("Bayes")) {#, "Bayes"
                      stay = mean(stay, na.rm = T))
         wsls$reward = factor(wsls$reward)
         
-        all_params = rbind(all_params, fitted_params)
         paper_plots()
         
         if (!data %in% c("human", "fitted_human")) {
@@ -80,16 +92,31 @@ for (learning_style in c("Bayes")) {#, "Bayes"
   }
 }
 
-all_params$learning_style = factor(all_params$learning_style)
-all_params$method = factor(all_params$method)
-summary(all_params)
+if (data != "human") {
+  all_params$learning_style = factor(all_params$learning_style)
+  all_params$method = factor(all_params$method)
+  summary(all_params)
+  
+  ddply(all_params, .(age_group, learning_style, method), summarize,
+        BIC = mean(BIC))
 
-all_paramsl = melt(all_params, measure.vars = c("BIC", "AIC"), variable.name = "measure", value.name = "fit")
-gg_fit = ggplot(subset(all_paramsl, measure == "BIC"), aes(learning_style, fit, color = learning_style)) +
-  stat_summary(fun.data = "mean_se", geom = "pointrange") +
-  geom_point(position = "jitter", alpha = 0.5) +
-  facet_grid(age_group ~ method)
-if (gg_save) {
-  ggsave(file.path(plot_dir, "gg_fit.png"), gg_fit)
+  # Git within-subject differences
+  # all_paramsw = 
+    # reshape(all_params, v.names = c("learning_style", "method"), direction = "wide")#
+  all_paramsw1 = reshape(subset(all_params, select = c("sID", "age_group", "BIC", "learning_style", "method")),
+          timevar = "learning_style", idvar = c("sID", "age_group", "method"), direction = "wide")
+  all_paramsw2 = reshape(all_paramsw1,
+          timevar = "method", idvar = c("sID", "age_group"), direction = "wide")
+  ggplot(all_paramsw2, aes(1, BIC.Bayes.direct - BIC.Bayes.softmax)) +
+    geom_point(position = "jitter")
+  
+  all_paramsl = melt(all_params, measure.vars = c("BIC", "AIC"), variable_name = "measure")
+  gg_fit = ggplot(subset(all_paramsl, measure == "BIC"), aes(learning_style, value, color = learning_style)) +
+    stat_summary(fun.data = "mean_se", geom = "pointrange") +
+    # geom_point(position = "jitter", alpha = 0.5) +
+    facet_grid(age_group ~ method)
+  if (gg_save) {
+    ggsave(file.path(plot_dir, "gg_fit2.png"), gg_fit)
+  }
 }
 ```
