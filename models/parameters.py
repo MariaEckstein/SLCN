@@ -61,8 +61,14 @@ class Parameters(object):
         self.fit_pars = fit_pars
 
     def adjust_fit_pars(self, learning_style, method):
-        if learning_style == 'Bayes':
+        if learning_style == 'RL':
+            self.fit_pars[0] = True  # alpha
+        else:
             self.fit_pars[0] = False  # alpha
+        if learning_style == 'estimate-switch':
+            self.fit_pars[5:8] = True  # the three estimate-switch parameters
+        else:
+            self.fit_pars[5:8] = False  # the three estimate-switch parameters
         if method == 'epsilon-greedy':
             self.fit_pars[1:3] = [False, True]  # beta, epsilon
         elif method == 'softmax':

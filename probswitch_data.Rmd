@@ -18,7 +18,7 @@ if (data %in% c("human", "fitted_human")) {
   base_dir = "C:/Users/maria/MEGAsync/SLCNdata/PSResults"
 } else {
   base_dir = "C:/Users/maria/MEGAsync/SLCN/PSGenRec"
-  genrec_dir = file.path(base_dir, 'genrec')
+  genrec_dir = base_dir
 }
 plot_dir = file.path(base_dir, "plots")
 unlink(plot_dir, recursive=TRUE)  # Delete old plots

@@ -44,10 +44,11 @@ class FitParameters(object):
 
         all_params_lim = self.parameters.inf_to_lim(params_inf)
         agent = UniversalAgent(self.agent_stuff, all_params_lim, self.task_stuff)
-        record_data = RecordData(n_trials=self.task_stuff['n_trials'],
-                                 agent_id=agent.id,
-                                 mode='add_to_existing_data',
-                                 agent_data=agent_data)
+        if goal == 'add_decisions_and_fit':
+            record_data = RecordData(n_trials=self.task_stuff['n_trials'],
+                                     agent_id=agent.id,
+                                     mode='add_to_existing_data',
+                                     agent_data=agent_data)
 
         n_trials = len(agent_data)
         for trial in range(n_trials):

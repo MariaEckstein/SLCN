@@ -20,11 +20,9 @@ class RecordData(object):
         self.subj_file['epsilon' + suff] = agent.epsilon
         self.subj_file['perseverance' + suff] = agent.perseverance
         self.subj_file['decay' + suff] = agent.decay
-
-    # def add_behavior(self, action, reward, trial, suff=''):
-    #     self.subj_file.loc[trial, 'selected_box' + suff] = action
-    #     self.subj_file.loc[trial, 'reward' + suff] = reward
-    #     self.subj_file.loc[trial, 'correct_box' + suff] = task.correct_box
+        self.subj_file['w_reward' + suff] = agent.w_reward
+        self.subj_file['w_noreward' + suff] = agent.w_noreward
+        self.subj_file['w_explore' + suff] = agent.w_explore
 
     def add_behavior(self, task, action, reward, trial, suff=''):
         self.subj_file.loc[trial, 'selected_box' + suff] = action
@@ -38,7 +36,7 @@ class RecordData(object):
         if agent.learning_style == 'RL':
             self.subj_file.loc[trial, 'values_l' + suff] = agent.q[0]
             self.subj_file.loc[trial, 'values_r' + suff] = agent.q[1]
-        elif agent.learning_style == 'Bayes':
+        else:  # if agent.learning_style == 'Bayes' or 'estimate-switch'
             self.subj_file.loc[trial, 'values_l' + suff] = agent.p_actions[0]
             self.subj_file.loc[trial, 'values_r' + suff] = agent.p_actions[1]
             self.subj_file.loc[trial, 'p_switch' + suff] = agent.p_switch

@@ -5,9 +5,9 @@ import numpy as np
 class GenRec(object):
     def __init__(self, parameters, full_genrec_path):
         self.save_path = full_genrec_path
-        try:
+        try:  # read in genrec if one exists already
             self.genrec = pd.read_csv(self.save_path, index_col=0)
-        except:
+        except:  # otherwise, create a new one
             self.genrec = pd.DataFrame(columns=['sID',
                                                 'learning_style', 'method', 'fit_par',
                                                 'NLL', 'BIC', 'AIC'] +
