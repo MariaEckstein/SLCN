@@ -30,21 +30,15 @@ class UniversalAgent(object):
                 self.p_actions = np.ones(self.n_actions) / self.n_actions
             else:
                 self.p_actions = self.epsilon * np.ones(self.n_actions)
-                best_action = np.argwhere(sticky_values == np.nanmax(sticky_values))[0]
-                self.p_actions[best_action] = 1 - self.epsilon
+                better_action = np.argwhere(sticky_values == np.nanmax(sticky_values))[0]
+                self.p_actions[better_action] = 1 - self.epsilon
         elif self.method == 'softmax':
-            p_left_box = 1 / (1 + np.exp(
-                self.beta * (sticky_values[1] - sticky_values[0])
-            ))
+            p_left_box = 1 / (1 + np.exp(self.beta * (sticky_values[1] - sticky_values[0])))
             self.p_actions = np.array([p_left_box, 1 - p_left_box])
-        elif self.method == 'direct':
-            self.p_actions = sticky_values / np.sum(sticky_values)  # normalize
         self.p_actions = 0.999 * self.p_actions + 0.001 / self.n_actions  # avoid 0's & 1's
 
     def select_action(self):
-        action = int(np.random.rand() > self.p_actions[0])  # select left ('0') when np.random.rand() < p_actions[0]
-        self.previous_action = np.array(range(self.n_actions)) == action
-        return action
+        return int(np.random.rand() > self.p_actions[0])  # select left ('0') when np.random.rand() < p_actions[0]
 
     def _get_action_values(self):
         if self.learning_style == 'RL':
@@ -54,20 +48,21 @@ class UniversalAgent(object):
 
     # Learn
     def learn(self, action, reward):
+        self.previous_action = np.array(range(self.n_actions)) == action
         self._update_LL(action)
         if self.learning_style == 'RL':
-            self._learn_rl(action, reward)
+            self._update_q(action, reward)
         elif self.learning_style == 'Bayes':
-            self._learn_bayes(action, reward)
+            self._update_p_boxes(action, reward)
 
     # Learn helpers
     def _update_LL(self, action):
         self.LL += np.log(self.p_actions[action])
 
-    def _learn_bayes(self, action, reward):
+    def _update_p_boxes(self, action, reward):
         self.p_boxes += self.decay * (self.initial_value - self.p_boxes)  # decay values back to uniform
         if reward == 1:  # The probability of getting a reward is 0 for all actions except the correct one
-            lik_boxes = np.zeros(self.n_actions) + 0.001  # avoid getting likelihoods of 0
+            lik_boxes = np.zeros(self.n_actions) + 0.001  # avoid likelihoods of 0
             lik_boxes[action] = self.p_reward
         else:  # The probability of getting NO reward is 1 for all actions except the correct one
             lik_boxes = np.ones(self.n_actions)
@@ -78,6 +73,6 @@ class UniversalAgent(object):
         next_trial_if_switch = self.p_switch * np.flipud(posterior)
         self.p_boxes = next_trial_if_no_switch + next_trial_if_switch
 
-    def _learn_rl(self, action, reward):
+    def _update_q(self, action, reward):
         self.q += self.decay * (self.initial_value - self.q)  # decay values back to initial value
         self.q[action] += self.alpha * (reward - self.q[action])  # update value of chosen action

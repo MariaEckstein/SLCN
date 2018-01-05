@@ -1,27 +1,23 @@
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
-import os
 from task import Task
 from universal_agent import UniversalAgent
 from record_data import RecordData
 
 
 class FitParameters(object):
-    def __init__(self, parameters, data_path, task_stuff, agent_stuff):
+    def __init__(self, parameters, task_stuff, agent_stuff):
         self.parameters = parameters
-        self.data_path = data_path
-        if not os.path.isdir(self.data_path):
-            os.makedirs(self.data_path)
         self.task_stuff = task_stuff
         self.agent_stuff = agent_stuff
         self.n_fit_par = sum(parameters.fit_pars)
 
-    def get_agent_data(self, way, all_params_lim=()):
+    def get_agent_data(self, way, data_path=(), all_params_lim=()):
         if way == 'simulate':
             return self.simulate_agent(all_params_lim)
         else:
-            file_name = self.data_path + '/PS_' + str(self.agent_stuff['id']) + '.csv'
+            file_name = data_path + '/PS_' + str(self.agent_stuff['id']) + '.csv'
             return pd.read_csv(file_name)
 
     def simulate_agent(self, all_params_lim):
@@ -38,11 +34,10 @@ class FitParameters(object):
             action = agent.select_action()
             reward = task.produce_reward(action)
             agent.learn(action, reward)
-            record_data.add_behavior(action, reward, trial)
-            # record_data.add_behavior(task, action, reward, trial)
+            record_data.add_behavior(task, action, reward, trial)
             record_data.add_decisions(agent, trial)
 
-        record_data.add_parameters(agent)  # for debugging only!
+        record_data.add_parameters(agent)
         return record_data.get()
 
     def calculate_NLL(self, params_inf, agent_data, goal='calculate_NLL'):
@@ -61,8 +56,6 @@ class FitParameters(object):
             reward = int(agent_data['reward'][trial])
             agent.learn(action, reward)
             if goal == 'add_decisions_and_fit':
-                record_data.add_behavior(action, reward, trial, suff='_rec')
-                # record_data.add_behavior(task, action, reward, trial, suff='_rec')
                 record_data.add_decisions(agent, trial, suff='_rec')
 
         BIC = - 2 * agent.LL + self.n_fit_par * np.log(n_trials)
@@ -90,5 +83,5 @@ class FitParameters(object):
         pars_inf = values[minimum][0]
         return self.parameters.inf_to_lim(pars_inf[1:])
 
-    def write_agent_data(self, agent_data):
-        agent_data.to_csv(self.data_path + "/PS_" + str(agent_data['sID'][0]) + ".csv")
+    def write_agent_data(self, agent_data, save_path):
+        agent_data.to_csv(save_path + "PS_" + str(agent_data['sID'][0]) + ".csv")

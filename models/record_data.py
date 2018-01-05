@@ -21,15 +21,15 @@ class RecordData(object):
         self.subj_file['perseverance' + suff] = agent.perseverance
         self.subj_file['decay' + suff] = agent.decay
 
-    def add_behavior(self, action, reward, trial, suff=''):
-        self.subj_file.loc[trial, 'selected_box' + suff] = action
-        self.subj_file.loc[trial, 'reward' + suff] = reward
-        # self.subj_file.loc[trial, 'correct_box' + suff] = task.correct_box
-
-    # def add_behavior(self, task, action, reward, trial, suff=''):
+    # def add_behavior(self, action, reward, trial, suff=''):
     #     self.subj_file.loc[trial, 'selected_box' + suff] = action
     #     self.subj_file.loc[trial, 'reward' + suff] = reward
     #     self.subj_file.loc[trial, 'correct_box' + suff] = task.correct_box
+
+    def add_behavior(self, task, action, reward, trial, suff=''):
+        self.subj_file.loc[trial, 'selected_box' + suff] = action
+        self.subj_file.loc[trial, 'reward' + suff] = reward
+        self.subj_file.loc[trial, 'correct_box' + suff] = task.correct_box
 
     def add_decisions(self, agent, trial, suff=''):
         self.subj_file.loc[trial, 'LL' + suff] = agent.LL

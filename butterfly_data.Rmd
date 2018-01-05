@@ -12,7 +12,7 @@ plot_dir = file.path(data_dir, "plots")
 if (!dir.exists(plot_dir)) {
   dir.create(plot_dir)
 }
-gg_save = T
+gg_save = F
 library("ggplot2"); theme_set(theme_bw())
 library("plyr")
 library("R.matlab")
