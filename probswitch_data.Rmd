@@ -91,15 +91,8 @@ if (data != "human") {
         BIC = mean(BIC))
   
   # Plot generated against recovered parameter values
-  genrec = data.frame()
-  filenames = list.files(genrec_dir, pattern = "*.csv")
-  filename = filenames[2] # debugging
-  
-  for(filename in filenames) {
-    genrec_file = read.csv(file.path(genrec_dir, filename))
-    genrec_file$X = NULL
-    genrec = rbind(genrec, genrec_file)
-  }
+  genrec = read.csv(file.path(genrec_dir, 'genrec.csv'))
+  genrec$X = NULL
   genrec_plots()
 
   # Get within-subject differences

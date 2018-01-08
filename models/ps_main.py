@@ -10,7 +10,7 @@ import os
 # Set parameters
 n_iter = 20
 n_agents = 500
-agent_start_id = 1001
+agent_start_id = 1000
 base_path = 'C:/Users/maria/MEGAsync/SLCN'
 data_path = base_path + '/PSGenRec'
 task_stuff = {'n_actions': 2,
@@ -34,7 +34,7 @@ gen_rec = GenRec(parameters=parameters,
 agent_stuff = {}
 agent_id = agent_start_id
 while agent_id < agent_start_id + n_agents:
-    for learning_style in ['estimate-switch', 'RL', 'Bayes']:
+    for learning_style in ['RL', 'Bayes']:  # 'estimate-switch',
         for method in ['softmax', 'epsilon-greedy']:
             for fit_pars in (np.array([0, 0, 0, 0, 0, 0, 0, 0], dtype=bool),  # alpha / the three / none + epsilon / b
                              np.array([0, 0, 0, 1, 0, 0, 0, 0], dtype=bool),  # alpha & persev. / persev. only (not RL)

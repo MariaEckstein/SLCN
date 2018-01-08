@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
+from scipy.optimize import brute
 from task import Task
 from universal_agent import UniversalAgent
 from record_data import RecordData
@@ -72,6 +73,12 @@ class FitParameters(object):
             return record_data.get()
 
     def get_optimal_pars(self, agent_data, n_iter):
+        # x0 = brute(func=self.calculate_NLL,
+        #            ranges=self.parameters.par_hard_limits,  # should be in the form (slice(-4, 4, 0.25), slice(-4, 4, 0.25))
+        #            args=agent_data,
+        #            full_output=True,
+        #            finish=None)  # should try! https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.brute.html#scipy.optimize.brute
+        # optimized_params = self.parameters.inf_to_lim(x0)
         values = np.zeros([n_iter, self.n_fit_par + 1])
         for iter in range(n_iter):
             start_par = self.parameters.create_random_params(scale='inf', get_all=False)
@@ -82,7 +89,8 @@ class FitParameters(object):
             values[iter, :] = np.concatenate(([minimization.fun], minimization.x))
         minimum = values[:, 0] == min(values[:, 0])
         pars_inf = values[minimum][0]
-        return self.parameters.inf_to_lim(pars_inf[1:])
+        optimized_params = self.parameters.inf_to_lim(pars_inf[1:])
+        return optimized_params
 
     def write_agent_data(self, agent_data, save_path):
         agent_data.to_csv(save_path + "PS_" + str(agent_data['sID'][0]) + ".csv")

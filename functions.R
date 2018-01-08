@@ -138,21 +138,30 @@ model_plots = function() {
 }
 
 genrec_plots = function() {
-  gg_genrec_a = ggplot(genrec, aes(alpha_gen, alpha_rec, color=fit_par)) +
-    geom_abline(slope = 1, linetype = "dotted") +
+  gen_plot = subset(genrec, learning_style != "estimate-switch")
+  gg_genrec_a = ggplot(gen_plot, aes(alpha_gen, alpha_rec, color=fit_par, shape=fit_par)) +
+    geom_abline(slope=1, linetype="dotted") +
     geom_point() +
+    scale_shape_manual(values=1:length(unique(gen_plot$fit_par))) +
     facet_grid(learning_style ~ method)
   gg_genrec_b = gg_genrec_a + aes(beta_gen, beta_rec)
   gg_genrec_e = gg_genrec_a + aes(epsilon_gen, epsilon_rec)
   gg_genrec_p = gg_genrec_a + aes(perseverance_gen, perseverance_rec)
   gg_genrec_d = gg_genrec_a + aes(decay_gen, decay_rec)
+  gg_genrec_wr = gg_genrec_a + aes(w_reward_gen, w_reward_rec)
+  gg_genrec_we = gg_genrec_a + aes(w_explore_gen, w_explore_rec)
+  gg_genrec_wn = gg_genrec_a + aes(w_noreward_gen, w_noreward_gen)
+  
   
   if (gg_save) {
-    ggsave(paste(plot_dir, "/gg_genrec_a_", learning_style, "_", method, ".png", sep = ""), gg_genrec_a)
-    ggsave(paste(plot_dir, "/gg_genrec_b_", learning_style, "_", method, ".png", sep = ""), gg_genrec_b)
-    ggsave(paste(plot_dir, "/gg_genrec_e_", learning_style, "_", method, ".png", sep = ""), gg_genrec_e)
-    ggsave(paste(plot_dir, "/gg_genrec_p_", learning_style, "_", method, ".png", sep = ""), gg_genrec_p)
-    ggsave(paste(plot_dir, "/gg_genrec_d_", learning_style, "_", method, ".png", sep = ""), gg_genrec_d)
+    ggsave(file.path(plot_dir, "/gg_genrec_a.png"), gg_genrec_a, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_b.png"), gg_genrec_b, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_e.png"), gg_genrec_e, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_p.png"), gg_genrec_p, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_d.png"), gg_genrec_d, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_wr.png"), gg_genrec_wr, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_we.png"), gg_genrec_we, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_wn.png"), gg_genrec_wn, width = 11, height = 8)
   }
 }
 

@@ -47,4 +47,5 @@ class RecordData(object):
         self.subj_file['AIC' + suff] = AIC
 
     def get(self):
+        # self.subj_file.describe()
         return self.subj_file.copy()
