@@ -1,0 +1,632 @@
+---
+title: "Reversal_Task_Analysis"
+author: "Michelle.VanTieghem"
+date: "August 28, 2017"
+output: html_document
+--- 
+
+```{r, include = F}
+# load libraries
+library(effects)
+library(car)
+library(ggplot2)
+library(lmerTest)
+library(lme4)
+library(stringr)
+library(dplyr)
+
+# file paths
+base_path = "C:/Users/maria/MEGAsync/SLCNdata"
+data_path = file.path(base_path, "4choice")  #~/Documents/Columbia/LabDATA/Projects/Reversal_task/Reversal/data/
+demographics_path = base_path
+
+# this is a function for making a repeated measures dataset, used below. 
+make.rm<-function(constant,repeated,data,contrasts) {
+  if(!missing(constant) && is.vector(constant)) {
+    if(!missing(repeated) && is.vector(repeated)) {
+      if(!missing(data)) {
+        dd<-dim(data)
+        replen<-length(repeated)
+        if(missing(contrasts))
+          contrasts<-
+          ordered(sapply(paste("T",1:length(repeated),sep=""),rep,dd[1]))
+        else
+          contrasts<-matrix(sapply(contrasts,rep,dd[1]),ncol=dim(contrasts)[2])
+        if(length(constant) == 1) cons.col<-rep(data[,constant],replen)
+        else cons.col<-lapply(data[,constant],rep,replen)
+        new.df<-data.frame(cons.col,
+                           repdat=as.vector(data.matrix(data[,repeated])),
+                           contrasts)
+        return(new.df)
+      }
+    }
+  }
+ }
+
+
+```
+
+```{r, include = F}
+# load the dataset of summary data from the reversal task. 
+reversal_df <- read.csv(file.path(data_path, "summary.scoring.Sept2017.Reversal.compiled.data.csv"))
+
+# some of the ages were entered wrong, make them NAs.
+reversal_df$Age <- ifelse(reversal_df$Age == 1, NA, reversal_df$Age)
+
+# load the demographic dataset
+master <- read.csv(file.path(demographics_path, "Qualtrix.csv"), na.strings = c("", "NA", "NAN"))
+master = master[2:nrow(master),]
+master$IDENT_SUBID = master$SUBJECTID = paste0("EL", master$Q1.1) # make the subjectid column names match
+
+# merging the reversal task data with the demographic dataset
+df <- merge(reversal_df, master, by = "SUBJECTID", all = TRUE)
+nrow(df)
+```
+
+# subset data based on task completion 
+```{r, include= F}
+# get rid of subjects who didn't do the task!  
+df <- subset(df,!is.na(df$TotalTrials))
+nrow(df)
+
+# calculate rate of task completion 
+total <- nrow(df)
+failed.aq <- sum(ifelse(df$learned.aq == "NO", 1, 0), na.rm = TRUE)
+learned.aq <- sum(ifelse(df$learned.aq =="YES", 1, 0), na.rm = TRUE)
+percent.learned.aq <- learned.aq/total
+failed.rev <- sum(ifelse(df$learned.aq == "YES" & df$learned.rev == "NO", 1, 0),na.rm = TRUE)
+# only 3 subjects failed the reversal. so if they get AQ, they get reversal.
+
+learned.rev <- sum(ifelse(df$learned.rev == "YES", 1, 0), na.rm = TRUE)
+percent.learned.rev <- learned.rev/total
+percent.learned.rev_if_learned.aq <- learned.rev/ learned.aq 
+# 96 % of subjects learned reversal if they got aq. 
+
+df <- subset(df, learned.rev=="YES")
+nrow(df)
+
+```
+
+# subset data based on group
+```{r, include = F}
+# this dataset includes all subjects (PI = previously institutionalized)
+# for this analysis, we only want comparison youth and adults 
+
+# getting group info 
+# 0 = comparison, 1 = PI, 2 = adults, 3 = parents
+df$GROUP.f = "COMP"  # all kids and teens in my dataset
+df$GROUP.f[df$Age > 20] = "Adult"  # all adults
+# df$GROUP <- as.character(df$GROUP)
+# df$GROUP.f <- ifelse(df$GROUP == 1, "PI", ifelse(df$GROUP == 0, "COMP", ifelse(df$GROUP == "P", "Parent",ifelse(is.na(df$GROUP),"Adult", "fix"))))
+# df$GROUP.f <- as.factor(ifelse(is.na(df$GROUP.f), "Adult", df$GROUP.f))
+# summary(df$GROUP.f)
+
+# only include comparisons and adults <= 30.
+data <- subset(df,(GROUP.f == "COMP" | GROUP.f == "Adult") & Age <= 30 )
+nrow(data)
+```
+
+# basic demographics on subjects
+```{r}
+sample_N <- nrow(data)
+summary(data$gender)
+data$Age <- as.numeric(as.character(data$Age))
+range(data$Age, na.rm = TRUE)
+summary((data$Age)) # 
+mean(data$Age)
+sd(data$Age)
+hist(data$Age, main = "", xlab = "Age (years)", col = "Blue", breaks = 30)
+
+```
+# add puberty data
+```{r}
+# getting the master dataset where the puberty data was enterred
+# puberty <- read.csv("~/Documents/Columbia/LabDATA/Projects/ELFK/data_entry_files/ELFK_DataEntryMaster_final.csv")
+
+# extracting actual puberty scale
+puberty_columns = c("Q9.2",	"Q9.3",	"Q9.4",	"Q9.5",	"Q9.6", "Q182",	"Q9.7",	"Q9.8",	"Q178",	"Q172",	"Q173")
+puberty_answers = c("ot yet", 'barely started', 'definitely', 'completed')
+puberty <- subset(master, select = c(puberty_columns, "IDENT_SUBID", "Q171"))
+
+# code answers with numbers instead of words
+for (ans in puberty_answers) {
+  puberty = mutate(puberty, matching_rows = grepl(ans, Q9.2))  # growth in height
+  puberty[puberty$matching_rows == T, "Q9.2_clean"] = ans
+  puberty = mutate(puberty, matching_rows = grepl(ans, Q9.3))  # body hair
+  puberty[puberty$matching_rows == T, "Q9.3_clean"] = ans
+  puberty = mutate(puberty, matching_rows = grepl(ans, Q9.4))  # skin changes
+  puberty[puberty$matching_rows == T, "Q9.4_clean"] = ans
+  puberty = mutate(puberty, matching_rows = grepl(ans, Q9.5))  # breast
+  puberty[puberty$matching_rows == T, "Q9.5_clean"] = ans
+  puberty = mutate(puberty, matching_rows = grepl(ans, Q172))  # deepening voice
+  puberty[puberty$matching_rows == T, "Q172_clean"] = ans
+  puberty = mutate(puberty, matching_rows = grepl(ans, Q173))  # facial hair
+  puberty[puberty$matching_rows == T, "Q173_clean"] = ans
+}
+puberty$matching_rows = NULL
+for (col in c("Q9.2_clean",	"Q9.3_clean",	"Q9.4_clean",	"Q9.5_clean", "Q172_clean", "Q173_clean")) {
+  puberty[,col] = factor(puberty[,col], levels = puberty_answers, labels = 1:4)
+  puberty[,col] = as.numeric(as.character(puberty[,col]))
+}
+puberty$Q9.7_clean = factor(puberty$Q9.7, levels = c("Yes", "No"), labels = c(4, 1))  # menstruate
+puberty$Q9.7_clean = as.numeric(as.character(puberty$Q9.7_clean))
+puberty = subset(puberty, select = !colnames(puberty) %in% puberty_columns)
+
+# check the dataframe
+summary(puberty)
+
+# Calculating mean Petersen development score! # skip number 5 for females 
+# http://www.sleepforscience.org/contentmgr/showdetails.php/id/91
+PDS_female_mean <- rowMeans(subset(puberty, select = c(Q9.2_clean, Q9.3_clean, Q9.4_clean, Q9.5_clean, Q9.7_clean)), na.rm = T, dims = 1)
+PDS_male_mean <- rowMeans(subset(puberty, select = c(Q9.2_clean, Q9.3_clean, Q9.4_clean, Q172_clean, Q173_clean)), na.rm = T, dims = 1)
+PDS_mean <- as.numeric(ifelse(is.na(PDS_male_mean), PDS_female_mean, PDS_male_mean))
+hist(PDS_mean)
+
+# calculate pubertal category sores using Crockett 
+# http://www.sleepforscience.org/contentmgr/showdetails.php/id/91
+PCS_female_sum <- 2 * rowMeans(subset(puberty, select = c(Q9.3_clean, Q9.5_clean)), na.rm = T, dims = 1)  # body hair, breast
+PCS_male_sum <- 3 * rowMeans(subset(puberty, select = c(Q9.3_clean, Q172_clean, Q173_clean)), na.rm = T, dims = 1)  # body hair, voice, facial hair
+
+PCS_female_score <- ifelse((PCS_female_sum <= 2 & puberty$Q9.7_clean == 1), "Prepubertal", 
+                           ifelse((PCS_female_sum == 3 & puberty$Q9.7_clean == 1), "Early",
+                                  ifelse((PCS_female_sum > 3 & puberty$Q9.7_clean == 1), "Mid",
+                                         ifelse((PCS_female_sum <= 7 & puberty$Q9.7_clean == 4), "Late", "Post"))))
+summary(as.factor(PCS_female_score))
+PCS_male_score <- ifelse(PCS_male_sum <= 3, "Prepubertal", ifelse(PCS_male_sum <= 5, "Early", ifelse(PCS_male_sum <= 8, "Mid", 
+                                          ifelse(PCS_male_sum <= 11, "Late", ifelse(PCS_male_sum == 12, "Post", NA)))))  
+summary(as.factor(PCS_male_score))
+
+# combining all of these puberty measures into one dataset
+pub.df <- data.frame(PDS_mean, PDS_female_mean, PDS_male_mean, puberty$IDENT_SUBID, PCS_male_score, PCS_female_score)
+nrow(pub.df)
+names(pub.df)
+pub.df$SUBJECTID <- pub.df$puberty.IDENT_SUBID 
+
+# merge puberty dataset with reversal data, which also has adults
+data.2 <- merge(data, pub.df, by = "SUBJECTID", all = TRUE)
+nrow(data.2)
+data.3 <- subset(data.2, learned.rev == "YES" & Age <= 30)
+nrow(data.3) # OK - all good.  
+data <- data.3
+```
+
+# making puberty categories
+```{r}
+# merging male and female scores + adults into one variable. 
+data$PCS_score <- as.factor(ifelse(is.na(data$PCS_female_score) & !is.na(data$PCS_male_score), as.character(data$PCS_male_score), ifelse(!is.na(data$PCS_female_score) & is.na(data$PCS_male_score), as.character(data$PCS_female_score), ifelse(data$Age >= 18, "Adult", "NA"))))
+summary(data$PCS_score) # some of these groups are very small. 
+
+# merging groups together 
+data$PCS_groups <- as.factor(ifelse(data$PCS_score == "Prepubertal", "Pre", ifelse(data$PCS_score == "Early" | data$PCS_score == "Mid", "Pubertal", ifelse(data$PCS_score == "Post" | data$PCS_score == "Late", "Late/Post", ifelse( data$PCS_score == "Adult", "Adult", NA)))))
+summary(data$PCS_groups) # 11 prepuberty
+
+# just re-ordering the caregories 
+data$Puberty.Pre.Post.Adult <- factor(data$PCS_groups, levels = c("Pre", "Pubertal", "Late/Post", "Adult"))
+summary(data$Puberty.Pre.Post.Adult)
+
+# check no one is missing puberty info! 
+check <- subset(data, is.na(PCS_groups))
+nrow(check) # 3 subs missing 
+
+# exclude 3 subs from analysis- we don't have petersen puberty data on them. 
+data <- subset(data, !is.na(PCS_groups))
+nrow(data)
+```
+
+### Age vs. puberty graph
+```{r}
+summary(data$Puberty.Pre.Post.Adult)
+summary(data$Age)
+
+ggplot (data, aes(x=Age, y=Puberty.Pre.Post.Adult, color = Puberty.Pre.Post.Adult)) +
+  geom_point(size = 1, position = "jitter") + #ylim(0,20)+
+  xlab("Age") + ylab("") +
+  #  stat_smooth(se=F) + ##lm = linear method for trend line
+  theme(plot.title=element_text(size=15, face="bold")) +
+  theme_bw()
+```
+
+
+### Learning criterion data
+
+1. Number of trials to learn Discrimination 
+```{r}
+# plotting the data 
+plot(data$Puberty.Pre.Post.Adult, data$trials.learn.aq)
+plot(data$PDS_mean, data$trials.learn.aq)
+plot(data$Age, data$trials.learn.aq)
+data$Age.c <- data$Age - mean(data$Age)
+
+```
+
+### Model comparisons 
+```{r}
+test.age <- lm(trials.learn.aq ~ Age.c + gender, data = data)
+anova(test.age) # age super sig. 
+
+test.pub <- lm(trials.learn.aq ~ Age.c + gender + Puberty.Pre.Post.Adult, data = data)
+anova(test.pub) # neither is sig 
+
+test.age.pub <- lm(trials.learn.aq ~  gender + Puberty.Pre.Post.Adult, data = data)
+anova(test.age.pub) # puberty trend when alone
+
+# Age best model fit. 
+AIC(test.age, test.pub, test.age.pub)
+
+
+# filename <- "~/Documents/Documents/Columbia/LabDATA/Projects/Reversal_task/Reversal/analysis_May_2017/orig_analysis/Flux_figures_and_results/Learn_Discrim_Age_effect.#pdf"
+#pdf(filename,width=3,height=3) # note: this code is for saving graph into pdf 
+
+plot(effect("Age.c", test.age),rug = FALSE, colors = "Blue", main = "" , xlab = "Age (centered)", ylab = "Trials to Learn Discrimination")
+#devoff()
+
+```
+
+### 2. Number of trials to learn REV
+
+```{r}
+# plot the data 
+plot(data$PDS_mean, data$trials.learn.rev)
+plot(data$Age, data$trials.learn.rev)
+plot(data$Puberty.Pre.Post.Adult, data$trials.learn.rev)
+```
+
+### model comparisons
+```{r}
+test.age <- lm(trials.learn.rev ~ Age.c + gender, data = data)
+anova(test.age) # age 
+
+test.pub <- lm(trials.learn.rev ~ Age.c + gender + Puberty.Pre.Post.Adult, data = data)
+anova(test.pub) # neither.
+
+test.age.pub <- lm(trials.learn.rev ~  gender + Puberty.Pre.Post.Adult, data = data)
+anova(test.age.pub) # puberty trend. 
+
+
+# Age best model fit (lower AIC)
+AIC(test.age, test.pub, test.age.pub)
+
+
+#filename <- "~/Documents/Documents/Columbia/LabDATA/Projects/Reversal_task/Reversal/analysis_May_2017/orig_analysis/Flux_figures_and_results/Learn_Rev_Age_effect.#pdf"
+#pdf(filename,width=3,height=3) 
+plot(effect("Age.c", test.age),rug = FALSE, colors = "Blue", main = "" , xlab = "Age (centered)", ylab = "Trials to Learn Reversal")
+#devoff()
+```
+### 3. REPEATED MEASURES for Errors during reversal phase! 
+```{r}
+#format data into repeated measures format 
+errors.RM <- make.rm(constant = c( "Age", "Puberty.Pre.Post.Adult",
+                                   "PDS_mean",
+                                    "SUBJECTID", "gender", 
+                                   "trials.learn.aq", "trials.learn.rev"), 
+                     repeated = c("irrelevant.choice.rev", "persev.choice.rev",
+                                  "novel.choice.rev"), data = data)
+
+# relabel the variables 
+errors.RM$NumErrors <- errors.RM$repdat 
+errors.RM$Error <- as.factor(ifelse(errors.RM$contrasts == "T1","irrelevant", ifelse(errors.RM$contrasts == "T2",
+                                                      "perseverative", ifelse(errors.RM$contrasts == "T3", "novel", NA))))
+
+
+errors.RM$Puberty.Pre.Post.Adult <- factor(errors.RM$Puberty.Pre.Post.Adult, levels = c("Pre", "Pubertal", "Late/Post", "Adult"))
+
+```
+
+### model comparison
+```{r}
+age.int <- lmer(NumErrors ~ Age*Error + gender  + trials.learn.rev + (1 | SUBJECTID), data = errors.RM)
+anova(age.int) # agexerror is NS
+
+age.int.pub <- lmer(NumErrors ~ Age*Error + gender +  Puberty.Pre.Post.Adult + trials.learn.rev + (1 | SUBJECTID), data = errors.RM)
+anova(age.int.pub) # agexerror is NS still 
+
+pub.int <- lmer(NumErrors ~ Puberty.Pre.Post.Adult* Error+ gender + trials.learn.rev + (1 | SUBJECTID), data = errors.RM)
+anova(pub.int)
+
+# model improves when you add age! pub still sig
+pub.int.age <- lmer(NumErrors ~ Puberty.Pre.Post.Adult* Error+ gender + Age + trials.learn.rev + (1 | SUBJECTID), data = errors.RM)
+anova(pub.int.age)
+
+# pub interaction alone is the best model fit!
+# we will keep age controlling, since conceptually makes sense to control for age.
+AIC(pub.int, pub.int.age, age.int.pub)
+
+```
+
+### plots of best model (puberty alone)
+```{r}
+# quick plot for interaction 
+plot(effect("Puberty.Pre.Post.Adult:Error", pub.int.age), main = "", color = "blue", xlab = "", ylab = "Number of Errors", row = 1)
+
+
+# quick plot for main effect of error
+plot(effect("Error", pub.int.age), main = "", color = "blue", xlab = "Type", ylab = "Number of Errors", row = 1)
+
+```
+
+### post-hoc tests for Puberty x Error interaction 
+```{r}
+# mean-centering everything 
+errors.RM$Age.c <- errors.RM$Age - mean(errors.RM$Age)
+errors.RM$gender.n <- ifelse(errors.RM$gender == "Female", 1, 0) 
+# men are negative, female positive.
+errors.RM$gender.c <- errors.RM$gender.n - mean(errors.RM$gender.n)
+errors.RM$trials.learn.rev.c <- errors.RM$trials.learn.rev - mean(errors.RM$trials.learn.rev)
+errors.RM$Error.2 <- factor(errors.RM$Error, levels = c("novel", "perseverative", "irrelevant"))
+
+# final model
+final.model.rm <- lmer(NumErrors ~ Puberty.Pre.Post.Adult*Error+ gender.c + Age.c + trials.learn.rev.c + (1 | SUBJECTID), data = errors.RM)
+anova(final.model.rm)
+
+# note: this package "difflsmeans" is from lmerTEST 
+# it gives you post-hoc tests for all contrasts in your interaction.
+post_hoc_tests_int <- difflsmeans(final.model.rm, test.effs = "Puberty.Pre.Post.Adult:Error")
+post_hoc_tests_error <- difflsmeans(final.model.rm, test.effs = "Error")
+
+# save the post-hoc tests for results! 
+#write.table(post_hoc_tests_int, "~/Documents/Documents/Columbia/LabDATA/Projects/Reversal_task/Reversal/analysis_May_2017/orig_analysis/ErrorXPuberty_model_post-hoc.txt")
+```
+
+### plots for puberty x error interaction 
+```{r}
+
+#### ERROR x PUBERTY EFFECT PLOT
+errorXpuberty.int.effect.means <- effect("Puberty.Pre.Post.Adult:Error", final.model.rm)
+
+# get means and SE from the model fit 
+class(errorXpuberty.int.effect.means$x[1])
+labels_group <- (errorXpuberty.int.effect.means$x[1])
+labels_error <- errorXpuberty.int.effect.means$x[2]
+means_plot <- errorXpuberty.int.effect.means$fit
+SE_plot <- errorXpuberty.int.effect.means$se
+
+plot.df <- data.frame(labels_group, labels_error, means_plot, SE_plot)
+plot.df$Error <- ifelse(plot.df$Error == "irrelevant", "Irrelevant", ifelse(plot.df$Error == "novel",
+                                     "Novel", "Perseverative"))
+# saving model output 
+write.csv(plot.df, file.path(data_path, "ErrorXPuberty_model_table.csv"))
+
+# reordering categories for the graph 
+plot.df$Puberty.Pre.Post.Adult <- factor(plot.df$Puberty.Pre.Post.Adult, levels = c("Pre", "Pubertal", "Late/Post", "Adult"))
+summary(plot.df$Puberty.Pre.Post.Adult)
+# calculate SE for error bars 
+lower_SE <- means_plot- SE_plot
+upper_SE <- means_plot+ SE_plot
+
+# generate bar graph 
+ggplot(plot.df, aes(x= Error, y= means_plot, fill = Puberty.Pre.Post.Adult)) + 
+       geom_bar(position = "dodge", stat = "identity", color = "black")+
+ xlab ("Error Type") +  ylab ("Number of Errors") + 
+   theme_bw()  +ylim(0, 3.5)  +
+  geom_errorbar(aes(ymin = lower_SE, ymax = upper_SE, width=.3),
+     position = position_dodge(.9)) + guides(fill=guide_legend(title=NULL))   + 
+  theme(legend.position=c(0.15,0.8))
+
+```
+### REACTION TIME during the task
+
+```{r}
+# basic plots of the data 
+hist(data$rt.aq)                                   
+hist(data$rt.reward.aq)                            
+hist(data$rt.error.aq)
+plot( data$Puberty.Pre.Post.Adult, data$rt.aq)
+plot( data$Puberty.Pre.Post.Adult, data$rt.reward.aq)
+plot( data$Puberty.Pre.Post.Adult, data$rt.error.aq)
+
+```
+### Check for RT outliers  >3 SD from the mean
+```{r, include= FALSE}
+# subset the data into groups, then look for outliers within each group. 
+pre.d <- subset(data, Puberty.Pre.Post.Adult == "Pre" )
+pubertal.d <- subset(data, Puberty.Pre.Post.Adult == "Pubertal" )
+post.d <- subset(data, Puberty.Pre.Post.Adult == "Late/Post")
+adult.d <- subset(data, Puberty.Pre.Post.Adult == "Adult")
+
+ # note: this is not efficient code! 
+meanz <- mean(adult.d$rt.reward.aq)
+sdz <- sd(adult.d$rt.reward.aq)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier1 <- ifelse(adult.d$rt.reward.aq > outupper | adult.d$rt.reward.aq < 
+                    outlower, as.character(adult.d$SUBJECTID), NA)
+# AL002
+
+meanz <- mean(adult.d$rt.error.aq, na.rm = TRUE)
+sdz <- sd(adult.d$rt.error.aq, na.rm = TRUE)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier2 <- ifelse(adult.d$rt.error.aq > outupper | adult.d$rt.error.aq < outlower, as.character(adult.d$SUBJECTID), NA)
+# AL 002
+
+meanz <- mean(adult.d$rt.error.rev, na.rm = TRUE)
+sdz <- sd(adult.d$rt.error.rev, na.rm = TRUE)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier3 <- ifelse(adult.d$rt.error.rev > outupper | adult.d$rt.error.rev < outlower, as.character(adult.d$SUBJECTID), NA)
+# AL002 
+
+meanz <- mean(adult.d$rt.reward.rev)
+sdz <- sd(adult.d$rt.reward.rev)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier4 <- ifelse(adult.d$rt.reward.rev > outupper | adult.d$rt.reward.rev < outlower, as.character(adult.d$SUBJECTID), NA)
+# AL022
+
+########
+meanz <- mean(pre.d$rt.reward.aq)
+sdz <- sd(pre.d$rt.reward.aq)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier1 <- ifelse(pre.d$rt.reward.aq > outupper | pre.d$rt.reward.aq < 
+                     outlower, as.character(pre.d$SUBJECTID), NA)
+
+meanz <- mean(pre.d$rt.error.aq, na.rm = TRUE)
+sdz <- sd(pre.d$rt.error.aq, na.rm = TRUE)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier2 <- ifelse(pre.d$rt.error.aq > outupper | pre.d$rt.error.aq < outlower, as.character(pre.d$SUBJECTID), NA)
+
+meanz <- mean(pre.d$rt.error.rev, na.rm = TRUE)
+sdz <- sd(pre.d$rt.error.rev, na.rm = TRUE)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier3 <- ifelse(pre.d$rt.error.rev > outupper | pre.d$rt.error.rev < outlower, as.character(pre.d$SUBJECTID), NA)
+ 
+
+meanz <- mean(pre.d$rt.reward.rev)
+sdz <- sd(pre.d$rt.reward.rev)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier4 <- ifelse(pre.d$rt.reward.rev > outupper | pre.d$rt.reward.rev < outlower, as.character(pre.d$SUBJECTID), NA)
+
+########
+meanz <- mean(pubertal.d$rt.reward.aq)
+sdz <- sd(pubertal.d$rt.reward.aq)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier1 <- ifelse(pubertal.d$rt.reward.aq > outupper | pubertal.d$rt.reward.aq < 
+                     outlower, as.character(pubertal.d$SUBJECTID), NA)
+
+meanz <- mean(pubertal.d$rt.error.aq, na.rm = TRUE)
+sdz <- sd(pubertal.d$rt.error.aq, na.rm = TRUE)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier2 <- ifelse(pubertal.d$rt.error.aq > outupper | pubertal.d$rt.error.aq < outlower, as.character(pubertal.d$SUBJECTID), NA)
+
+meanz <- mean(pubertal.d$rt.error.rev, na.rm = TRUE)
+sdz <- sd(pubertal.d$rt.error.rev, na.rm = TRUE)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier3 <- ifelse(pubertal.d$rt.error.rev > outupper | pubertal.d$rt.error.rev < outlower, as.character(pubertal.d$SUBJECTID), NA)
+
+meanz <- mean(pubertal.d$rt.reward.rev)
+sdz <- sd(pubertal.d$rt.reward.rev)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier4 <- ifelse(pubertal.d$rt.reward.rev > outupper | pubertal.d$rt.reward.rev < outlower, as.character(pubertal.d$SUBJECTID), NA)
+# EL055
+########
+meanz <- mean(post.d$rt.reward.aq)
+sdz <- sd(post.d$rt.reward.aq)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier1 <- ifelse(post.d$rt.reward.aq > outupper | post.d$rt.reward.aq < 
+                     outlower, as.character(post.d$SUBJECTID), NA)
+
+meanz <- mean(post.d$rt.error.aq, na.rm = TRUE)
+sdz <- sd(post.d$rt.error.aq, na.rm = TRUE)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier2 <- ifelse(post.d$rt.error.aq > outupper | post.d$rt.error.aq < outlower, as.character(post.d$SUBJECTID), NA)
+
+meanz <- mean(post.d$rt.error.rev, na.rm = TRUE)
+sdz <- sd(post.d$rt.error.rev, na.rm = TRUE)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier3 <- ifelse(post.d$rt.error.rev > outupper | post.d$rt.error.rev < outlower, as.character(post.d$SUBJECTID), NA)
+
+
+meanz <- mean(post.d$rt.reward.rev)
+sdz <- sd(post.d$rt.reward.rev)
+outupper <- meanz + 3*sdz
+outlower <- meanz -3*sdz
+outlier4 <- ifelse(post.d$rt.reward.rev > outupper | post.d$rt.reward.rev < outlower, as.character(post.d$SUBJECTID), NA)
+
+
+#*** EXCLUDING SUBJECTS  AL002  & EL055 who have response times > 3SD from the mean
+data.o <- subset(data,SUBJECTID != "AL002"& SUBJECTID != "EL055")
+nrow(data.o)
+nrow(data)
+```
+
+### RT for Puberty Phase, AQ vs. REV, REW vs. ERROR
+```{r}
+# making a repeated measures dataset with the variables for RT analysis
+RM.RT <- make.rm(constant = c("Age", "Puberty.Pre.Post.Adult", 
+                              "PDS_mean", "SUBJECTID", "gender"),
+                 repeated = c( "rt.error.aq", "rt.error.aq", "rt.error.rev","rt.reward.rev"), data = data.o)
+head(RM.RT)
+
+# relabeling the variables 
+RM.RT$type <- as.factor(ifelse(RM.RT$contrasts == "T1","DISCRIM.error", ifelse(RM.RT$contrasts == "T2","DSCRIM.reward",  ifelse(RM.RT$contrasts == "T3", "REV.error",ifelse(RM.RT$contrasts == "T4", "REV.reward",
+                                                                                                                                ifelse(RM.RT$contrasts == "T5", "irrelevant.error","REV.reward"))))))
+RM.RT$RT <- RM.RT$repdat
+RM.RT$Reward.condition <- as.factor(ifelse(RM.RT$contrasts == "T1" | RM.RT$contrasts == "T3", "Error", "Reward"))
+RM.RT$Phase <- as.factor(ifelse(RM.RT$contrasts == "T1" | RM.RT$contrasts == "T2", "Discrimination", "Reversal"))
+RM.RT$Puberty.Pre.Post.Adult <- factor(RM.RT$Puberty.Pre.Post.Adult , levels = c("Pre", "Pubertal", "Late/Post", "Adult"))
+
+```
+
+### modeling RT 
+```{r}
+# model comparisons here: 
+
+test.rm <- lmer(RT ~ Phase*Reward.condition*Puberty.Pre.Post.Adult + Age + gender + (1 | SUBJECTID), data = RM.RT)
+anova(test.rm) # no 3 way interaction 
+
+pub.int <- lmer(RT ~ Phase*Puberty.Pre.Post.Adult + Reward.condition + 
+                  gender + (1 | SUBJECTID), data = RM.RT)
+anova(pub.int)
+
+pub.int.age <- lmer(RT ~ Phase*Puberty.Pre.Post.Adult + Reward.condition + Age +
+                  gender + (1 | SUBJECTID), data = RM.RT)
+anova(pub.int.age)
+
+age.int <- lmer(RT ~ Phase*Age + Reward.condition +
+                  gender + (1 | SUBJECTID), data = RM.RT)
+anova(age.int)
+
+age.int.pub <- lmer(RT ~ Phase*Age + Reward.condition + Puberty.Pre.Post.Adult + 
+                  gender + (1 | SUBJECTID), data = RM.RT)
+anova(age.int.pub)
+
+# pub interaction alone is the best model fit!
+# we will keep age controlling, since conceptually makes sense to control for age.
+AIC(pub.int, pub.int.age, age.int.pub)
+
+plot(effect("Phase:Puberty.Pre.Post.Adult", pub.int.age))
+
+```
+### post-hoc for RT Puberty x Phase  interaction. 
+```{r}
+# mean-centering everything. 
+RM.RT$Age.c <- RM.RT$Age - mean(RM.RT$Age)
+RM.RT$gender.n <- ifelse(RM.RT$gender == "Female", 1, 0)
+RM.RT$gender.c <- RM.RT$gender.n - mean(RM.RT$gender.n)
+RM.RT$Reward.condition.n <- ifelse(RM.RT$Reward.condition == "Reward", 1, 0)
+RM.RT$Reward.condition.c <- RM.RT$Reward.condition.n - mean(RM.RT$Reward.condition.n)
+final.model.RT <-  lmer(RT ~ Phase*Puberty.Pre.Post.Adult + Reward.condition.c + Age.c + gender.c 
+                          + (1 | SUBJECTID), data = RM.RT)
+anova(final.model.RT)
+
+# difflsmeans gives us the post-hoc tests 
+post_hoc_tests_int <- difflsmeans(final.model.RT, test.effs = "Phase:Puberty.Pre.Post.Adult")
+
+#use effect package to get means and SE of the fits, for plotting
+RT.int.effect <- effect("Phase:Puberty.Pre.Post.Adult", final.model.RT, se = TRUE)
+```
+
+### plot RT Puberty x Phase interaction 
+```{r}
+ 
+# get all of the means and SE from the model fit 
+labels_phase <- (RT.int.effect$x[1])
+labels_puberty <- (RT.int.effect$x[2])
+means_plot <- RT.int.effect$fit
+SE_plot <- RT.int.effect$se
+plot.df1 <- data.frame(labels_phase, labels_puberty, means_plot, SE_plot)
+lower_SE <- means_plot -SE_plot
+upper_SE <- means_plot + SE_plot 
+
+plot.df1$Puberty.Pre.Post.Adult <- factor(
+  plot.df1$Puberty.Pre.Post.Adult, levels = c("Pre", "Pubertal", "Late/Post", "Adult"))
+
+# make bar plot plot
+ggplot(plot.df1, aes(x=Phase, y= means_plot, fill = Puberty.Pre.Post.Adult)) + 
+  geom_bar(position = "dodge", stat = "identity", color = "Black") + xlab ("Phase") +  ylab ("Reaction Time (sec)") + 
+  theme_bw()+ ylim (0, 15) +guides(fill=guide_legend(title=NULL)) + 
+  geom_errorbar(aes(ymin = lower_SE, ymax = upper_SE, width=.2),
+                position = position_dodge(.9))
+
+```
