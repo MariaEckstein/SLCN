@@ -193,11 +193,15 @@ data <- data.3
 # making puberty categories
 ```{r}
 # merging male and female scores + adults into one variable. 
-data$PCS_score <- as.factor(ifelse(is.na(data$PCS_female_score) & !is.na(data$PCS_male_score), as.character(data$PCS_male_score), ifelse(!is.na(data$PCS_female_score) & is.na(data$PCS_male_score), as.character(data$PCS_female_score), ifelse(data$Age >= 18, "Adult", "NA"))))
-summary(data$PCS_score) # some of these groups are very small. 
+data$PCS_score = as.character(data$PCS_male_score)
+data$PCS_score[data$gender == "Female"] = as.character(data$PCS_female_score[data$gender == "Female"])
+data$PCS_score[data$Age > 20] = "Adult"
+data$PCS_score = factor(data$PCS_score)
+# data$PCS_score <- as.factor(ifelse(is.na(data$PCS_female_score) & !is.na(data$PCS_male_score), as.character(data$PCS_male_score), ifelse(!is.na(data$PCS_female_score) & is.na(data$PCS_male_score), as.character(data$PCS_female_score), ifelse(data$Age >= 18, "Adult", "NA"))))
+summary(data$PCS_score) # some of these groups are very small.
 
 # merging groups together 
-data$PCS_groups <- as.factor(ifelse(data$PCS_score == "Prepubertal", "Pre", ifelse(data$PCS_score == "Early" | data$PCS_score == "Mid", "Pubertal", ifelse(data$PCS_score == "Post" | data$PCS_score == "Late", "Late/Post", ifelse( data$PCS_score == "Adult", "Adult", NA)))))
+data$PCS_groups <- as.factor(ifelse(data$PCS_score == "Prepubertal", "Pre", ifelse(data$PCS_score == "Early" | data$PCS_score == "Mid", "Pubertal", ifelse(data$PCS_score == "Post" | data$PCS_score == "Late", "Late/Post", ifelse(data$PCS_score == "Adult", "Adult", NA)))))
 summary(data$PCS_groups) # 11 prepuberty
 
 # just re-ordering the caregories 
@@ -211,6 +215,7 @@ nrow(check) # 3 subs missing
 # exclude 3 subs from analysis- we don't have petersen puberty data on them. 
 data <- subset(data, !is.na(PCS_groups))
 nrow(data)
+summary(data$Age[!is.na(data.$PCS_score)])
 ```
 
 ### Age vs. puberty graph

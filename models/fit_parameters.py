@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from scipy.optimize import brute
-from task import Task
-from universal_agent import UniversalAgent
+from ps_task import Task
+from ps_agent import UniversalAgent
 from record_data import RecordData
 
 
@@ -29,14 +29,15 @@ class FitParameters(object):
                                  agent_id=agent.id,
                                  mode='create_from_scratch')
 
-        for trial in range(task.n_trials):
-            task.switch_box()
-            agent.calculate_p_actions()
-            action = agent.select_action()
-            reward = task.produce_reward(action)
-            agent.learn(action, reward)
-            record_data.add_behavior(task, action, reward, trial)
-            record_data.add_decisions(agent, trial)
+        for context in range(3):
+            for trial in range(task.n_trials):
+                task.prepare_trial()
+                stimulus = task.present_stimulus(context, trial)
+                action = agent.select_action(stimulus)
+                reward = task.produce_reward(action)
+                agent.learn(stimulus, action, reward)
+                record_data.add_behavior(task, action, reward, trial)
+                record_data.add_decisions(agent, trial)
 
         record_data.add_parameters(agent)
         return record_data.get()

@@ -8,6 +8,7 @@ import os
 # TD: start at the right trial - ie, after task instructions!
 
 # Set parameters
+context_sequence = range(3)
 n_iter = 20
 n_agents = 500
 agent_start_id = 1000

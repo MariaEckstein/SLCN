@@ -38,10 +38,16 @@ class Task(object):
         next_reward_index = reward_indexes[reward_indexes > self.n_correct][0]
         self.coin_win[next_reward_index] = 0
 
-    def switch_box(self):
+    def prepare_trial(self):
+        # switch box if necessary
         period_over = self.n_rewards == self.run_length[self.i_episode]
         if period_over:
             self.correct_box = 1 - self.correct_box
             self.switched = True
             self.n_rewards = 0
             self.i_episode += 1
+
+    @staticmethod
+    def present_stimulus(context, trial):
+        # not necessary here, but in other tasks
+        return None

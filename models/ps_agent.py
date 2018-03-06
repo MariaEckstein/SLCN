@@ -11,7 +11,7 @@ class UniversalAgent(object):
          self.w_reward, self.w_noreward, self.w_explore] = all_params_lim
         if self.learning_style == 'RL':
             self.initial_value = 1 / self.n_actions
-            self.q = self.initial_value * np.ones(self.n_actions)
+            self.q = self.initial_value * np.ones(self.n_actions) #+ np.random.rand(self.n_actions) / 1000
         elif self.learning_style == 'Bayes':
             self.p_switch = task_stuff['p_reward'] / np.mean(task_stuff['av_run_length'])  # true average switch probability
             self.p_reward = task_stuff['p_reward']  # true reward probability
@@ -43,7 +43,8 @@ class UniversalAgent(object):
             self.p_actions = np.array([p_left_box, 1 - p_left_box])
         self.p_actions = 0.999 * self.p_actions + 0.001 / self.n_actions  # avoid 0's & 1's
 
-    def select_action(self):
+    def select_action(self, stimulus):
+        self.calculate_p_actions()
         return int(np.random.rand() > self.p_actions[0])  # select left ('0') when np.random.rand() < p_actions[0]
 
     def _get_action_values(self):
@@ -57,7 +58,7 @@ class UniversalAgent(object):
             return self.p_boxes
 
     # Learn
-    def learn(self, action, reward):
+    def learn(self, stimulus, action, reward):
         self.previous_action = np.array(range(self.n_actions)) == action
         self._update_LL(action)
         if self.learning_style == 'RL':
