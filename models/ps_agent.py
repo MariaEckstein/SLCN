@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class UniversalAgent(object):
+class Agent(object):
     def __init__(self, agent_stuff, all_params_lim, task_stuff):
         self.n_actions = task_stuff['n_actions']
         self.learning_style = agent_stuff['learning_style']

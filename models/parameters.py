@@ -60,7 +60,7 @@ class Parameters(object):
     def set_fit_pars(self, fit_pars):
         self.fit_pars = fit_pars
 
-    def adjust_fit_pars(self, learning_style, method):
+    def adjust_fit_pars(self, method, learning_style=np.nan):
         if learning_style == 'RL':
             self.fit_pars[0] = True  # alpha
         else:

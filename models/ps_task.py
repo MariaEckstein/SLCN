@@ -38,7 +38,7 @@ class Task(object):
         next_reward_index = reward_indexes[reward_indexes > self.n_correct][0]
         self.coin_win[next_reward_index] = 0
 
-    def prepare_trial(self):
+    def prepare_trial(self, trial=np.nan):
         # switch box if necessary
         period_over = self.n_rewards == self.run_length[self.i_episode]
         if period_over:

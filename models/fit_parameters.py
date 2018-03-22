@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from scipy.optimize import brute
-from ps_task import Task
-from ps_agent import UniversalAgent
-from record_data import RecordData
+from alien_task import Task
+from alien_agents import Agent
+from alien_record_data import RecordData
 
 
 class FitParameters(object):
@@ -24,20 +24,19 @@ class FitParameters(object):
     def simulate_agent(self, all_params_lim):
 
         task = Task(self.task_stuff, self.agent_stuff['id'])
-        agent = UniversalAgent(self.agent_stuff, all_params_lim, self.task_stuff)
-        record_data = RecordData(n_trials=self.task_stuff['n_trials'],
+        agent = Agent(self.agent_stuff, all_params_lim, self.task_stuff)
+        record_data = RecordData(n_trials=task.n_trials,
                                  agent_id=agent.id,
                                  mode='create_from_scratch')
 
-        for context in range(3):
-            for trial in range(task.n_trials):
-                task.prepare_trial()
-                stimulus = task.present_stimulus(context, trial)
-                action = agent.select_action(stimulus)
-                reward = task.produce_reward(action)
-                agent.learn(stimulus, action, reward)
-                record_data.add_behavior(task, action, reward, trial)
-                record_data.add_decisions(agent, trial)
+        for trial in range(task.n_trials):
+            task.prepare_trial(trial)
+            stimulus = task.present_stimulus(trial)
+            action = agent.select_action(stimulus)
+            reward = task.produce_reward(action)
+            agent.learn(stimulus, action, reward)
+            record_data.add_behavior(task, stimulus, action, reward, trial)
+            record_data.add_decisions(agent, trial)
 
         record_data.add_parameters(agent)
         return record_data.get()
@@ -45,21 +44,20 @@ class FitParameters(object):
     def calculate_NLL(self, params_inf, agent_data, goal='calculate_NLL'):
 
         all_params_lim = self.parameters.inf_to_lim(params_inf)
-        agent = UniversalAgent(self.agent_stuff, all_params_lim, self.task_stuff)
+        agent = Agent(self.agent_stuff, all_params_lim, self.task_stuff)
         if goal == 'add_decisions_and_fit':
-            record_data = RecordData(n_trials=self.task_stuff['n_trials'],
+            record_data = RecordData(n_trials=np.nan,
                                      agent_id=agent.id,
                                      mode='add_to_existing_data',
                                      agent_data=agent_data)
 
         n_trials = len(agent_data)
-        for trial in range(n_trials):
-            agent.calculate_p_actions()
-            action = int(agent_data['selected_box'][trial])
-            reward = int(agent_data['reward'][trial])
-            agent.learn(action, reward)
-            if goal == 'add_decisions_and_fit':
-                record_data.add_decisions(agent, trial, suff='_rec')
+        # for trial in range(n_trials):
+        #     action = int(agent_data['selected_box'][trial])
+        #     reward = int(agent_data['reward'][trial])
+        #     agent.learn(action, reward)
+        #     if goal == 'add_decisions_and_fit':
+        #         record_data.add_decisions(agent, trial, suff='_rec')
 
         BIC = - 2 * agent.LL + self.n_fit_par * np.log(n_trials)
         AIC = - 2 * agent.LL + self.n_fit_par

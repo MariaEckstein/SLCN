@@ -24,7 +24,7 @@ class RecordData(object):
         self.subj_file['w_noreward' + suff] = agent.w_noreward
         self.subj_file['w_explore' + suff] = agent.w_explore
 
-    def add_behavior(self, task, action, reward, trial, suff=''):
+    def add_behavior(self, task, stimulus, action, reward, trial, suff=''):
         self.subj_file.loc[trial, 'selected_box' + suff] = action
         self.subj_file.loc[trial, 'reward' + suff] = reward
         self.subj_file.loc[trial, 'correct_box' + suff] = task.correct_box
