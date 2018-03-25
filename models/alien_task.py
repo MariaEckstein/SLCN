@@ -18,23 +18,7 @@ class Task(object):
         self.shuffled_aliens = np.random.choice(range(4), size=4, replace=False)
         self.context = np.nan
         self.alien = np.nan
-
-        # TS
-                             # TS0
-        self.TS = np.array([[[0, 6, 0],  # alien0, items0-2
-                             [0, 0, 4],  # alien1, items0-2
-                             [5, 0, 0],  # etc.
-                             [10, 0, 0]],
-                             # TS1
-                            [[0, 0, 2],  # alien0, items0-2
-                             [0, 8, 0],  # etc.
-                             [0, 0, 7],
-                             [0, 3, 0]],
-                             # TS2
-                            [[0, 0, 7],  # TS2
-                             [3, 0, 0],
-                             [0, 3, 0],
-                             [2, 0, 0]]])
+        self.TS = task_stuff['TS']
 
         # Create context order
         self.contexts = np.empty(0, dtype=int)

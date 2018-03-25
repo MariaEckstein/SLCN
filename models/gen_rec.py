@@ -1,5 +1,7 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 class GenRec(object):
@@ -19,7 +21,9 @@ class GenRec(object):
         print('gen_pars:', np.round(gen_pars, 2), '\nrec_pars:', np.round(rec_pars, 2), '\nfit:', fit)
         row = np.concatenate(([agent_stuff['id'],
                                agent_stuff['learning_style'], agent_stuff['method'], agent_stuff['fit_par']],
-                              fit, gen_pars, rec_pars))
+                               fit, gen_pars, rec_pars))
         self.genrec.loc[self.genrec_row, :] = row
         self.genrec_row += 1
         self.genrec.to_csv(self.save_path)
+
+    # def plot_genrec(self):

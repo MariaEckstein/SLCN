@@ -38,7 +38,7 @@ class FitParameters(object):
             record_data.add_behavior(task, stimulus, action, reward, trial)
             record_data.add_decisions(agent, trial)
 
-        record_data.add_parameters(agent)
+        record_data.add_parameters(agent, [])  # add parameters (alpha, beta, etc.) only
         return record_data.get()
 
     def calculate_NLL(self, params_inf, agent_data, goal='calculate_NLL'):
@@ -52,12 +52,16 @@ class FitParameters(object):
                                      agent_data=agent_data)
 
         n_trials = len(agent_data)
-        # for trial in range(n_trials):
-        #     action = int(agent_data['selected_box'][trial])
-        #     reward = int(agent_data['reward'][trial])
-        #     agent.learn(action, reward)
-        #     if goal == 'add_decisions_and_fit':
-        #         record_data.add_decisions(agent, trial, suff='_rec')
+        for trial in range(n_trials):
+            context = int(agent_data['context'][trial])
+            sad_alien = int(agent_data['sad_alien'][trial])
+            stimulus = np.array([context, sad_alien])
+            agent.select_action(stimulus)  # calculate p_actions
+            action = int(agent_data['item_chosen'][trial])
+            reward = int(agent_data['reward'][trial])
+            agent.learn(stimulus, action, reward)
+            if goal == 'add_decisions_and_fit':
+                record_data.add_decisions(agent, trial, suff='_rec')
 
         BIC = - 2 * agent.LL + self.n_fit_par * np.log(n_trials)
         AIC = - 2 * agent.LL + self.n_fit_par
@@ -67,7 +71,7 @@ class FitParameters(object):
         elif goal == 'calculate_fit':
             return [-agent.LL, BIC, AIC]
         elif goal == 'add_decisions_and_fit':
-            record_data.add_parameters(agent, suff='_rec')
+            record_data.add_parameters(agent, self.parameters, suff='_rec')  # add parameters and fit_pars
             record_data.add_fit(-agent.LL, BIC, AIC, suff='_rec')
             return record_data.get()
 
