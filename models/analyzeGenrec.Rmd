@@ -1,0 +1,58 @@
+---
+title: "AnalyzeGenrec"
+author: "Maria Eckstein"
+date: "March 25, 2018"
+output: html_document
+---
+
+```{r Set parameters, load packages, etc.}
+library("ggplot2"); library("plyr"); library("reshape2")
+theme_set(theme_bw())
+
+parameter_names = c("alpha", "beta", "epsilon", "perseverance", "forget", "mix")
+
+gg_save = T
+data_dir = "C:/Users/maria/MEGAsync/Berkeley/TaskSets/AlienGenRec"
+plot_dir = file.path(data_dir, "plots")
+if (!dir.exists(plot_dir)) {
+  dir.create(plot_dir)
+}
+genrec_filenames = c("AlphaOnly/genrec.csv", "genrec.csv")
+```
+```{r Read in genrec and melt}
+genrec = data.frame()
+i = 1
+for (genrec_filename in genrec_filenames) {
+  new_genrec = read.csv(file = file.path(data_dir, genrec_filename), header = T, na.strings = c("", "NA", "NaN"))
+  new_genrec$sID = 1000 * i + new_genrec$sID
+  genrec = rbind(genrec, new_genrec)
+  i = i + 1
+}
+genrec$X = NULL
+genrec = subset(genrec, !is.na(fit_par))
+
+genrec_long_gen = melt(subset(genrec, select = c("sID", paste0(parameter_names, "_gen"))),
+                       measure.vars = paste0(parameter_names, "_gen"), variable.name = "parameter")
+genrec_long_gen$parameter = gsub("_gen", "", genrec_long_gen$parameter)
+
+genrec_long_rec = melt(subset(genrec, select = c("sID", paste0(parameter_names, "_rec"))),
+                       measure.vars = paste0(parameter_names, "_rec"), variable.name = "parameter")
+genrec_long_rec$parameter = gsub("_rec", "", genrec_long_gen$parameter)
+
+genrec_long = merge(genrec_long_gen, genrec_long_rec, by = c("sID", "parameter"), suff = c("_gen", "_rec"))
+genrec_long = merge(subset(genrec, select = c("sID", "learning_style", "method", "fit_par")), genrec_long)
+
+genrec_long
+```
+```{r Plot original versus fitted parameters}
+plot_dat = subset(genrec_long, !is.na(fit_par))
+for (par in intersect(unique(plot_dat$fit_par), unique(plot_dat$parameter))) {
+  gg_gen_rec_par = ggplot(subset(plot_dat, parameter == par & fit_par == par), aes(value_gen, value_rec)) +
+    geom_point() +
+    labs(x = paste0(par, "_gen"), y = paste0(par, "_rec")) +
+    facet_grid(method ~ learning_style)
+  ggsave(file.path(plot_dir, paste0("gg_genrec_", par, ".png")), gg_gen_rec_par)
+}
+```
+```{r Start button}
+```

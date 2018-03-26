@@ -53,10 +53,25 @@ class VisualizeAgent:
                                               agent_data=agent_data,
                                               goal='add_decisions_and_fit')
         # Compare initial and recovered Qs and action probs
-        for i, col in enumerate(['Q_low' + str(i) for i in range(3)] + ['Q_high' + str(i) for i in range(3)]):
-            plt.subplot(2, 3, i + 1)
-            plt.plot(agent_data[col], agent_data[col + '_rec'], 'o')
-            plt.title(col)
+        sub = 1
+        for sad_alien in range(3):
+            for context in range(3):
+                plot_dat = agent_data.loc[(agent_data['sad_alien'] == sad_alien) & (agent_data['context'] == context)]
+                for col in ['Q_low' + str(i) for i in range(3)]:
+                    plt.subplot(9, 3, sub)
+                    plt.plot(plot_dat[col], plot_dat[col + '_rec'], 'o')
+                    plt.title('alien' + str(sad_alien) + ' context' + str(context) + ' ' + col)
+                    sub += 1
+        plt.show()
+
+        sub = 1
+        for TS in range(3):
+            plot_dat = agent_data.loc[agent_data['TS'] == TS]
+            for col in ['Q_high' + str(i) for i in range(3)]:
+                plt.subplot(3, 3, sub)
+                plt.plot(plot_dat[col], plot_dat[col + '_rec'], 'o')
+                plt.title('TS' + str(TS) + ' ' + col)
+                sub += 1
         plt.show()
 
         for i, col in enumerate(['p_action' + str(i) for i in range(3)]):

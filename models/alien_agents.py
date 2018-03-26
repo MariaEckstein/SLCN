@@ -22,12 +22,12 @@ class Agent(object):
         else:
             first_dim = self.n_TS
         Q_low_dim = [first_dim, task_stuff['n_aliens'], self.n_actions]
-        self.Q_low = self.initial_q_low * np.ones(Q_low_dim) + np.random.normal(0, 0.001, Q_low_dim)  # jitter avoids ident. values
+        self.Q_low = self.initial_q_low * np.ones(Q_low_dim) #+ np.random.normal(0, 0.001, Q_low_dim)  # jitter avoids ident. values
 
         # Set up values at high (context-TS) level
         self.initial_q_high = 5 / 3  # 5 was the reward during training
         Q_high_dim = [task_stuff['n_contexts'], self.n_TS]
-        self.Q_high = self.initial_q_high * np.ones(Q_high_dim) + np.random.normal(0, 0.001, Q_high_dim)
+        self.Q_high = self.initial_q_high * np.ones(Q_high_dim) #+ np.random.normal(0, 0.001, Q_high_dim)
 
         # Initialize action probs, current TS and action, LL
         self.p_TS = np.ones(self.n_TS) / self.n_TS

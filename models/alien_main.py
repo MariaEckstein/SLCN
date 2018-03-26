@@ -16,7 +16,7 @@ generate_and_recover = True
 # Model fitting parameters
 n_iter = 20
 n_agents = 1000
-agent_start_id = 0
+agent_start_id = 21
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
 data_path = base_path + '/AlienGenRec'
 
@@ -51,6 +51,7 @@ parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'perseverance', '
                         par_soft_limits=((0, 1), (1, 6), (0, 0.25), (-0.3, 0.3), (0, 0.3), (0, 1)),  # no simul. outside
                         default_pars_lim=np.array([0.05, 1+1e-5, 1e-5, 1e-5, 1e-5, 1]))  # when a parameter is fixed
 viz_agent = VisualizeAgent(parameters)
+# viz_agent.plot_generated_recovered_Qs(task_stuff, 'softmax', 'hierarchical')
 
 # Check that all parameters are working (plot Qs and check if they make sense)
 if create_sanity_plots:
@@ -95,13 +96,9 @@ if generate_and_recover:
     while agent_id < agent_start_id + n_agents:
         for method in ['softmax', 'epsilon-greedy']:
             for learning_style in ['flat', 'hierarchical']:
-        #         for fit_pars in (np.array([0, 0, 0, 0, 0, 0], dtype=bool),   # alpha & epsilon / beta
-        #                          np.array([0, 0, 0, 1, 0, 0], dtype=bool),   # alpha & perseverance
-        #                          np.array([0, 0, 0, 0, 1, 0], dtype=bool),   # alpha & forget
-        #                          np.array([0, 0, 0, 0, 0, 1], dtype=bool),   # alpha & mix
-        #                          np.array([0, 0, 0, 1, 1, 1], dtype=bool)):  # alpha, perseverance, forget, & mix
-
-                    fit_pars = np.array([1, 0, 0, 0, 0, 0], dtype=bool)  # alpha only
+                for fit_par in range(len(parameters.par_names)):
+                    fit_pars = np.zeros(len(parameters.par_names), dtype=bool)
+                    fit_pars[fit_par] = True  # Set fitting for one parameter to True, all others to False
 
                     # Specify model
                     agent_stuff['method'] = method
