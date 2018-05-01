@@ -4,11 +4,13 @@ import pandas as pd
 
 class RecordData(object):
 
-    def __init__(self, n_trials, agent_id, mode='add_to_existing_data', agent_data=()):
+    def __init__(self, agent_id, mode='add_to_existing_data', agent_data=(), task=()):
         if mode == 'create_from_scratch':
             colnames = ['trial_type', 'trial_index', 'correct', 'reward', 'item_chosen', 'sad_alien', 'TS', 'block-type']
-            self.subj_file = pd.DataFrame(data=np.zeros([n_trials, len(colnames)]),
+            self.subj_file = pd.DataFrame(data=np.zeros([task.n_trials, len(colnames)]),
                                           columns=colnames)
+            self.subj_file['n_trials_per_alien'] = task.n_trials_per_alien
+            self.subj_file['n_blocks'] = task.n_blocks
             self.subj_file['sID'] = agent_id
             self.subj_file['RT'] = np.nan
         else:
@@ -42,12 +44,13 @@ class RecordData(object):
         if agent.TS:  # make sure agent.TS != []
             self.subj_file.loc[trial, 'TS' + suff] = agent.TS
         self.subj_file.loc[trial, 'LL' + suff] = agent.LL
-        [TS, alien] = self.subj_file.loc[trial, ['TS', 'sad_alien']]
+        alien = self.subj_file.loc[trial, 'sad_alien']
         for i in range(3):
-            self.subj_file.loc[trial, 'Q_low' + str(i) + suff] = agent.Q_low[TS, alien, int(i)]  # here, i is action
-            self.subj_file.loc[trial, 'Q_high' + str(i) + suff] = agent.Q_high[int(i), TS]  # here, i is context
             self.subj_file.loc[trial, 'p_action' + str(i) + suff] = agent.p_actions[int(i)]  # here, i is action
             self.subj_file.loc[trial, 'p_TS' + str(i) + suff] = agent.p_TS[int(i)]  # here, i is TS
+            for TS in range(3):
+                self.subj_file.loc[trial, 'Q_low_TS' + str(TS) + '_action_' + str(i) + suff] = agent.Q_low[TS, alien, int(i)]  # here, i is action
+                self.subj_file.loc[trial, 'Q_high_TS' + str(TS) + '_action_' + str(i) + suff] = agent.Q_high[int(i), TS]  # here, i is context
 
     def add_fit(self, NLL, BIC, AIC, suff=''):
         self.subj_file['NLL' + suff] = NLL

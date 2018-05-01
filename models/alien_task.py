@@ -23,7 +23,7 @@ class Task(object):
         # Create context order
         self.contexts = np.empty(0, dtype=int)
         for block in range(self.n_blocks):
-            randomized_contexts = range(3)  # np.random.choice(range(self.n_contexts), size=self.n_contexts, replace=False)
+            randomized_contexts = np.random.choice(range(self.n_contexts), size=self.n_contexts, replace=False)
             new_block = np.concatenate([i * np.ones(self.block_length, dtype=int) for i in randomized_contexts])
             self.contexts = np.append(self.contexts, new_block)
 
