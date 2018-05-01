@@ -7,6 +7,8 @@ class Agent(object):
         self.learning_style = agent_stuff['learning_style']
         self.id = agent_stuff['id']
         self.method = agent_stuff['method']
+        assert(self.method in ['epsilon-greedy', 'softmax'])
+        assert(self.learning_style in ['Bayes', 'RL', 'estimate-switch'])
         [self.alpha, self.beta, self.epsilon, self.perseverance, self.decay,
          self.w_reward, self.w_noreward, self.w_explore] = all_params_lim
         if self.learning_style == 'RL':

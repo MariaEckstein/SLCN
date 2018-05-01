@@ -2,9 +2,12 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from scipy.optimize import brute
-from alien_task import Task
-from alien_agents import Agent
-from alien_record_data import RecordData
+# from alien_task import Task
+# from alien_agents import Agent
+# from alien_record_data import RecordData
+from ps_task import Task
+from ps_agent import Agent
+from ps_record_data import RecordData
 
 
 class FitParameters(object):
@@ -14,7 +17,7 @@ class FitParameters(object):
         self.agent_stuff = agent_stuff
         self.n_fit_par = sum(parameters.fit_pars)
 
-    def get_agent_data(self, way, data_path=(), all_params_lim=()):
+    def get_agent_data(self, way, data_path='', all_params_lim=()):
         if way == 'simulate':
             return self.simulate_agent(all_params_lim)
         else:
@@ -25,9 +28,9 @@ class FitParameters(object):
 
         task = Task(self.task_stuff, self.agent_stuff['id'])
         agent = Agent(self.agent_stuff, all_params_lim, self.task_stuff)
-        record_data = RecordData(n_trials=task.n_trials,
-                                 agent_id=agent.id,
-                                 mode='create_from_scratch')
+        record_data = RecordData(agent_id=agent.id,
+                                 mode='create_from_scratch',
+                                 task=task)
 
         for trial in range(task.n_trials):
             task.prepare_trial(trial)
@@ -38,7 +41,7 @@ class FitParameters(object):
             record_data.add_behavior(task, stimulus, action, reward, trial)
             record_data.add_decisions(agent, trial)
 
-        record_data.add_parameters(agent, [])  # add parameters (alpha, beta, etc.) only
+        record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()
 
     def calculate_NLL(self, params_inf, agent_data, goal='calculate_NLL'):
@@ -46,18 +49,18 @@ class FitParameters(object):
         all_params_lim = self.parameters.inf_to_lim(params_inf)
         agent = Agent(self.agent_stuff, all_params_lim, self.task_stuff)
         if goal == 'add_decisions_and_fit':
-            record_data = RecordData(n_trials=np.nan,
-                                     agent_id=agent.id,
+            record_data = RecordData(agent_id=agent.id,
                                      mode='add_to_existing_data',
                                      agent_data=agent_data)
 
         n_trials = len(agent_data)
         for trial in range(n_trials):
-            context = int(agent_data['context'][trial])
-            sad_alien = int(agent_data['sad_alien'][trial])
-            stimulus = np.array([context, sad_alien])
+            # context = int(agent_data['context'][trial])
+            # sad_alien = int(agent_data['sad_alien'][trial])
+            stimulus = np.nan  # np.array([context, sad_alien])
             agent.select_action(stimulus)  # calculate p_actions
-            action = int(agent_data['item_chosen'][trial])
+            # action = int(agent_data['item_chosen'][trial])
+            action = int(agent_data['selected_box'][trial])
             reward = int(agent_data['reward'][trial])
             agent.learn(stimulus, action, reward)
             if goal == 'add_decisions_and_fit':
@@ -95,5 +98,5 @@ class FitParameters(object):
         optimized_params = self.parameters.inf_to_lim(pars_inf[1:])
         return optimized_params
 
-    def write_agent_data(self, agent_data, save_path):
-        agent_data.to_csv(save_path + "PS_" + str(agent_data['sID'][0]) + ".csv")
+    def write_agent_data(self, agent_data, save_path, file_name=''):
+        agent_data.to_csv(save_path + file_name + "_" + str(agent_data['sID'][0]) + ".csv")

@@ -6,8 +6,9 @@ from fit_parameters import FitParameters
 
 
 class VisualizeAgent:
-    def __init__(self, parameters):
+    def __init__(self, parameters, agent_name):
         self.parameters = parameters
+        self.agent_name = agent_name
 
     def plot_Qs(self, par_name, parameter_values, fit_params):
         # Get default parameter values
@@ -22,10 +23,10 @@ class VisualizeAgent:
             for lh in ['high', 'low']:
                 agent_data_long = pd.melt(agent_data,
                                           id_vars=["trial_index", "reward", "item_chosen", "sad_alien", "TS"],
-                                          value_vars=["Q_" + lh + "0", "Q_" + lh + "1", "Q_" + lh + "2"],
-                                          var_name="action/context", value_name="Q_" + lh)
+                                          value_vars=["Q_" + lh + "0", "Q_" + lh + "1", "Q_" + lh + "2"],  # needs to be fixed
+                                          var_name="action/context", value_name=lh)
 
-                sns.lmplot(x="trial_index", y="Q_" + lh, hue="sad_alien",
+                sns.lmplot(x="trial_index", y=lh, hue="sad_alien",
                            col="TS", row="action/context",
                            scatter=True, fit_reg=False,
                            size=5, data=agent_data_long)
@@ -53,29 +54,35 @@ class VisualizeAgent:
                                               agent_data=agent_data,
                                               goal='add_decisions_and_fit')
         # Compare initial and recovered Qs and action probs
-        sub = 1
-        for sad_alien in range(3):
-            for context in range(3):
-                plot_dat = agent_data.loc[(agent_data['sad_alien'] == sad_alien) & (agent_data['context'] == context)]
-                for col in ['Q_low' + str(i) for i in range(3)]:
-                    plt.subplot(9, 3, sub)
-                    plt.plot(plot_dat[col], plot_dat[col + '_rec'], 'o')
-                    plt.title('alien' + str(sad_alien) + ' context' + str(context) + ' ' + col)
-                    sub += 1
-        plt.show()
+        if self.agent_name == 'alien':
+            sub = 1
+            for sad_alien in range(3):
+                for context in range(3):
+                    plot_dat = agent_data.loc[(agent_data['sad_alien'] == sad_alien) & (agent_data['context'] == context)]
+                    for col in ['Q_low' + str(i) for i in range(3)]:
+                        plt.subplot(9, 3, sub)
+                        plt.plot(plot_dat[col], plot_dat[col + '_rec'], 'o')
+                        plt.title('alien' + str(sad_alien) + ' context' + str(context) + ' ' + col)
+                        sub += 1
+            plt.show()
+            if self.agent_name == 'alien':
+                sub = 1
+                for TS in range(3):
+                    plot_dat = agent_data.loc[agent_data['TS'] == TS]
+                    for col in ['Q_high' + str(i) for i in range(3)]:
+                        plt.subplot(3, 3, sub)
+                        plt.plot(plot_dat[col], plot_dat[col + '_rec'], 'o')
+                        plt.title('TS' + str(TS) + ' ' + col)
+                        sub += 1
+                plt.show()
 
-        sub = 1
-        for TS in range(3):
-            plot_dat = agent_data.loc[agent_data['TS'] == TS]
-            for col in ['Q_high' + str(i) for i in range(3)]:
-                plt.subplot(3, 3, sub)
-                plt.plot(plot_dat[col], plot_dat[col + '_rec'], 'o')
-                plt.title('TS' + str(TS) + ' ' + col)
-                sub += 1
-        plt.show()
+                for i, col in enumerate(['p_action' + str(i) for i in range(3)]):
+                    plt.subplot(1, 3, i + 1)
+                    plt.plot(agent_data[col], agent_data[col + '_rec'], 'o')
+                    plt.title(col)
+                plt.show()
 
-        for i, col in enumerate(['p_action' + str(i) for i in range(3)]):
-            plt.subplot(1, 3, i + 1)
-            plt.plot(agent_data[col], agent_data[col + '_rec'], 'o')
-            plt.title(col)
-        plt.show()
+        else:
+            for col in ['values_l', 'values_l', 'p_action_l']:
+                plt.plot(agent_data[col], agent_data[col + '_rec'], 'o')
+            plt.show()

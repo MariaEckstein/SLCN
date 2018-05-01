@@ -4,17 +4,21 @@ import pandas as pd
 
 class RecordData(object):
 
-    def __init__(self, n_trials, agent_id, mode='add_to_existing_data', agent_data=()):
+    def __init__(self, agent_id, mode='add_to_existing_data', agent_data=(), task=()):
         if mode == 'create_from_scratch':
             colnames = ['selected_box', 'reward', 'p_switch', 'correct_box', 'sID', 'RT']
-            self.subj_file = pd.DataFrame(data=np.zeros([n_trials, len(colnames)]),
+            self.subj_file = pd.DataFrame(data=np.zeros([task.n_trials, len(colnames)]),
                                           columns=colnames)
             self.subj_file['sID'] = agent_id
             self.subj_file['RT'] = np.nan
         else:
             self.subj_file = agent_data
 
-    def add_parameters(self, agent, suff=''):
+    def add_parameters(self, agent, parameters, suff=''):
+        if parameters:
+            self.subj_file['fit_pars'] = str(parameters.fit_pars)
+        self.subj_file['method'] = agent.method
+        self.subj_file['learning_style'] = agent.learning_style
         self.subj_file['alpha' + suff] = agent.alpha
         self.subj_file['beta' + suff] = agent.beta
         self.subj_file['epsilon' + suff] = agent.epsilon

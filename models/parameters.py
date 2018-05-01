@@ -63,16 +63,16 @@ class Parameters(object):
     def adjust_fit_pars(self, method, learning_style=np.nan):
         if learning_style == 'RL':
             self.fit_pars[0] = True  # alpha
-        else:
+        elif learning_style == 'Bayes':
             self.fit_pars[0] = False  # alpha
-        if learning_style == 'estimate-switch':
-            self.fit_pars[5:8] = True  # the three estimate-switch parameters
-        else:
-            self.fit_pars[5:8] = False  # the three estimate-switch parameters
+        elif learning_style == 'flat':
+            self.fit_pars[5] = False  # mix
         if method == 'epsilon-greedy':
-            self.fit_pars[1:3] = [False, True]  # beta, epsilon
+            self.fit_pars[1] = False  # beta
+            self.fit_pars[2] = True  # epsilon
         elif method == 'softmax':
-            self.fit_pars[1:3] = [True, False]  # beta, epsilon
+            self.fit_pars[1] = True  # beta
+            self.fit_pars[2] = False  # epsilon
 
     def get_all_pars(self, params_inf):
         default_pars_01 = self.change_limits(self.default_pars_lim, 'lim_to_01')

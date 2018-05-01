@@ -48,6 +48,6 @@ class Task(object):
             self.i_episode += 1
 
     @staticmethod
-    def present_stimulus(context, trial):
+    def present_stimulus(context=(), trial=()):
         # not necessary here, but in other tasks
         return None

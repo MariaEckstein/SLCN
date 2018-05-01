@@ -21,15 +21,18 @@ genrec_filenames = c("AlphaOnly/genrec.csv", "genrec.csv")
 ```
 ```{r Read in genrec and melt}
 genrec = data.frame()
-i = 1
+i = 0
 for (genrec_filename in genrec_filenames) {
   new_genrec = read.csv(file = file.path(data_dir, genrec_filename), header = T, na.strings = c("", "NA", "NaN"))
-  new_genrec$sID = 1000 * i + new_genrec$sID
+  new_genrec$sID = 150 * i + new_genrec$sID
   genrec = rbind(genrec, new_genrec)
   i = i + 1
 }
 genrec$X = NULL
-genrec = subset(genrec, !is.na(fit_par))
+dim(genrec)
+genrec = subset(genrec, !is.na(fit_par))  # remove datasets in which no parameter was fitted
+genrec = subset(genrec, !(method == "softmax" & fit_par == "epsilon") & !(method == "epsilon-greedy" & fit_par == "beta") & !(learning_style == "flat" & fit_par == "mix"))  # remove datasets in which a meaningless parameter was fitted
+dim(genrec)
 
 genrec_long_gen = melt(subset(genrec, select = c("sID", paste0(parameter_names, "_gen"))),
                        measure.vars = paste0(parameter_names, "_gen"), variable.name = "parameter")
@@ -47,12 +50,31 @@ genrec_long
 ```{r Plot original versus fitted parameters}
 plot_dat = subset(genrec_long, !is.na(fit_par))
 for (par in intersect(unique(plot_dat$fit_par), unique(plot_dat$parameter))) {
-  gg_gen_rec_par = ggplot(subset(plot_dat, parameter == par & fit_par == par), aes(value_gen, value_rec)) +
+  gg_gen_rec_par = ggplot(subset(plot_dat, parameter == par & fit_par == par), aes(value_gen, value_rec, color = sID)) +
     geom_point() +
+    geom_abline(slope = 1, linetype = "dotted") +
     labs(x = paste0(par, "_gen"), y = paste0(par, "_rec")) +
     facet_grid(method ~ learning_style)
   ggsave(file.path(plot_dir, paste0("gg_genrec_", par, ".png")), gg_gen_rec_par)
 }
+```
+```{r Read in simulated agents and check generated versus recovered Qs}
+
+filenames = list.files(data_dir, pattern = "PS_")
+all_files = data.frame()
+
+for (filename in filenames) {
+  agent_file = read.csv(file = file.path(data_dir, filename), header = T, na.strings = c("", "NA", "NaN"))
+  n_col = ncol(agent_file)
+  if (length(try(rbind(all_files, agent_file), T)) > 1) {
+    all_files = rbind(all_files, agent_file)
+  }
+}
+
+all_files$X = NULL
+all_files
+
+
 ```
 ```{r Start button}
 ```
