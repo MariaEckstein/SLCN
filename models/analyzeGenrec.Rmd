@@ -17,14 +17,14 @@ plot_dir = file.path(data_dir, "plots")
 if (!dir.exists(plot_dir)) {
   dir.create(plot_dir)
 }
-genrec_filenames = c("AlphaOnly/genrec.csv", "genrec.csv")
+genrec_filenames = c("genrec.csv")
 ```
 ```{r Read in genrec and melt}
 genrec = data.frame()
 i = 0
 for (genrec_filename in genrec_filenames) {
   new_genrec = read.csv(file = file.path(data_dir, genrec_filename), header = T, na.strings = c("", "NA", "NaN"))
-  new_genrec$sID = 150 * i + new_genrec$sID
+  # new_genrec$sID = 150 * i + new_genrec$sID
   genrec = rbind(genrec, new_genrec)
   i = i + 1
 }
@@ -49,8 +49,8 @@ genrec_long
 ```
 ```{r Plot original versus fitted parameters}
 plot_dat = subset(genrec_long, !is.na(fit_par))
-for (par in intersect(unique(plot_dat$fit_par), unique(plot_dat$parameter))) {
-  gg_gen_rec_par = ggplot(subset(plot_dat, parameter == par & fit_par == par), aes(value_gen, value_rec, color = sID)) +
+for (par in parameter_names) { #intersect(unique(plot_dat$fit_par), unique(plot_dat$parameter))) {
+  gg_gen_rec_par = ggplot(subset(plot_dat, parameter == par), aes(value_gen, value_rec, color = sID)) +# & fit_par == par
     geom_point() +
     geom_abline(slope = 1, linetype = "dotted") +
     labs(x = paste0(par, "_gen"), y = paste0(par, "_rec")) +

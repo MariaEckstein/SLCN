@@ -65,8 +65,8 @@ class Parameters(object):
             self.fit_pars[0] = True  # alpha
         elif learning_style == 'Bayes':
             self.fit_pars[0] = False  # alpha
-        elif learning_style == 'flat':
-            self.fit_pars[5] = False  # mix
+        # elif learning_style == 'flat':
+        #     self.fit_pars[5] = False  # mix
         if method == 'epsilon-greedy':
             self.fit_pars[1] = False  # beta
             self.fit_pars[2] = True  # epsilon

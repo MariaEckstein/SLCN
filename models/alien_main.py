@@ -17,7 +17,7 @@ fit_human_data = False
 
 # Model fitting parameters
 n_iter = 5
-n_agents = 100
+n_agents = 1000
 agent_start_id = 0
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
 data_path = base_path + '/AlienGenRec/'
