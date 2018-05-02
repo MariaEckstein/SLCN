@@ -27,7 +27,7 @@ task_stuff = {'n_actions': 2,
               'n_trials': 200,
               'av_run_length': 10,  # DOUBLE-CHECK!!!!
               'path': base_path + '/ProbabilisticSwitching/Prerandomized sequences'}
-agent_stuff = {'name': 'PS'}
+agent_stuff = {'name': 'PS_'}
 parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'perseverance', 'decay',
                                    'w_reward', 'w_noreward', 'w_explore'],
                         fit_pars=np.array([1, 1, 1, 1, 1, 1, 1, 1], dtype=bool),  # which parameters will be fitted?

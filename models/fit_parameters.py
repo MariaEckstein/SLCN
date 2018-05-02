@@ -2,12 +2,12 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from scipy.optimize import brute
-# from alien_task import Task
-# from alien_agents import Agent
-# from alien_record_data import RecordData
-from ps_task import Task
-from ps_agent import Agent
-from ps_record_data import RecordData
+from alien_task import Task
+from alien_agents import Agent
+from alien_record_data import RecordData
+# from ps_task import Task
+# from ps_agent import Agent
+# from ps_record_data import RecordData
 
 
 class FitParameters(object):
@@ -15,13 +15,14 @@ class FitParameters(object):
         self.parameters = parameters
         self.task_stuff = task_stuff
         self.agent_stuff = agent_stuff
+        assert self.agent_stuff['name'] in ['alien', 'PS_']
         self.n_fit_par = sum(parameters.fit_pars)
 
     def get_agent_data(self, way, data_path='', all_params_lim=()):
         if way == 'simulate':
             return self.simulate_agent(all_params_lim)
         else:
-            file_name = data_path + '/PS_' + str(self.agent_stuff['id']) + '.csv'
+            file_name = data_path + '/' + self.agent_stuff['name'] + str(self.agent_stuff['id']) + '.csv'
             return pd.read_csv(file_name)
 
     def simulate_agent(self, all_params_lim):
@@ -55,12 +56,17 @@ class FitParameters(object):
 
         n_trials = len(agent_data)
         for trial in range(n_trials):
-            # context = int(agent_data['context'][trial])
-            # sad_alien = int(agent_data['sad_alien'][trial])
-            stimulus = np.nan  # np.array([context, sad_alien])
+            if self.agent_stuff['name'] == 'alien':
+                context = int(agent_data['context'][trial])
+                sad_alien = int(agent_data['sad_alien'][trial])
+                stimulus = np.array([context, sad_alien])
+            elif self.agent_stuff['name'] == 'PS_':
+                stimulus = np.nan  # np.array([context, sad_alien])
             agent.select_action(stimulus)  # calculate p_actions
-            # action = int(agent_data['item_chosen'][trial])
-            action = int(agent_data['selected_box'][trial])
+            if self.agent_stuff['name'] == 'alien':
+                action = int(agent_data['item_chosen'][trial])
+            elif self.agent_stuff['name'] == 'PS_':
+                action = int(agent_data['selected_box'][trial])
             reward = int(agent_data['reward'][trial])
             agent.learn(stimulus, action, reward)
             if goal == 'add_decisions_and_fit':

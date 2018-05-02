@@ -23,7 +23,7 @@ class VisualizeAgent:
             for lh in ['high', 'low']:
                 agent_data_long = pd.melt(agent_data,
                                           id_vars=["trial_index", "reward", "item_chosen", "sad_alien", "TS"],
-                                          value_vars=["Q_" + lh + "0", "Q_" + lh + "1", "Q_" + lh + "2"],  # needs to be fixed
+                                          value_vars=["Q_{0}_TS0_action_{1}".format(lh, str(i)) for i in range(3)],  # needs to be fixed
                                           var_name="action/context", value_name=lh)
 
                 sns.lmplot(x="trial_index", y=lh, hue="sad_alien",
@@ -34,14 +34,16 @@ class VisualizeAgent:
                 ax.set_title('Parameters: ' + str(np.round(gen_pars, 2)))
                 plt.show()
 
-    def plot_generated_recovered_Qs(self, task_stuff, method, learning_style):
+    def plot_generated_recovered_Qs(self, task_stuff, method, learning_style, mix_probs):
         # Specify model
         self.parameters.set_fit_pars(np.zeros(len(self.parameters.par_names), dtype=bool))  # fix all parameters; no fitting
-        agent_stuff = {'n_TS': 3,
+        agent_stuff = {'name': 'alien',
+                       'n_TS': 3,
                        'method': method,
                        'learning_style': learning_style,
                        'id': 0,
-                       'fit_par': []}
+                       'fit_par': [],
+                       'mix_probs': mix_probs}
         fit_params = FitParameters(parameters=self.parameters,
                                    task_stuff=task_stuff,
                                    agent_stuff=agent_stuff)
@@ -59,28 +61,27 @@ class VisualizeAgent:
             for sad_alien in range(3):
                 for context in range(3):
                     plot_dat = agent_data.loc[(agent_data['sad_alien'] == sad_alien) & (agent_data['context'] == context)]
-                    for col in ['Q_low' + str(i) for i in range(3)]:
+                    for col in ['Q_low_TS0_action_{0}'.format(str(i)) for i in range(3)]:
                         plt.subplot(9, 3, sub)
                         plt.plot(plot_dat[col], plot_dat[col + '_rec'], 'o')
-                        plt.title('alien' + str(sad_alien) + ' context' + str(context) + ' ' + col)
+                        plt.title('alien{0} context{1} {2}'.format(str(sad_alien), str(context), col))
                         sub += 1
             plt.show()
-            if self.agent_name == 'alien':
-                sub = 1
-                for TS in range(3):
-                    plot_dat = agent_data.loc[agent_data['TS'] == TS]
-                    for col in ['Q_high' + str(i) for i in range(3)]:
-                        plt.subplot(3, 3, sub)
-                        plt.plot(plot_dat[col], plot_dat[col + '_rec'], 'o')
-                        plt.title('TS' + str(TS) + ' ' + col)
-                        sub += 1
-                plt.show()
+            sub = 1
+            for TS in range(3):
+                plot_dat = agent_data.loc[agent_data['TS'] == TS]
+                for col in ['Q_low_TS0_action_{0}'.format(str(i)) for i in range(3)]:
+                    plt.subplot(3, 3, sub)
+                    plt.plot(plot_dat[col], plot_dat[col + '_rec'], 'o')
+                    plt.title('TS{0} {1}'.format(str(TS), col))
+                    sub += 1
+            plt.show()
 
-                for i, col in enumerate(['p_action' + str(i) for i in range(3)]):
-                    plt.subplot(1, 3, i + 1)
-                    plt.plot(agent_data[col], agent_data[col + '_rec'], 'o')
-                    plt.title(col)
-                plt.show()
+            for i, col in enumerate(['p_action' + str(i) for i in range(3)]):
+                plt.subplot(1, 3, i + 1)
+                plt.plot(agent_data[col], agent_data[col + '_rec'], 'o')
+                plt.title(col)
+            plt.show()
 
         else:
             for col in ['values_l', 'values_l', 'p_action_l']:

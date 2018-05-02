@@ -9,15 +9,15 @@ from visualize_agent import VisualizeAgent
 
 
 # What should be done?
-simulate_agents = True
+simulate_agents = False
 create_sanity_plots = False
 check_genrec_values = False
-generate_and_recover = False
+generate_and_recover = True
 fit_human_data = False
 
 # Model fitting parameters
-n_iter = 20
-n_agents = 30
+n_iter = 5
+n_agents = 100
 agent_start_id = 0
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
 data_path = base_path + '/AlienGenRec/'
@@ -91,30 +91,31 @@ if create_sanity_plots:
                                task_stuff=task_stuff,
                                agent_stuff=agent_stuff)
     viz_agent.plot_Qs('alpha', [0.01, 0.4], fit_params)
-    # agent_stuff['method'] = 'softmax'
-    # agent_stuff['learning_style'] = 'hierarchical'
-    # agent_stuff['id'] = agent_id
-    # fit_params = FitParameters(parameters=parameters,
-    #                            task_stuff=task_stuff,
-    #                            agent_stuff=agent_stuff)
-    #
-    # viz_agent.plot_Qs('alpha', [0.01, 0.4], fit_params)
-    # viz_agent.plot_Qs('beta', [0.1, 1, 10], fit_params)
-    # viz_agent.plot_Qs('perseverance', [0.1, 0.99], fit_params)
-    # viz_agent.plot_Qs('forget', [0.01, 0.99], fit_params)
-    # viz_agent.plot_Qs('mix', [0.01, 0.5, 0.99], fit_params)
-    # agent_stuff['method'] = 'epsilon-greedy'
-    # viz_agent.plot_Qs('alpha', [0.01, 0.4], fit_params)
-    # viz_agent.plot_Qs('epsilon', [0.01, 0.4], fit_params)
-    # agent_stuff['method'] = 'softmax'
-    # agent_stuff['learning_style'] = 'flat'
-    # viz_agent.plot_Qs('alpha', [0.01, 0.4], fit_params)
+    agent_stuff['method'] = 'softmax'
+    agent_stuff['learning_style'] = 'hierarchical'
+    agent_stuff['id'] = agent_id
+    fit_params = FitParameters(parameters=parameters,
+                               task_stuff=task_stuff,
+                               agent_stuff=agent_stuff)
+    viz_agent.plot_Qs('alpha', [0.01, 0.4], fit_params)
+    viz_agent.plot_Qs('beta', [0.1, 1, 10], fit_params)
+    viz_agent.plot_Qs('perseverance', [0.1, 0.99], fit_params)
+    viz_agent.plot_Qs('forget', [0.01, 0.99], fit_params)
+    viz_agent.plot_Qs('mix', [0.01, 0.5, 0.99], fit_params)
+    agent_stuff['method'] = 'epsilon-greedy'
+    viz_agent.plot_Qs('alpha', [0.01, 0.4], fit_params)
+    viz_agent.plot_Qs('epsilon', [0.01, 0.4], fit_params)
+    agent_stuff['method'] = 'softmax'
+    agent_stuff['learning_style'] = 'flat'
+    viz_agent.plot_Qs('alpha', [0.01, 0.4], fit_params)
 
 # Check that genrec recovers Qs and action probs correctly (based on the actual parameter values)
 if check_genrec_values:
     for method in ['epsilon-greedy', 'softmax']:
         for learning_style in ['flat', 'hierarchical']:
-            viz_agent.plot_generated_recovered_Qs(task_stuff, method, learning_style)
+            for mix_probs in [False, True]:
+                print('Method: {0}, Learning style: {1}, Mix_probs: {2}'.format(method, learning_style, str(mix_probs)))
+                viz_agent.plot_generated_recovered_Qs(task_stuff, method, learning_style, mix_probs)
 
 # Generate and recover
 if generate_and_recover:
@@ -130,44 +131,47 @@ if generate_and_recover:
     while agent_id < agent_start_id + n_agents:
         for method in ['softmax', 'epsilon-greedy']:
             for learning_style in ['flat', 'hierarchical']:
-                for fit_par in range(len(parameters.par_names)):
-                    fit_pars = np.zeros(len(parameters.par_names), dtype=bool)
-                    fit_pars[fit_par] = True  # Set fitting for one parameter to True, all others to False
+                for mix_probs in [True, False]:
+                    for fit_par in range(len(parameters.par_names)):
+                        fit_pars = np.zeros(len(parameters.par_names), dtype=bool)
+                        fit_pars[fit_par] = True  # Set fitting for one parameter to True, all others to False
 
-                    # Specify model
-                    agent_stuff['method'] = method
-                    agent_stuff['learning_style'] = learning_style
-                    agent_stuff['id'] = agent_id
+                        # Specify model
+                        agent_stuff['method'] = method
+                        agent_stuff['learning_style'] = learning_style
+                        agent_stuff['mix_probs'] = mix_probs
+                        agent_stuff['id'] = agent_id
 
-                    parameters.set_fit_pars(fit_pars)
-                    parameters.adjust_fit_pars(method, learning_style)
-                    if np.sum(parameters.fit_pars) > 0:  # don't do the following if there are no parameters to fit
-                        fit_par_names = '_'.join([parameters.par_names[int(i)] for i in np.argwhere(parameters.fit_pars)])
-                        agent_stuff['fit_par'] = fit_par_names
-                        fit_params = FitParameters(parameters=parameters,
-                                                   task_stuff=task_stuff,
-                                                   agent_stuff=agent_stuff)
-                        print('\nFitted parameters:', fit_par_names, '- Agent:', agent_id, method, learning_style)
-
-                        # Create random parameters to simulate data, fit parameters and calculate fit, create genrec
-                        gen_pars = parameters.create_random_params(scale='lim', get_all=True, mode='soft')
-                        agent_data = fit_params.get_agent_data(way='simulate',
-                                                               all_params_lim=gen_pars)
-                        rec_pars = fit_params.get_optimal_pars(agent_data=agent_data,
-                                                               n_iter=n_iter)
-                        agent_data = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
-                                                              agent_data=agent_data,
-                                                              goal='add_decisions_and_fit')
-                        fit_params.write_agent_data(agent_data=agent_data,
-                                                    save_path=save_agent_path)
-                        fit = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
-                                                       agent_data=agent_data,
-                                                       goal='calculate_fit')
-                        gen_rec.update_and_save_genrec(gen_pars=gen_pars,
-                                                       rec_pars=rec_pars,
-                                                       fit=fit,
+                        parameters.set_fit_pars(fit_pars)
+                        parameters.adjust_fit_pars(method, learning_style)
+                        if np.sum(parameters.fit_pars) > 0:  # don't do the following if there are no parameters to fit
+                            fit_par_names = '_'.join([parameters.par_names[int(i)] for i in np.argwhere(parameters.fit_pars)])
+                            agent_stuff['fit_par'] = fit_par_names
+                            fit_params = FitParameters(parameters=parameters,
+                                                       task_stuff=task_stuff,
                                                        agent_stuff=agent_stuff)
-                        agent_id += 1
+                            print('\nFree params:', fit_par_names, '- Agent:', agent_id, method, learning_style, mix_probs)
+
+                            # Create random parameters to simulate data, fit parameters and calculate fit, create genrec
+                            gen_pars = parameters.create_random_params(scale='lim', get_all=True, mode='soft')
+                            agent_data = fit_params.get_agent_data(way='simulate',
+                                                                   all_params_lim=gen_pars)
+                            rec_pars = fit_params.get_optimal_pars(agent_data=agent_data,
+                                                                   n_iter=n_iter)
+                            agent_data = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
+                                                                  agent_data=agent_data,
+                                                                  goal='add_decisions_and_fit')
+                            fit_params.write_agent_data(agent_data=agent_data,
+                                                        save_path=save_agent_path,
+                                                        file_name='alien')
+                            fit = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
+                                                           agent_data=agent_data,
+                                                           goal='calculate_fit')
+                            gen_rec.update_and_save_genrec(gen_pars=gen_pars,
+                                                           rec_pars=rec_pars,
+                                                           fit=fit,
+                                                           agent_stuff=agent_stuff)
+                            agent_id += 1
 
 # Fit parameters to human data
 if fit_human_data:

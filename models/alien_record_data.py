@@ -23,6 +23,7 @@ class RecordData(object):
         self.subj_file['n_TS'] = agent.n_TS
         self.subj_file['method'] = agent.method
         self.subj_file['learning_style'] = agent.learning_style
+        self.subj_file['mix_probs'] = agent.mix_probs
         self.subj_file['alpha' + suff] = agent.alpha
         self.subj_file['alpha_high' + suff] = agent.alpha_high
         self.subj_file['beta' + suff] = agent.beta
