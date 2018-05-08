@@ -42,16 +42,29 @@ class RecordData(object):
         self.subj_file.loc[trial, 'correct'] = reward > 0
 
     def add_decisions(self, agent, trial, suff=''):
-        if agent.TS:  # make sure agent.TS != []
-            self.subj_file.loc[trial, 'TS' + suff] = agent.TS
+        current_context = int(self.subj_file.loc[trial, 'context'])
+        current_TS = int(agent.TS)
+        current_alien = int(self.subj_file.loc[trial, 'sad_alien'])
+        current_item_chosen = int(self.subj_file.loc[trial, 'item_chosen'])
         self.subj_file.loc[trial, 'LL' + suff] = agent.LL
-        alien = self.subj_file.loc[trial, 'sad_alien']
-        for i in range(3):
-            self.subj_file.loc[trial, 'p_action' + str(i) + suff] = agent.p_actions[int(i)]  # here, i is action
-            self.subj_file.loc[trial, 'p_TS' + str(i) + suff] = agent.p_TS[int(i)]  # here, i is TS
-            for TS in range(3):
-                self.subj_file.loc[trial, 'Q_low_TS' + str(TS) + '_action_' + str(i) + suff] = agent.Q_low[TS, alien, int(i)]  # here, i is action
-                self.subj_file.loc[trial, 'Q_high_TS' + str(TS) + '_action_' + str(i) + suff] = agent.Q_high[int(i), TS]  # here, i is context
+        self.subj_file.loc[trial, 'TS' + suff] = current_TS
+        # Q_high and Q_low for the current trial's TS and chosen item, respectively
+        self.subj_file.loc[trial, 'Q_TS' + suff] = agent.Q_high[current_context, current_TS]
+        self.subj_file.loc[trial, 'Q_action' + suff] = agent.Q_low[current_TS, current_alien, current_item_chosen]
+        # p_high and p_low for the current trial's TS and chosen item, respectively
+        self.subj_file.loc[trial, 'p_TS' + suff] = agent.p_TS[current_TS]
+        self.subj_file.loc[trial, 'p_action' + suff] = agent.p_actions[current_item_chosen]
+        # Add all values
+        for TS in range(3):
+            self.subj_file.loc[trial, 'p_TS' + str(TS) + suff] = agent.p_TS[int(TS)]
+            for context in range(3):
+                self.subj_file.loc[trial, 'Q_TS{0}_context{1}{2}'.format(str(TS), str(context), suff)] = agent.Q_high[int(context), TS]
+        for action in range(3):
+            self.subj_file.loc[trial, 'p_action' + str(action) + suff] = agent.p_actions[int(action)]
+            for alien in range(4):
+                for TS in range(3):
+                    self.subj_file.loc[trial, 'Q_action{0}_alien{1}_TS{2}{3}'.format(str(action), str(alien), str(TS), suff)]\
+                        = agent.Q_low[action, alien, int(TS)]
 
     def add_fit(self, NLL, BIC, AIC, suff=''):
         self.subj_file['NLL' + suff] = NLL

@@ -24,43 +24,46 @@ genrec = data.frame()
 i = 0
 for (genrec_filename in genrec_filenames) {
   new_genrec = read.csv(file = file.path(data_dir, genrec_filename), header = T, na.strings = c("", "NA", "NaN"))
-  # new_genrec$sID = 150 * i + new_genrec$sID
   genrec = rbind(genrec, new_genrec)
   i = i + 1
 }
 genrec$X = NULL
 dim(genrec)
+summary(genrec)
 genrec = subset(genrec, !is.na(fit_par))  # remove datasets in which no parameter was fitted
 genrec = subset(genrec, !(method == "softmax" & fit_par == "epsilon") & !(method == "epsilon-greedy" & fit_par == "beta") & !(learning_style == "flat" & fit_par == "mix"))  # remove datasets in which a meaningless parameter was fitted
 dim(genrec)
 
+# Get parameters into the rows (gen)
 genrec_long_gen = melt(subset(genrec, select = c("sID", paste0(parameter_names, "_gen"))),
                        measure.vars = paste0(parameter_names, "_gen"), variable.name = "parameter")
 genrec_long_gen$parameter = gsub("_gen", "", genrec_long_gen$parameter)
-
+# Get parameters into the rows (rec)
 genrec_long_rec = melt(subset(genrec, select = c("sID", paste0(parameter_names, "_rec"))),
                        measure.vars = paste0(parameter_names, "_rec"), variable.name = "parameter")
 genrec_long_rec$parameter = gsub("_rec", "", genrec_long_gen$parameter)
-
+# Add learning_style, method, mix_probs, and fit_par back in
 genrec_long = merge(genrec_long_gen, genrec_long_rec, by = c("sID", "parameter"), suff = c("_gen", "_rec"))
-genrec_long = merge(subset(genrec, select = c("sID", "learning_style", "method", "fit_par")), genrec_long)
+genrec_long = merge(subset(genrec, select = c("sID", "learning_style", "method", "mix_probs", "fit_par")), genrec_long)
 
 genrec_long
 ```
 ```{r Plot original versus fitted parameters}
-plot_dat = subset(genrec_long, !is.na(fit_par))
 for (par in parameter_names) { #intersect(unique(plot_dat$fit_par), unique(plot_dat$parameter))) {
-  gg_gen_rec_par = ggplot(subset(plot_dat, parameter == par), aes(value_gen, value_rec, color = sID)) +# & fit_par == par
-    geom_point() +
-    geom_abline(slope = 1, linetype = "dotted") +
-    labs(x = paste0(par, "_gen"), y = paste0(par, "_rec")) +
-    facet_grid(method ~ learning_style)
-  ggsave(file.path(plot_dir, paste0("gg_genrec_", par, ".png")), gg_gen_rec_par)
+  plot_dat = subset(genrec_long, parameter == par & fit_par == par)
+  if (nrow(plot_dat) > 0) {
+    gg_gen_rec_par = ggplot(plot_dat, aes(value_gen, value_rec, color = sID)) +  #, color = mix_probs)) +# & fit_par == par
+      geom_point() +
+      geom_abline(slope = 1, linetype = "dotted") +
+      labs(x = paste0(par, "_gen"), y = paste0(par, "_rec")) +
+      facet_grid(method ~ learning_style)
+    ggsave(file.path(plot_dir, paste0("gg_genrec_", par, ".png")), gg_gen_rec_par)
+  }
 }
 ```
 ```{r Read in simulated agents and check generated versus recovered Qs}
 
-filenames = list.files(data_dir, pattern = "PS_")
+filenames = list.files(data_dir, pattern = "alien")
 all_files = data.frame()
 
 for (filename in filenames) {
@@ -74,7 +77,21 @@ for (filename in filenames) {
 all_files$X = NULL
 all_files
 
+summary(all_files)
 
+# Check if TS values and action values are correlated for the current TS and current action
+gg_Q_high_low = ggplot(all_files, aes(Q_TS, Q_action, color = sID, shape = mix_probs)) +
+  geom_point() +
+  facet_grid(learning_style ~ method)
+gg_p_high_low = gg_Q_high_low + aes(p_TS, p_action)
+
+# Check if TS values and action values are correlated for any TS and any action
+
+
+if (gg_save) {
+  ggsave(file.path(plot_dir, "gg_Q_high_low.png"), gg_Q_high_low)
+  ggsave(file.path(plot_dir, "gg_p_high_low.png"), gg_p_high_low)
+}
 ```
 ```{r Start button}
 ```

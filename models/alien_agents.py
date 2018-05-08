@@ -27,7 +27,7 @@ class Agent(object):
         elif self.learning_style == 'hierarchical':
             n_TS = self.n_TS
         Q_low_dim = [n_TS, task_stuff['n_aliens'], self.n_actions]
-        self.Q_low = self.initial_q_low * np.ones(Q_low_dim) #+ np.random.normal(0, 0.001, Q_low_dim)  # jitter avoids ident. values
+        self.Q_low = self.initial_q_low * np.ones(Q_low_dim) + np.random.normal(0, 0.001, Q_low_dim)  # jitter avoids ident. values
 
         # Set up values at high (context-TS) level
         if self.learning_style == 'flat':
@@ -35,7 +35,7 @@ class Agent(object):
         elif self.learning_style == 'hierarchical':
             self.initial_q_high = 5 / 3  # 5 was the reward during training
             Q_high_dim = [task_stuff['n_contexts'], self.n_TS]
-            self.Q_high = self.initial_q_high * np.ones(Q_high_dim) #+ np.random.normal(0, 0.001, Q_high_dim)
+            self.Q_high = self.initial_q_high * np.ones(Q_high_dim) + np.random.normal(0, 0.001, Q_high_dim)
 
         # Initialize action probs, current TS and action, LL
         self.p_TS = np.ones(self.n_TS) / self.n_TS  # P(TS|context)
@@ -55,7 +55,7 @@ class Agent(object):
 
         if self.mix_probs:  # P(action|context, alien) = \sum_TS P(action|TS_i, alien) P(TS_i|context)
             self.TS = np.argmax(self.p_TS)  # just for saving in agent_data
-            self.p_actions = np.sum(np.dot(self.p_TS * np.eye(self.n_TS), p_actions), axis=0)
+            self.p_actions = np.sum(np.dot(self.p_TS * np.eye(self.n_TS), p_actions), axis=0)  # * = elementwise multiplication
         else:  # Select one TS based on Q(TS|context), then select one action based on Q(action|context, alien)
             self.TS = np.random.choice(range(self.n_TS), p=self.p_TS)
             self.p_actions = p_actions[self.TS]
@@ -69,14 +69,16 @@ class Agent(object):
         self.update_LL(action)
 
     def get_p_from_Q(self, Q, previous_choice, select_deterministic=False):
-        Q[previous_choice] += self.perseverance  # Should affect the original Q table! -> Perseverance is persistent!
+        if self.learning_style != 'flat':
+            Q[previous_choice] += self.perseverance  # Affects original Q table! -> Perseverance is persistent!
         if select_deterministic:
+            assert(np.sum(Q == 1) == 1)  # Verify that exactly 1 Q-value == 1
             p = np.array(Q == 1, dtype=int)  # select the one TS that has a value of 1 (all others have values of 0)
         elif self.method == 'epsilon-greedy':
             p = self.calculate_p_epsilon_greedy(Q)
         elif self.method == 'softmax':
             p = self.calculate_p_softmax(Q)
-        assert math.isclose(sum(p), 1, rel_tol=1e-5)
+        assert math.isclose(sum(p), 1, rel_tol=1e-5)  # Verify that probabilities sum up to 1
         return p
 
     def calculate_p_epsilon_greedy(self, Q):

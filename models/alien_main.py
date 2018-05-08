@@ -12,11 +12,12 @@ from visualize_agent import VisualizeAgent
 simulate_agents = False
 create_sanity_plots = False
 check_genrec_values = False
+quick_generate_and_recover = False
 generate_and_recover = True
 fit_human_data = False
 
 # Model fitting parameters
-n_iter = 5
+n_iter = 2
 n_agents = 1000
 agent_start_id = 0
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
@@ -40,8 +41,8 @@ TSs = np.array([[[0, 6, 0],  # alien0, items0-2
                 [0, 3, 0],
                 [2, 0, 0]]])
 
-task_stuff = {'n_trials_per_alien': 13,  # 13
-              'n_blocks': 3,  # 3
+task_stuff = {'n_trials_per_alien': 10,  # 13
+              'n_blocks': 1,  # 3
               'n_aliens': 4,
               'n_actions': n_actions,
               'n_contexts': 3,
@@ -52,9 +53,9 @@ agent_stuff = {'name': 'alien',
 
 parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'perseverance', 'forget', 'mix'],
                         fit_pars=np.ones(6, dtype=bool),  # which parameters will be fitted?
-                        par_hard_limits=((0, 1), (1, 15), (0, 1), (-1, 1), (0, 1), (0, 1)),  # no values fitted outside
-                        par_soft_limits=((0, 1), (1, 6), (0, 0.25), (-0.3, 0.3), (0, 0.3), (0, 1)),  # no simul. outside
-                        default_pars_lim=np.array([0.05, 1+1e-5, 1e-5, 1e-5, 1e-5, 1]))  # when a parameter is fixed
+                        par_hard_limits=((0, 1), (1, 15), (0, 1), (-1, 1), (0, 0.3), (0, 1)),  # no values fitted outside
+                        par_soft_limits=((0, 0.5), (1, 6), (0, 0.25), (-0.3, 0.3), (0, 0.1), (0, 1)),  # no simul. outside
+                        default_pars_lim=np.array([0.1, 2+1e-5, 1e-5, 1e-5, 1e-5, 1]))  # when a parameter is fixed
 viz_agent = VisualizeAgent(parameters, agent_stuff['name'])
 
 # Simulate specific agents
@@ -83,31 +84,22 @@ if simulate_agents:
 
 # Check that all parameters are working (plot Qs and check if they make sense)
 if create_sanity_plots:
+    print("Creating sanity plots...")
     agent_id = agent_start_id
-    agent_stuff['method'] = 'epsilon-greedy'
-    agent_stuff['learning_style'] = 'flat'
-    agent_stuff['id'] = agent_id
-    fit_params = FitParameters(parameters=parameters,
-                               task_stuff=task_stuff,
-                               agent_stuff=agent_stuff)
-    viz_agent.plot_Qs('alpha', [0.01, 0.4], fit_params)
     agent_stuff['method'] = 'softmax'
     agent_stuff['learning_style'] = 'hierarchical'
+    agent_stuff['mix_probs'] = False
     agent_stuff['id'] = agent_id
     fit_params = FitParameters(parameters=parameters,
                                task_stuff=task_stuff,
                                agent_stuff=agent_stuff)
-    viz_agent.plot_Qs('alpha', [0.01, 0.4], fit_params)
-    viz_agent.plot_Qs('beta', [0.1, 1, 10], fit_params)
-    viz_agent.plot_Qs('perseverance', [0.1, 0.99], fit_params)
-    viz_agent.plot_Qs('forget', [0.01, 0.99], fit_params)
-    viz_agent.plot_Qs('mix', [0.01, 0.5, 0.99], fit_params)
-    agent_stuff['method'] = 'epsilon-greedy'
-    viz_agent.plot_Qs('alpha', [0.01, 0.4], fit_params)
-    viz_agent.plot_Qs('epsilon', [0.01, 0.4], fit_params)
-    agent_stuff['method'] = 'softmax'
-    agent_stuff['learning_style'] = 'flat'
-    viz_agent.plot_Qs('alpha', [0.01, 0.4], fit_params)
+    viz_agent.plot_Qs('alpha', [0.05, 0.4], fit_params, 'Q')
+    # viz_agent.plot_Qs('beta', [0.01, 10], fit_params, 'p')
+    # viz_agent.plot_Qs('perseverance', [0.1, 0.99], fit_params, 'p')
+    # viz_agent.plot_Qs('forget', [0.01, 0.1], fit_params, 'Q')
+    # viz_agent.plot_Qs('mix', [0.01, 0.5, 0.99], fit_params, 'p')
+    # agent_stuff['method'] = 'epsilon-greedy'
+    # viz_agent.plot_Qs('epsilon', [0.01, 0.4], fit_params, 'p')
 
 # Check that genrec recovers Qs and action probs correctly (based on the actual parameter values)
 if check_genrec_values:
@@ -118,6 +110,74 @@ if check_genrec_values:
                 viz_agent.plot_generated_recovered_Qs(task_stuff, method, learning_style, mix_probs)
 
 # Generate and recover
+if quick_generate_and_recover:
+
+    # Specify where data will be saved
+    save_agent_path = data_path
+    if not os.path.isdir(save_agent_path):
+        os.makedirs(save_agent_path)
+
+    gen_rec = GenRec(parameters=parameters,
+                     full_genrec_path=data_path + '/genrec.csv')
+    agent_id = agent_start_id
+    while agent_id < agent_start_id + n_agents:
+        print("Agent " + str(agent_id))
+        method = 'softmax'
+        learning_style = 'flat'
+        mix_probs = False
+        fit_par = parameters.par_names[0]
+        fit_pars = np.array(parameters.par_names) == fit_par  # Set one parameter to T, all others F
+
+        # Specify model
+        agent_stuff['method'] = method
+        agent_stuff['learning_style'] = learning_style
+        agent_stuff['mix_probs'] = mix_probs
+        agent_stuff['id'] = agent_id
+
+        # Decide which parameters will be fit (others will just be known)
+        parameters.set_fit_pars(fit_pars)
+        parameters.adjust_fit_pars(method, learning_style)
+
+        fit_par_names = '_'.join([parameters.par_names[int(i)] for i in np.argwhere(parameters.fit_pars)])
+        agent_stuff['fit_par'] = fit_par_names
+        fit_params = FitParameters(parameters=parameters,
+                                   task_stuff=task_stuff,
+                                   agent_stuff=agent_stuff)
+
+        # Simulate agent based on random parameters
+        gen_pars = parameters.create_random_params(scale='lim', get_all=True, mode='soft')
+        print("Generated parameters: " + str(np.round(gen_pars, 3)))
+        agent_data = fit_params.get_agent_data(way='simulate',
+                                               all_params_lim=gen_pars)
+        # Make sure that data are based on the right parameters
+        for i, par in enumerate(parameters.par_names):
+            assert(gen_pars[i] == agent_data[par][0])
+
+        # Fit the free parameters (remaining parameters will be set to gen_pars)
+        rec_pars = fit_params.get_optimal_pars(agent_data=agent_data,
+                                               n_iter=n_iter,
+                                               default_pars_lim=gen_pars)
+        print("Recovered parameters: " + str(np.round(rec_pars, 3)))
+
+        # Calculate model fit and add stuff
+        agent_data = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
+                                              agent_data=agent_data,
+                                              default_pars_lim=gen_pars,
+                                              goal='add_decisions_and_fit')
+
+        fit_params.write_agent_data(agent_data=agent_data,
+                                    save_path=save_agent_path,
+                                    file_name='alien')
+        fit = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
+                                       agent_data=agent_data,
+                                       default_pars_lim=gen_pars,
+                                       goal='calculate_fit')
+        gen_rec.update_and_save_genrec(gen_pars=gen_pars,
+                                       rec_pars=rec_pars,
+                                       fit=fit,
+                                       agent_stuff=agent_stuff)
+        agent_id += 1
+
 if generate_and_recover:
 
     # Specify where data will be saved
@@ -130,11 +190,10 @@ if generate_and_recover:
     agent_id = agent_start_id
     while agent_id < agent_start_id + n_agents:
         for method in ['softmax', 'epsilon-greedy']:
-            for learning_style in ['flat', 'hierarchical']:
+            for learning_style in ['hierarchical', 'flat']:
                 for mix_probs in [True, False]:
-                    for fit_par in range(len(parameters.par_names)):
-                        fit_pars = np.zeros(len(parameters.par_names), dtype=bool)
-                        fit_pars[fit_par] = True  # Set fitting for one parameter to True, all others to False
+                    for fit_par in parameters.par_names:
+                        fit_pars = np.array(parameters.par_names) == fit_par  # Set one parameter to T, all others F
 
                         # Specify model
                         agent_stuff['method'] = method
@@ -142,9 +201,11 @@ if generate_and_recover:
                         agent_stuff['mix_probs'] = mix_probs
                         agent_stuff['id'] = agent_id
 
+                        # Decide which parameters will be fit (others will just be known)
                         parameters.set_fit_pars(fit_pars)
                         parameters.adjust_fit_pars(method, learning_style)
                         if np.sum(parameters.fit_pars) > 0:  # don't do the following if there are no parameters to fit
+
                             fit_par_names = '_'.join([parameters.par_names[int(i)] for i in np.argwhere(parameters.fit_pars)])
                             agent_stuff['fit_par'] = fit_par_names
                             fit_params = FitParameters(parameters=parameters,
@@ -152,20 +213,33 @@ if generate_and_recover:
                                                        agent_stuff=agent_stuff)
                             print('\nFree params:', fit_par_names, '- Agent:', agent_id, method, learning_style, mix_probs)
 
-                            # Create random parameters to simulate data, fit parameters and calculate fit, create genrec
+                            # Simulate agent based on random parameters
                             gen_pars = parameters.create_random_params(scale='lim', get_all=True, mode='soft')
+                            print("Generated parameters: " + str(np.round(gen_pars, 3)))
                             agent_data = fit_params.get_agent_data(way='simulate',
                                                                    all_params_lim=gen_pars)
+                            # Make sure that data are based on the right parameters
+                            for i, par in enumerate(parameters.par_names):
+                                assert(gen_pars[i] == agent_data[par][0])
+
+                            # Fit the free parameters (remaining parameters will be set to gen_pars)
                             rec_pars = fit_params.get_optimal_pars(agent_data=agent_data,
-                                                                   n_iter=n_iter)
+                                                                   n_iter=n_iter,
+                                                                   default_pars_lim=gen_pars)
+                            print("Recovered parameters: " + str(np.round(rec_pars, 3)))
+
+                            # Calculate model fit and add stuff
                             agent_data = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
                                                                   agent_data=agent_data,
+                                                                  default_pars_lim=gen_pars,
                                                                   goal='add_decisions_and_fit')
+
                             fit_params.write_agent_data(agent_data=agent_data,
                                                         save_path=save_agent_path,
                                                         file_name='alien')
                             fit = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
                                                            agent_data=agent_data,
+                                                           default_pars_lim=gen_pars,
                                                            goal='calculate_fit')
                             gen_rec.update_and_save_genrec(gen_pars=gen_pars,
                                                            rec_pars=rec_pars,

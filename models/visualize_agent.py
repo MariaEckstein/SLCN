@@ -10,28 +10,33 @@ class VisualizeAgent:
         self.parameters = parameters
         self.agent_name = agent_name
 
-    def plot_Qs(self, par_name, parameter_values, fit_params):
+    def plot_Qs(self, par_name, parameter_values, fit_params, p_or_Q):
         # Get default parameter values
         gen_pars = self.parameters.default_pars_lim
         par_index = np.argwhere(np.array(self.parameters.par_names) == par_name)
         for par_value in parameter_values:
             # Replace the parameter in question with the value of interest and simulate data
             gen_pars[par_index] = par_value
+            print("Simulating data...")
             agent_data = fit_params.get_agent_data(way='simulate',
                                                    all_params_lim=gen_pars)
             # Plot Q values over time
-            for lh in ['high', 'low']:
-                agent_data_long = pd.melt(agent_data,
-                                          id_vars=["trial_index", "reward", "item_chosen", "sad_alien", "TS"],
-                                          value_vars=["Q_{0}_TS0_action_{1}".format(lh, str(i)) for i in range(3)],  # needs to be fixed
-                                          var_name="action/context", value_name=lh)
+            for TS_or_action in ['_TS', '_action']:
+                columns = [col for col in agent_data.columns if p_or_Q + TS_or_action in col]
 
-                sns.lmplot(x="trial_index", y=lh, hue="sad_alien",
-                           col="TS", row="action/context",
+                print("Melting data...")
+                agent_data_long = pd.melt(agent_data,
+                                          id_vars=["trial_index", "reward", "item_chosen", "sad_alien", "TS", "context"],
+                                          value_vars=columns,
+                                          var_name=TS_or_action, value_name=p_or_Q)
+                print("Plotting data...")
+                TS_plot = sns.lmplot(x="trial_index", y=p_or_Q, hue=TS_or_action, col='context',
                            scatter=True, fit_reg=False,
                            size=5, data=agent_data_long)
+                TS_plot.savefig(TS_or_action + "plot.png")
+
                 ax = plt.gca()
-                ax.set_title('Parameters: ' + str(np.round(gen_pars, 2)))
+                ax.set_title('Pars: {0}, {1}-values, {2}'.format(str(np.round(gen_pars, 2)), TS_or_action, p_or_Q))
                 plt.show()
 
     def plot_generated_recovered_Qs(self, task_stuff, method, learning_style, mix_probs):

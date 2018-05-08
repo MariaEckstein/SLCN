@@ -22,24 +22,28 @@ class Parameters(object):
         return pars_inf
 
     def create_random_params(self, scale='lim', get_all=True, mode='hard'):
-        pars_01 = np.random.rand(sum(self.fit_pars))
-        if get_all:
-            pars_inf = self.change_scale(pars_01, '01_to_inf')
-            all_pars_inf = self.get_all_pars(pars_inf)
-            pars_01 = self.change_scale(all_pars_inf, 'inf_to_01')
-            if scale == 'lim':  # Can only change limits when I have all parameters
-                return self.change_limits(pars_01, '01_to_lim', mode=mode)
-        elif scale == 'inf':
-            return self.change_scale(pars_01, '01_to_inf')
+        if get_all and (scale == 'lim'):
+            if mode == 'soft':
+                limits = self.par_soft_limits
+            elif mode == 'hard':
+                limits = self.par_hard_limits
+            all_pars_lim = [limit[0] + np.random.rand() * (limit[1] - limit[0]) for limit in limits]
+            return np.array(all_pars_lim)
+        elif (not get_all) and (scale == 'inf'):
+            pars_01 = np.random.rand(sum(self.fit_pars))
+            return np.array(self.change_scale(pars_01, '01_to_inf'))
 
     @staticmethod
     def change_scale(pars_in, direction):
         pars_out = pars_in.copy()
         if direction == '01_to_inf':
-            pars_out = 0.9999 * pars_out + 0.0001 * 0.5 * np.ones(len(pars_out))  # Avoid 0's and 1's
+            assert(np.all(pars_out >= 0) and np.all(pars_out <= 1))
+            pars_out = 0.99999 * pars_out + 0.00001 * 0.5 * np.ones(len(pars_out))  # Avoid 0's and 1's
             pars_out = -np.log(1 / pars_out - 1)  # inverse sigmoid
         elif direction == 'inf_to_01':
+            pars_out = 0.99999 * pars_out + 0.00001 * 0.5 * np.ones(len(pars_out))  # Avoid 0's and 1's
             pars_out = 1 / (1 + np.e ** -pars_out)  # sigmoid
+            assert (np.all(pars_out >= 0) and np.all(pars_out <= 1))
         return pars_out
 
     def change_limits(self, all_pars_in, direction, mode='hard'):
@@ -61,17 +65,17 @@ class Parameters(object):
         self.fit_pars = fit_pars
 
     def adjust_fit_pars(self, method, learning_style=np.nan):
-        if learning_style == 'RL':
-            self.fit_pars[0] = True  # alpha
-        elif learning_style == 'Bayes':
+        # if learning_style == 'RL':
+        #     self.fit_pars[0] = True  # alpha
+        if learning_style == 'Bayes':
             self.fit_pars[0] = False  # alpha
-        # elif learning_style == 'flat':
-        #     self.fit_pars[5] = False  # mix
+        elif learning_style == 'flat':
+            self.fit_pars[5] = False  # mix RPE_low and RPE_high
         if method == 'epsilon-greedy':
             self.fit_pars[1] = False  # beta
-            self.fit_pars[2] = True  # epsilon
+            # self.fit_pars[2] = True  # epsilon
         elif method == 'softmax':
-            self.fit_pars[1] = True  # beta
+            # self.fit_pars[1] = True  # beta
             self.fit_pars[2] = False  # epsilon
 
     def get_all_pars(self, params_inf):

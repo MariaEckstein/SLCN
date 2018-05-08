@@ -18,7 +18,6 @@ class GenRec(object):
         self.genrec_row = len(self.genrec)
 
     def update_and_save_genrec(self, gen_pars, rec_pars, fit, agent_stuff):
-        print('gen_pars:', np.round(gen_pars, 2), '\nrec_pars:', np.round(rec_pars, 2), '\nfit:', fit)
         row = np.concatenate(([agent_stuff['id'],
                                agent_stuff['learning_style'], agent_stuff['method'],
                                agent_stuff['mix_probs'], agent_stuff['fit_par']],
