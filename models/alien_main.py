@@ -20,7 +20,7 @@ fit_human_data = False
 # Model fitting parameters
 n_iter = 2
 n_agents = 1000
-agent_start_id = 23
+agent_start_id = 0
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
 data_path = base_path + '/AlienGenRec/'
 
@@ -52,10 +52,10 @@ agent_stuff = {'name': 'alien',
                'n_TS': 3,
                'mix_probs': False}
 
-parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'mix'],
+parameters = Parameters(par_names=['alpha', 'beta', 'epsilon'],
                         fit_pars=np.ones(6, dtype=bool),  # which parameters will be fitted?
-                        par_hard_limits=((0, 1),   (1, 15), (0, 1),    (0, 1)),  # no values fitted outside
-                        par_soft_limits=((0, 0.5), (1, 6),  (0, 0.25), (0, 1)),  # no simulations outside
+                        par_hard_limits=((0, 1),   (1, 15), (0, 1)),  # no values fitted outside
+                        par_soft_limits=((0, 0.5), (1, 6),  (0, 0.25)),  # no simulations outside
                         default_pars_lim=np.array([0.1, 10, 0, 1]))  # when a parameter is fixed
 viz_agent = VisualizeAgent(parameters, agent_stuff['name'])
 
@@ -118,7 +118,6 @@ if create_sanity_plots:
                                agent_stuff=agent_stuff)
     viz_agent.plot_Qs('alpha', [0.05, 0.4], fit_params, 'Q')
     # viz_agent.plot_Qs('beta', [0.01, 10], fit_params, 'p')
-    # viz_agent.plot_Qs('mix', [0.01, 0.5, 0.99], fit_params, 'p')
     # agent_stuff['method'] = 'epsilon-greedy'
     # viz_agent.plot_Qs('epsilon', [0.01, 0.4], fit_params, 'p')
 

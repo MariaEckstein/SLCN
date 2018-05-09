@@ -9,7 +9,7 @@ output: html_document
 library("ggplot2"); library("plyr"); library("reshape2")
 theme_set(theme_bw())
 
-parameter_names = c("alpha", "beta", "epsilon", "mix")
+parameter_names = c("alpha", "beta", "epsilon")
 
 gg_save = T
 data_dir = "C:/Users/maria/MEGAsync/Berkeley/TaskSets/AlienGenRec"

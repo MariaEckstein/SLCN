@@ -69,8 +69,8 @@ class Parameters(object):
         #     self.fit_pars[np.array(self.par_names) == 'alpha'] = True
         if learning_style == 'Bayes':
             self.fit_pars[np.array(self.par_names) == 'alpha'] = False
-        elif learning_style == 'flat':
-            self.fit_pars[np.array(self.par_names) == 'mix'] = False  # mix RPE_low and RPE_high
+        # elif learning_style == 'flat':
+        #     self.fit_pars[np.array(self.par_names) == 'mix'] = False  # mix RPE_low and RPE_high
         if method == 'epsilon-greedy':
             self.fit_pars[np.array(self.par_names) == 'beta'] = False
             # self.fit_pars[np.array(self.par_names) == 'epsilon'] = True

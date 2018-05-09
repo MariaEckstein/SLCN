@@ -13,7 +13,7 @@ class Agent(object):
         self.select_deterministic = self.learning_style == 'flat'  # Hack to select the right TS each time for the flat agent
         self.mix_probs = agent_stuff['mix_probs']
         self.id = agent_stuff['id']
-        [self.alpha, self.beta, self.epsilon, self.mix] = all_params_lim
+        [self.alpha, self.beta, self.epsilon] = all_params_lim
         self.alpha_high = self.alpha  # TD
         assert(self.alpha > 0)  # Make sure that alpha is a number and is > 0
         assert(self.mix_probs in [True, False])
@@ -94,15 +94,14 @@ class Agent(object):
         old_Q_high = self.Q_high[stimulus[0], self.TS].copy()
         RPEs_low = reward - self.Q_low[:, stimulus[1], action]  # Q_low for all TSs, given alien & action
         RPEs_high = reward - self.Q_high[stimulus[0], :]  # Q_high for all TSs, given context
-        RPEs_mix = self.mix * RPEs_high + (1 - self.mix) * RPEs_low
         if self.mix_probs:
             self.Q_low[:, stimulus[1], action] += self.alpha * self.p_TS * RPEs_low  # flat agent: p_TS has just one 1
             if self.learning_style == 'hierarchical':
-                self.Q_high[stimulus[0], :] += self.alpha_high * self.p_TS * RPEs_mix
+                self.Q_high[stimulus[0], :] += self.alpha_high * self.p_TS * RPEs_high
         else:
             self.Q_low[self.TS, stimulus[1], action] += self.alpha * RPEs_low[self.TS]
             if self.learning_style == 'hierarchical':
-                self.Q_high[stimulus[0], self.TS] += self.alpha_high * RPEs_mix[self.TS]
+                self.Q_high[stimulus[0], self.TS] += self.alpha_high * RPEs_high[self.TS]
         # Return old values, RPE, new values
         new_Q_high = self.Q_high[stimulus[0], self.TS].copy()
         new_Q_low = self.Q_low[self.TS, stimulus[1], action].copy()
