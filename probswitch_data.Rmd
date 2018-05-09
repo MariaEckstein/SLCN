@@ -62,7 +62,7 @@ wsls = ddply(all_files, .(sID, reward, age_group), summarize,
 wsls$reward = factor(wsls$reward)
 
 if (!data == "human") {
-  # model_plots()
+  model_plots()
 }
 ```
 ```{r Plots}
@@ -91,9 +91,10 @@ gg_fit = ggplot(subset(all_paramsl, measure == "BIC"), aes(learning_style, value
   theme(legend.position = "none")
 
 fitted_paramsl = melt(all_params, measure.vars = c("alpha", "beta", "epsilon", "perseverance", "decay"), variable.name = "parameter")
+fitted_paramsl[fitted_paramsl$parameter == 'beta', 'value'] = fitted_paramsl[fitted_paramsl$parameter == 'beta', 'value'] / 10
 gg_params = ggplot(fitted_paramsl, aes(parameter, value, color = age_group, fill = age_group)) +
   stat_summary(fun.data = "mean_se", geom = "pointrange", position = position_dodge(width = 0.8)) +
-  geom_point(position = "jitter", alpha = 0.3) +
+  # geom_point(position = "jitter", alpha = 0.3) +
   labs(x = "", y = "Parameter value", color = "Age group", fill = "Age group") +
   facet_grid(learning_style ~ method)
 

@@ -215,7 +215,7 @@ nrow(check) # 3 subs missing
 # exclude 3 subs from analysis- we don't have petersen puberty data on them. 
 data <- subset(data, !is.na(PCS_groups))
 nrow(data)
-summary(data$Age[!is.na(data.$PCS_score)])
+summary(data$Age[!is.na(data$PCS_score)])
 ```
 
 ### Age vs. puberty graph
@@ -242,6 +242,14 @@ plot(data$PDS_mean, data$trials.learn.aq)
 plot(data$Age, data$trials.learn.aq)
 data$Age.c <- data$Age - mean(data$Age)
 
+```
+```{r}
+ggplot(data, aes(Age, persev.choice.rev)) +
+  geom_point(position = "jitter", alpha = 0.4)
+
+ggplot(data, aes(round(PDS_mean), persev.choice.rev, color = Age)) +
+  geom_point(position = "jitter", alpha = 0.4) +
+  stat_summary(fun.data = "mean_se", geom = "pointrange")
 ```
 
 ### Model comparisons 
@@ -634,4 +642,6 @@ ggplot(plot.df1, aes(x=Phase, y= means_plot, fill = Puberty.Pre.Post.Adult)) +
   geom_errorbar(aes(ymin = lower_SE, ymax = upper_SE, width=.2),
                 position = position_dodge(.9))
 
+```
+```{r}
 ```
