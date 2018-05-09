@@ -62,9 +62,9 @@ class Agent(object):
         return self.prev_action
 
     def learn(self, stimulus, action, reward):
-        [old_Q, RPE, new_Q] = self.update_Qs(stimulus, action, reward)
+        [old_Q_a, RPE_a, new_Q_a, old_Q_TS, RPE_TS, new_Q_TS] = self.update_Qs(stimulus, action, reward)
         self.update_LL(action)
-        return [old_Q, RPE, new_Q]
+        return [old_Q_a, RPE_a, new_Q_a, old_Q_TS, RPE_TS, new_Q_TS]
 
     def get_p_from_Q(self, Q, select_deterministic=False):
         if select_deterministic:
@@ -91,6 +91,7 @@ class Agent(object):
 
     def update_Qs(self, stimulus, action, reward):
         old_Q_low = self.Q_low[self.TS, stimulus[1], action].copy()
+        old_Q_high = self.Q_high[stimulus[0], self.TS].copy()
         RPEs_low = reward - self.Q_low[:, stimulus[1], action]  # Q_low for all TSs, given alien & action
         RPEs_high = reward - self.Q_high[stimulus[0], :]  # Q_high for all TSs, given context
         RPEs_mix = self.mix * RPEs_high + (1 - self.mix) * RPEs_low
@@ -103,8 +104,9 @@ class Agent(object):
             if self.learning_style == 'hierarchical':
                 self.Q_high[stimulus[0], self.TS] += self.alpha_high * RPEs_mix[self.TS]
         # Return old values, RPE, new values
+        new_Q_high = self.Q_high[stimulus[0], self.TS].copy()
         new_Q_low = self.Q_low[self.TS, stimulus[1], action].copy()
-        return [old_Q_low, RPEs_low[self.TS], new_Q_low]
+        return [old_Q_low, RPEs_low[self.TS], new_Q_low, old_Q_high, RPEs_high[self.TS], new_Q_high]
 
     def update_LL(self, action):
         self.LL += np.log(self.p_actions[action])

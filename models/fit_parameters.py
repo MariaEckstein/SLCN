@@ -28,7 +28,7 @@ class FitParameters(object):
 
     def simulate_agent(self, all_params_lim, all_Q_columns, interactive=False):
 
-        task = Task(self.task_stuff, self.agent_stuff['id'])
+        task = Task(self.task_stuff)
         agent = Agent(self.agent_stuff, all_params_lim, self.task_stuff)
         record_data = RecordData(agent_id=agent.id,
                                  mode='create_from_scratch',
@@ -40,20 +40,23 @@ class FitParameters(object):
                 task.alien = int(input('Alien (0, 1, 2):'))
                 stimulus = [task.context, task.alien]
                 suggested_action = agent.select_action(stimulus)  # calculate p_actions
-                print('Suggested action: {0}, value: {1}'.format(
-                    str(suggested_action), str(np.round(agent.Q_low[agent.TS, task.alien, agent.prev_action], 2))))
+                print('Selected TS: {0}, TS-value: {1}\nSuggested action: {2}, action-value: {3}'.format(
+                    str(agent.TS), str(np.round(agent.Q_high[task.context, agent.TS], 2)),
+                    str(suggested_action), str(np.round(agent.Q_low[agent.TS, task.alien, suggested_action], 2))))
                 action = int(input('Action (0, 1, 2):'))
             else:
                 task.prepare_trial(trial)
                 stimulus = task.present_stimulus(trial)
                 action = agent.select_action(stimulus)
             [reward, correct] = task.produce_reward(action)
-            [old_Q, RPE, new_Q] = agent.learn(stimulus, action, reward)
+            [old_Q_a, RPE_a, new_Q_a, old_Q_TS, RPE_TS, new_Q_TS] = agent.learn(stimulus, action, reward)
             if interactive:
                 print('Reward: {0}, Correct: {1}'
-                      '\nOld Q_action: {2}, RPE_action: {3}, New Q_action: {4}'.format(
-                        str(np.round(reward, 2)), str(correct), str(np.round(old_Q, 2)),
-                        str(np.round(RPE, 2)), str(np.round(new_Q, 2))))
+                      '\nOld Q_action: {2}, RPE_action: {3}, New Q_action: {4}'
+                      '\nOld Q_TS: {5}, RPE_TS: {6}, New Q_TS: {7}'.format(
+                    str(np.round(reward, 2)), str(correct),
+                    str(np.round(old_Q_a, 2)), str(np.round(RPE_a, 2)), str(np.round(new_Q_a, 2)),
+                    str(np.round(old_Q_TS, 2)), str(np.round(RPE_TS, 2)), str(np.round(new_Q_TS, 2))))
             record_data.add_behavior(task, stimulus, action, reward, correct, trial)
             record_data.add_decisions(agent, trial, suff='', all_Q_columns=all_Q_columns)
 

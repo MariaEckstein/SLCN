@@ -3,7 +3,7 @@ import scipy.io as spio
 
 
 class Task(object):
-    def __init__(self, task_stuff, agent_id=np.nan):
+    def __init__(self, task_stuff):
 
         # Get parameters from task_stuff
         self.n_blocks = task_stuff['n_blocks']
@@ -28,14 +28,12 @@ class Task(object):
             self.contexts = np.append(self.contexts, new_block)
 
     def prepare_trial(self, trial):
-        # Get current context
         self.context = self.contexts[trial]
         # Get a random order of the four aliens every 4 trials
         if trial % self.n_aliens == 0:
             self.shuffled_aliens = np.random.choice(range(self.n_aliens), size=self.n_aliens, replace=False)
 
     def present_stimulus(self, trial):
-        # Return a context-alien stimulus
         self.alien = self.shuffled_aliens[trial % self.n_aliens]
         return np.array([self.context, self.alien])
 

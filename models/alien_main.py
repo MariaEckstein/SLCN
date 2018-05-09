@@ -20,7 +20,7 @@ fit_human_data = False
 # Model fitting parameters
 n_iter = 2
 n_agents = 1000
-agent_start_id = 0
+agent_start_id = 23
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
 data_path = base_path + '/AlienGenRec/'
 
@@ -63,7 +63,7 @@ viz_agent = VisualizeAgent(parameters, agent_stuff['name'])
 if interactive_game:
     agent_stuff['id'] = agent_start_id
     agent_stuff['method'] = 'softmax'
-    agent_stuff['learning_style'] = 'flat'
+    agent_stuff['learning_style'] = 'hierarchical'
     agent_stuff['mix_probs'] = False
     parameter_of_interest = 'alpha'
     gen_pars = parameters.default_pars_lim
@@ -73,7 +73,7 @@ if interactive_game:
     # agent_stuff['learning_style'] = input('Learning style ("flat" or "hierarchical"):')
     # agent_stuff['mix_probs'] = input('Mix_probs ("True" or "False"):') == "True"
     # gen_pars = [float(input(par_name)) for par_name in parameters.par_names]
-    gen_pars[np.array(parameters.par_names) == parameter_of_interest] = float(input(parameter_of_interest))
+    # gen_pars[np.array(parameters.par_names) == parameter_of_interest] = float(input(parameter_of_interest))
     print('Agent parameters: ' + str(np.round(gen_pars, 2)))
     fit_params = FitParameters(parameters=parameters,
                                task_stuff=task_stuff,
