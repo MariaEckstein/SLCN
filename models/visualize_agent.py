@@ -19,7 +19,8 @@ class VisualizeAgent:
             gen_pars[par_index] = par_value
             print("Simulating data...")
             agent_data = fit_params.get_agent_data(way='simulate',
-                                                   all_params_lim=gen_pars)
+                                                   all_params_lim=gen_pars,
+                                                   all_Q_columns=True)
             # Plot Q values over time
             for TS_or_action in ['_TS', '_action']:
                 columns = [col for col in agent_data.columns if p_or_Q + TS_or_action in col]

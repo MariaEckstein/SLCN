@@ -16,6 +16,7 @@ class Agent(object):
         [self.alpha, self.beta, self.epsilon, self.perseverance, self.forget, self.mix] = all_params_lim
         self.alpha_high = self.alpha  # TD
         self.forget_high = self.forget  # TD
+        assert(self.alpha > 0)  # Make sure that alpha is a number and is > 0
         assert(self.mix_probs in [True, False])
         assert(self.method in ['epsilon-greedy', 'softmax'])
         assert(self.learning_style in ['flat', 'hierarchical'])
@@ -65,8 +66,9 @@ class Agent(object):
 
     def learn(self, stimulus, action, reward):
         self.forget_Qs()
-        self.update_Qs(stimulus, action, reward)
+        [old_Q, RPE, new_Q] = self.update_Qs(stimulus, action, reward)
         self.update_LL(action)
+        return [old_Q, RPE, new_Q]
 
     def get_p_from_Q(self, Q, previous_choice, select_deterministic=False):
         if self.learning_style != 'flat':
@@ -99,6 +101,7 @@ class Agent(object):
             self.Q_high += self.forget_high * (self.initial_q_high - self.Q_high)
 
     def update_Qs(self, stimulus, action, reward):
+        old_Q_low = self.Q_low[self.TS, stimulus[1], action].copy()
         RPEs_low = reward - self.Q_low[:, stimulus[1], action]  # Q_low for all TSs, given alien & action
         RPEs_high = reward - self.Q_high[stimulus[0], :]  # Q_high for all TSs, given context
         RPEs_mix = self.mix * RPEs_high + (1 - self.mix) * RPEs_low
@@ -110,6 +113,9 @@ class Agent(object):
             self.Q_low[self.TS, stimulus[1], action] += self.alpha * RPEs_low[self.TS]
             if self.learning_style == 'hierarchical':
                 self.Q_high[stimulus[0], self.TS] += self.alpha_high * RPEs_mix[self.TS]
+        # Return old values, RPE, new values
+        new_Q_low = self.Q_low[self.TS, stimulus[1], action].copy()
+        return [old_Q_low, RPEs_low[self.TS], new_Q_low]
 
     def update_LL(self, action):
         self.LL += np.log(self.p_actions[action])

@@ -41,7 +41,5 @@ class Task(object):
 
     def produce_reward(self, action):
         reward = self.TS[self.context, self.alien, action]
-        if reward == 0:
-            return reward
-        else:
-            return reward + np.round(np.random.normal(0, 0.5), 1)
+        correct = reward > 0
+        return [reward + np.round(np.random.normal(0, 0.5), 1), correct]

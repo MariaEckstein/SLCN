@@ -18,14 +18,15 @@ class FitParameters(object):
         assert self.agent_stuff['name'] in ['alien', 'PS_']
         self.n_fit_par = sum(parameters.fit_pars)
 
-    def get_agent_data(self, way, data_path='', all_params_lim=()):
-        if way == 'simulate':
-            return self.simulate_agent(all_params_lim)
-        else:
+    def get_agent_data(self, way, data_path='', all_Q_columns=False, all_params_lim=()):
+        assert(way in ['simulate', 'real_data', 'interactive'])
+        if way in ['simulate', 'interactive']:
+            return self.simulate_agent(all_params_lim, all_Q_columns, interactive=way=='interactive')
+        elif way == 'real_data':
             file_name = data_path + '/' + self.agent_stuff['name'] + str(self.agent_stuff['id']) + '.csv'
             return pd.read_csv(file_name)
 
-    def simulate_agent(self, all_params_lim):
+    def simulate_agent(self, all_params_lim, all_Q_columns, interactive=False):
 
         task = Task(self.task_stuff, self.agent_stuff['id'])
         agent = Agent(self.agent_stuff, all_params_lim, self.task_stuff)
@@ -34,13 +35,25 @@ class FitParameters(object):
                                  task=task)
 
         for trial in range(task.n_trials):
-            task.prepare_trial(trial)
-            stimulus = task.present_stimulus(trial)
-            action = agent.select_action(stimulus)
-            reward = task.produce_reward(action)
-            agent.learn(stimulus, action, reward)
-            record_data.add_behavior(task, stimulus, action, reward, trial)
-            record_data.add_decisions(agent, trial)
+            if interactive:
+                task.context = int(input('Context (0, 1, 2):'))
+                task.alien = int(input('Alien (0, 1, 2):'))
+                stimulus = [task.context, task.alien]
+                agent.select_action(stimulus)  # calculate p_actions
+                action = int(input('Action (0, 1, 2):'))
+            else:
+                task.prepare_trial(trial)
+                stimulus = task.present_stimulus(trial)
+                action = agent.select_action(stimulus)
+            [reward, correct] = task.produce_reward(action)
+            [old_Q, RPE, new_Q] = agent.learn(stimulus, action, reward)
+            if interactive:
+                print('Reward: {0}, Correct: {1}'
+                      '\nOld Q_action: {2}, RPE_action: {3}, New Q_action: {4}'.format(
+                        str(np.round(reward, 2)), str(correct), str(np.round(old_Q, 2)),
+                        str(np.round(RPE, 2)), str(np.round(new_Q, 2))))
+            record_data.add_behavior(task, stimulus, action, reward, correct, trial)
+            record_data.add_decisions(agent, trial, suff='', all_Q_columns=all_Q_columns)
 
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()

@@ -9,11 +9,12 @@ from visualize_agent import VisualizeAgent
 
 
 # What should be done?
+play_interactive = True
 simulate_agents = False
 create_sanity_plots = False
 check_genrec_values = False
 quick_generate_and_recover = False
-generate_and_recover = True
+generate_and_recover = False
 fit_human_data = False
 
 # Model fitting parameters
@@ -41,8 +42,8 @@ TSs = np.array([[[0, 6, 0],  # alien0, items0-2
                 [0, 3, 0],
                 [2, 0, 0]]])
 
-task_stuff = {'n_trials_per_alien': 10,  # 13
-              'n_blocks': 1,  # 3
+task_stuff = {'n_trials_per_alien': 13,  # 13
+              'n_blocks': 3,  # 3
               'n_aliens': 4,
               'n_actions': n_actions,
               'n_contexts': 3,
@@ -57,6 +58,25 @@ parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'perseverance', '
                         par_soft_limits=((0, 0.5), (1, 6), (0, 0.25), (-0.3, 0.3), (0, 0.1), (0, 1)),  # no simul. outside
                         default_pars_lim=np.array([0.1, 2+1e-5, 1e-5, 1e-5, 1e-5, 1]))  # when a parameter is fixed
 viz_agent = VisualizeAgent(parameters, agent_stuff['name'])
+
+# Play the game to test everything
+if play_interactive:
+    agent_stuff['id'] = agent_start_id
+    agent_stuff['method'] = 'softmax'
+    agent_stuff['learning_style'] = 'hierarchical'
+    agent_stuff['mix_probs'] = False
+    gen_pars = parameters.default_pars_lim
+
+    # Un-comment any of the following lines to adjust parameters:
+    # agent_stuff['method'] = input('Method ("softmax" or "epsilon-greedy"):')
+    # agent_stuff['learning_style'] = input('Learning style ("flat" or "hierarchical"):')
+    # agent_stuff['mix_probs'] = input('Mix_probs ("True" or "False"):') == "True"
+    # gen_pars = [float(input(par_name)) for par_name in parameters.par_names]
+    fit_params = FitParameters(parameters=parameters,
+                               task_stuff=task_stuff,
+                               agent_stuff=agent_stuff)
+    agent_data = fit_params.get_agent_data(way='interactive',
+                                           all_params_lim=gen_pars)
 
 # Simulate specific agents
 if simulate_agents:
