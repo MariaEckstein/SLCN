@@ -9,12 +9,12 @@ from visualize_agent import VisualizeAgent
 
 
 # What should be done?
-play_interactive = True
+interactive_game = False
 simulate_agents = False
 create_sanity_plots = False
 check_genrec_values = False
 quick_generate_and_recover = False
-generate_and_recover = False
+generate_and_recover = True
 fit_human_data = False
 
 # Model fitting parameters
@@ -27,20 +27,20 @@ data_path = base_path + '/AlienGenRec/'
 # Task parameters
 n_actions = 3
                 # TS0
-TSs = np.array([[[0, 6, 0],  # alien0, items0-2
-                [0, 0, 4],  # alien1, items0-2
-                [5, 0, 0],  # etc.
-                [10, 0, 0]],
+TSs = np.array([[[1, 6, 1],  # alien0, items0-2
+                [1, 1, 4],  # alien1, items0-2
+                [5, 1, 1],  # etc.
+                [10, 1, 1]],
                 # TS1
-               [[0, 0, 2],  # alien0, items0-2
-                [0, 8, 0],  # etc.
-                [0, 0, 7],
-                [0, 3, 0]],
+               [[1, 1, 2],  # alien0, items0-2
+                [1, 8, 1],  # etc.
+                [1, 1, 7],
+                [1, 3, 1]],
                 # TS2
-               [[0, 0, 7],  # TS2
-                [3, 0, 0],
-                [0, 3, 0],
-                [2, 0, 0]]])
+               [[1, 1, 7],  # TS2
+                [3, 1, 1],
+                [1, 3, 1],
+                [2, 1, 1]]])
 
 task_stuff = {'n_trials_per_alien': 13,  # 13
               'n_blocks': 3,  # 3
@@ -52,19 +52,20 @@ agent_stuff = {'name': 'alien',
                'n_TS': 3,
                'mix_probs': False}
 
-parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'perseverance', 'forget', 'mix'],
+parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'mix'],
                         fit_pars=np.ones(6, dtype=bool),  # which parameters will be fitted?
-                        par_hard_limits=((0, 1), (1, 15), (0, 1), (-1, 1), (0, 0.3), (0, 1)),  # no values fitted outside
-                        par_soft_limits=((0, 0.5), (1, 6), (0, 0.25), (-0.3, 0.3), (0, 0.1), (0, 1)),  # no simul. outside
-                        default_pars_lim=np.array([0.1, 2+1e-5, 1e-5, 1e-5, 1e-5, 1]))  # when a parameter is fixed
+                        par_hard_limits=((0, 1),   (1, 15), (0, 1),    (0, 1)),  # no values fitted outside
+                        par_soft_limits=((0, 0.5), (1, 6),  (0, 0.25), (0, 1)),  # no simulations outside
+                        default_pars_lim=np.array([0.1, 10, 0, 1]))  # when a parameter is fixed
 viz_agent = VisualizeAgent(parameters, agent_stuff['name'])
 
 # Play the game to test everything
-if play_interactive:
+if interactive_game:
     agent_stuff['id'] = agent_start_id
     agent_stuff['method'] = 'softmax'
-    agent_stuff['learning_style'] = 'hierarchical'
+    agent_stuff['learning_style'] = 'flat'
     agent_stuff['mix_probs'] = False
+    parameter_of_interest = 'alpha'
     gen_pars = parameters.default_pars_lim
 
     # Un-comment any of the following lines to adjust parameters:
@@ -72,6 +73,8 @@ if play_interactive:
     # agent_stuff['learning_style'] = input('Learning style ("flat" or "hierarchical"):')
     # agent_stuff['mix_probs'] = input('Mix_probs ("True" or "False"):') == "True"
     # gen_pars = [float(input(par_name)) for par_name in parameters.par_names]
+    gen_pars[np.array(parameters.par_names) == parameter_of_interest] = float(input(parameter_of_interest))
+    print('Agent parameters: ' + str(np.round(gen_pars, 2)))
     fit_params = FitParameters(parameters=parameters,
                                task_stuff=task_stuff,
                                agent_stuff=agent_stuff)
@@ -115,8 +118,6 @@ if create_sanity_plots:
                                agent_stuff=agent_stuff)
     viz_agent.plot_Qs('alpha', [0.05, 0.4], fit_params, 'Q')
     # viz_agent.plot_Qs('beta', [0.01, 10], fit_params, 'p')
-    # viz_agent.plot_Qs('perseverance', [0.1, 0.99], fit_params, 'p')
-    # viz_agent.plot_Qs('forget', [0.01, 0.1], fit_params, 'Q')
     # viz_agent.plot_Qs('mix', [0.01, 0.5, 0.99], fit_params, 'p')
     # agent_stuff['method'] = 'epsilon-greedy'
     # viz_agent.plot_Qs('epsilon', [0.01, 0.4], fit_params, 'p')

@@ -41,5 +41,6 @@ class Task(object):
 
     def produce_reward(self, action):
         reward = self.TS[self.context, self.alien, action]
-        correct = reward > 0
-        return [reward + np.round(np.random.normal(0, 0.5), 1), correct]
+        correct = reward > 1
+        noised_reward = max(0, reward + np.round(np.random.normal(0, 0.5), 1))
+        return [noised_reward, correct]

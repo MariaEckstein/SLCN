@@ -13,9 +13,8 @@ class Agent(object):
         self.select_deterministic = self.learning_style == 'flat'  # Hack to select the right TS each time for the flat agent
         self.mix_probs = agent_stuff['mix_probs']
         self.id = agent_stuff['id']
-        [self.alpha, self.beta, self.epsilon, self.perseverance, self.forget, self.mix] = all_params_lim
+        [self.alpha, self.beta, self.epsilon, self.mix] = all_params_lim
         self.alpha_high = self.alpha  # TD
-        self.forget_high = self.forget  # TD
         assert(self.alpha > 0)  # Make sure that alpha is a number and is > 0
         assert(self.mix_probs in [True, False])
         assert(self.method in ['epsilon-greedy', 'softmax'])
@@ -48,10 +47,8 @@ class Agent(object):
     def select_action(self, stimulus):
 
         self.p_TS = self.get_p_from_Q(Q=self.Q_high[stimulus[0], :],
-                                      previous_choice=[],
                                       select_deterministic=self.select_deterministic)  # works for flat & hierarchical
-        p_actions = [self.get_p_from_Q(Q=self.Q_low[TS_i, stimulus[1], :],
-                                       previous_choice=self.prev_action)
+        p_actions = [self.get_p_from_Q(Q=self.Q_low[TS_i, stimulus[1], :])
                      for TS_i in range(self.n_TS)]
 
         if self.mix_probs:  # P(action|context, alien) = \sum_TS P(action|TS_i, alien) P(TS_i|context)
@@ -65,14 +62,11 @@ class Agent(object):
         return self.prev_action
 
     def learn(self, stimulus, action, reward):
-        self.forget_Qs()
         [old_Q, RPE, new_Q] = self.update_Qs(stimulus, action, reward)
         self.update_LL(action)
         return [old_Q, RPE, new_Q]
 
-    def get_p_from_Q(self, Q, previous_choice, select_deterministic=False):
-        if self.learning_style != 'flat':
-            Q[previous_choice] += self.perseverance  # Affects original Q table! -> Perseverance is persistent!
+    def get_p_from_Q(self, Q, select_deterministic=False):
         if select_deterministic:
             assert(np.sum(Q == 1) == 1)  # Verify that exactly 1 Q-value == 1
             p = np.array(Q == 1, dtype=int)  # select the one TS that has a value of 1 (all others have values of 0)
@@ -94,11 +88,6 @@ class Agent(object):
             denominator = 1 + sum([np.exp(self.beta * (Q[j] - Q[i])) for j in range(len(Q)) if j != i])
             p_actions[i] = 1 / denominator
         return p_actions
-
-    def forget_Qs(self):
-        self.Q_low += self.forget * (self.initial_q_low - self.Q_low)
-        if self.learning_style == 'hierarchical':
-            self.Q_high += self.forget_high * (self.initial_q_high - self.Q_high)
 
     def update_Qs(self, stimulus, action, reward):
         old_Q_low = self.Q_low[self.TS, stimulus[1], action].copy()

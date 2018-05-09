@@ -39,7 +39,9 @@ class FitParameters(object):
                 task.context = int(input('Context (0, 1, 2):'))
                 task.alien = int(input('Alien (0, 1, 2):'))
                 stimulus = [task.context, task.alien]
-                agent.select_action(stimulus)  # calculate p_actions
+                suggested_action = agent.select_action(stimulus)  # calculate p_actions
+                print('Suggested action: {0}, value: {1}'.format(
+                    str(suggested_action), str(np.round(agent.Q_low[agent.TS, task.alien, agent.prev_action], 2))))
                 action = int(input('Action (0, 1, 2):'))
             else:
                 task.prepare_trial(trial)

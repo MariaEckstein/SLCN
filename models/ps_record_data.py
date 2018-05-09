@@ -22,8 +22,6 @@ class RecordData(object):
         self.subj_file['alpha' + suff] = agent.alpha
         self.subj_file['beta' + suff] = agent.beta
         self.subj_file['epsilon' + suff] = agent.epsilon
-        self.subj_file['perseverance' + suff] = agent.perseverance
-        self.subj_file['decay' + suff] = agent.decay
         self.subj_file['w_reward' + suff] = agent.w_reward
         self.subj_file['w_noreward' + suff] = agent.w_noreward
         self.subj_file['w_explore' + suff] = agent.w_explore
