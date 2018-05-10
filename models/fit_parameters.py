@@ -21,7 +21,7 @@ class FitParameters(object):
     def get_agent_data(self, way, data_path='', all_Q_columns=False, all_params_lim=()):
         assert(way in ['simulate', 'real_data', 'interactive'])
         if way in ['simulate', 'interactive']:
-            return self.simulate_agent(all_params_lim, all_Q_columns, interactive=way=='interactive')
+            return self.simulate_agent(all_params_lim, all_Q_columns, interactive=way == 'interactive')
         elif way == 'real_data':
             file_name = data_path + '/' + self.agent_stuff['name'] + str(self.agent_stuff['id']) + '.csv'
             return pd.read_csv(file_name)
@@ -36,24 +36,29 @@ class FitParameters(object):
 
         for trial in range(task.n_trials):
             if interactive:
+                print('\n\tTRIAL {0}'.format(str(trial)))
                 task.context = int(input('Context (0, 1, 2):'))
-                task.alien = int(input('Alien (0, 1, 2):'))
+                task.alien = int(input('Alien (0, 1, 2, 3):'))
                 stimulus = [task.context, task.alien]
                 suggested_action = agent.select_action(stimulus)  # calculate p_actions
-                print('Selected TS: {0}, TS-value: {1}\nSuggested action: {2}, action-value: {3}'.format(
+                print('TS.     Selected:  {0}, value: {1} (all values: {2}; all ps: {3})\n'
+                      'Action. Suggested: {4}, value: {5} (all values: {6}; all ps: {7})'.format(
                     str(agent.TS), str(np.round(agent.Q_high[task.context, agent.TS], 2)),
-                    str(suggested_action), str(np.round(agent.Q_low[agent.TS, task.alien, suggested_action], 2))))
+                    str(np.round(agent.Q_high[task.context, :], 2)), str(np.round(agent.p_TS, 2)),
+                    str(suggested_action), str(np.round(agent.Q_low[agent.TS, task.alien, suggested_action], 2)),
+                    str(np.round(agent.Q_low[agent.TS, task.alien, :], 2)), str(np.round(agent.p_actions, 2))))
                 action = int(input('Action (0, 1, 2):'))
             else:
                 task.prepare_trial(trial)
                 stimulus = task.present_stimulus(trial)
                 action = agent.select_action(stimulus)
             [reward, correct] = task.produce_reward(action)
-            [old_Q_a, RPE_a, new_Q_a, old_Q_TS, RPE_TS, new_Q_TS] = agent.learn(stimulus, action, reward)
+            [old_Q_a, RPE_a, new_Q_a, old_Q_TS, RPE_TS, new_Q_TS] = \
+                agent.learn(stimulus, action, reward)
             if interactive:
-                print('Reward: {0}, Correct: {1}'
-                      '\nOld Q_action: {2}, RPE_action: {3}, New Q_action: {4}'
-                      '\nOld Q_TS: {5}, RPE_TS: {6}, New Q_TS: {7}'.format(
+                print('Reward: {0} ({1})\n'
+                      'Q_action. Old: {2}, RPE: {3}, New: {4}\n'
+                      'Q_TS.     Old: {5}, RPE: {6}, New: {7}'.format(
                     str(np.round(reward, 2)), str(correct),
                     str(np.round(old_Q_a, 2)), str(np.round(RPE_a, 2)), str(np.round(new_Q_a, 2)),
                     str(np.round(old_Q_TS, 2)), str(np.round(RPE_TS, 2)), str(np.round(new_Q_TS, 2))))

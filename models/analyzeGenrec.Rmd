@@ -50,7 +50,7 @@ genrec_long
 ```
 ```{r Plot original versus fitted parameters}
 for (par in parameter_names) { #intersect(unique(plot_dat$fit_par), unique(plot_dat$parameter))) {
-  plot_dat = subset(genrec_long, parameter == par & fit_par == par)
+  plot_dat = subset(genrec_long, parameter == par & grepl(par, fit_par))  # grepl checks if the string fit_par contains the string par
   if (nrow(plot_dat) > 0) {
     gg_gen_rec_par = ggplot(plot_dat, aes(value_gen, value_rec, color = mix_probs)) +# & fit_par == par
       geom_point() +

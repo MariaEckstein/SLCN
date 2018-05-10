@@ -40,12 +40,11 @@ class VisualizeAgent:
                 ax.set_title('Pars: {0}, {1}-values, {2}'.format(str(np.round(gen_pars, 2)), TS_or_action, p_or_Q))
                 plt.show()
 
-    def plot_generated_recovered_Qs(self, task_stuff, method, learning_style, mix_probs):
+    def plot_generated_recovered_Qs(self, task_stuff, learning_style, mix_probs):
         # Specify model
         self.parameters.set_fit_pars(np.zeros(len(self.parameters.par_names), dtype=bool))  # fix all parameters; no fitting
         agent_stuff = {'name': 'alien',
                        'n_TS': 3,
-                       'method': method,
                        'learning_style': learning_style,
                        'id': 0,
                        'fit_par': [],

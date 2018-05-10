@@ -6,7 +6,6 @@ class Agent(object):
         self.n_actions = task_stuff['n_actions']
         self.learning_style = agent_stuff['learning_style']
         self.id = agent_stuff['id']
-        self.method = agent_stuff['method']
         assert(self.method in ['epsilon-greedy', 'softmax'])
         assert(self.learning_style in ['Bayes', 'RL', 'estimate-switch'])
         [self.alpha, self.beta, self.epsilon, self.perseverance, self.decay,

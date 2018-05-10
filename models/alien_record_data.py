@@ -21,7 +21,6 @@ class RecordData(object):
             self.subj_file['fit_pars'] = str(parameters.fit_pars)
         self.subj_file['n_actions'] = agent.n_actions
         self.subj_file['n_TS'] = agent.n_TS
-        self.subj_file['method'] = agent.method
         self.subj_file['learning_style'] = agent.learning_style
         self.subj_file['mix_probs'] = agent.mix_probs
         self.subj_file['alpha' + suff] = agent.alpha
