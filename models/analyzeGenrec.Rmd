@@ -9,6 +9,7 @@ output: html_document
 library("ggplot2"); library("plyr"); library("reshape2")
 theme_set(theme_bw())
 
+read_or_create_genrec = "create"  # can be "read" (read in the genrec.csv) or "create" (get the info from the individual simulated agents)
 parameter_names = c("alpha", "beta", "epsilon")
 
 gg_save = T
@@ -19,21 +20,30 @@ if (!dir.exists(plot_dir)) {
 }
 genrec_filenames = c("genrec.csv")
 ```
-```{r Read in genrec and melt}
+```{r Get genrec (Either read in, or create)}
 genrec = data.frame()
-i = 0
-for (genrec_filename in genrec_filenames) {
-  new_genrec = read.csv(file = file.path(data_dir, genrec_filename), header = T, na.strings = c("", "NA", "NaN"))
-  genrec = rbind(genrec, new_genrec)
-  i = i + 1
+if (read_or_create_genrec == "create") {
+  filenames = list.files(data_dir, pattern = "alien_")
+  filename = filenames[1]
+  for (filename in filenames) {
+    subj_file = read.csv(file = file.path(data_dir, filename), header = T, na.strings = c("", "NA", "NaN"))
+    genrec_row = subset(subj_file, trial_index == 0, select = c("sID", "learning_style", "mix_probs", "fit_pars", "BIC_rec", "AIC_rec", parameter_names, paste0(parameter_names, "_rec")))
+    genrec = rbind(genrec, genrec_row)
+  }
+  colnames(genrec)[colnames(genrec) %in% c("fit_pars", "BIC_rec", "AIC_rec", parameter_names)] = c("fit_par", "BIC", "AIC", paste0(parameter_names, "_gen"))
+} else {
+  i = 0
+  for (genrec_filename in genrec_filenames) {
+    new_genrec = read.csv(file = file.path(data_dir, genrec_filename), header = T, na.strings = c("", "NA", "NaN"))
+    genrec = rbind(genrec, new_genrec)
+    i = i + 1
+  }
+  genrec$X = NULL
 }
-genrec$X = NULL
 dim(genrec)
 summary(genrec)
-genrec = subset(genrec, !is.na(fit_par))  # remove datasets in which no parameter was fitted
-genrec = subset(genrec, !(method == "softmax" & fit_par == "epsilon") & !(method == "epsilon-greedy" & fit_par == "beta") & !(learning_style == "flat" & fit_par == "mix"))  # remove datasets in which a meaningless parameter was fitted
-dim(genrec)
-
+```
+```{r Beautify and melt genrec}
 # Get parameters into the rows (gen)
 genrec_long_gen = melt(subset(genrec, select = c("sID", paste0(parameter_names, "_gen"))),
                        measure.vars = paste0(parameter_names, "_gen"), variable.name = "parameter")
@@ -44,19 +54,19 @@ genrec_long_rec = melt(subset(genrec, select = c("sID", paste0(parameter_names, 
 genrec_long_rec$parameter = gsub("_rec", "", genrec_long_gen$parameter)
 # Add learning_style, method, mix_probs, and fit_par back in
 genrec_long = merge(genrec_long_gen, genrec_long_rec, by = c("sID", "parameter"), suff = c("_gen", "_rec"))
-genrec_long = merge(subset(genrec, select = c("sID", "learning_style", "method", "mix_probs", "fit_par")), genrec_long)
+genrec_long = merge(subset(genrec, select = c("sID", "learning_style", "mix_probs", "fit_par")), genrec_long)
 
 genrec_long
 ```
 ```{r Plot original versus fitted parameters}
 for (par in parameter_names) { #intersect(unique(plot_dat$fit_par), unique(plot_dat$parameter))) {
-  plot_dat = subset(genrec_long, parameter == par & grepl(par, fit_par))  # grepl checks if the string fit_par contains the string par
+  plot_dat = subset(genrec_long, parameter == par)  # & grepl(par, fit_par))  # grepl checks if the string fit_par contains the string par
   if (nrow(plot_dat) > 0) {
-    gg_gen_rec_par = ggplot(plot_dat, aes(value_gen, value_rec, color = mix_probs)) +# & fit_par == par
+    gg_gen_rec_par = ggplot(plot_dat, aes(value_gen, value_rec, color = sID)) +# & fit_par == par
       geom_point() +
       geom_abline(slope = 1, linetype = "dotted") +
       labs(x = paste0(par, "_gen"), y = paste0(par, "_rec")) +
-      facet_grid(method ~ learning_style)
+      facet_grid(~ learning_style)
     ggsave(file.path(plot_dir, paste0("gg_genrec_", par, ".png")), gg_gen_rec_par)
   }
 }

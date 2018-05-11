@@ -30,7 +30,7 @@ class Task(object):
     def prepare_trial(self, trial):
         self.context = self.contexts[trial]
         # Get a random order of the four aliens every 4 trials
-        if trial % self.n_aliens == 0:
+        if trial % self.n_aliens == 0:  # Every 4th trials, starting at 0
             self.shuffled_aliens = np.random.choice(range(self.n_aliens), size=self.n_aliens, replace=False)
 
     def present_stimulus(self, trial):

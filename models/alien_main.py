@@ -8,6 +8,9 @@ from gen_rec import GenRec
 from visualize_agent import VisualizeAgent
 
 
+# TDs / bugs
+# First trial is currently not recorded (the data files are missing the alien in the first trial)
+
 # What should be done?
 interactive_game = False
 simulate_agents = False
@@ -20,7 +23,7 @@ fit_human_data = False
 # Model fitting parameters
 n_iter = 5
 n_agents = 1000
-agent_start_id = 0
+agent_start_id = 100
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/'
 
@@ -54,9 +57,9 @@ agent_stuff = {'name': 'alien',
 
 parameters = Parameters(par_names=['alpha', 'beta', 'epsilon'],
                         fit_pars=np.ones(6, dtype=bool),  # which parameters will be fitted?
-                        par_hard_limits=((0, 1),   (1, 15), (0, 1)),  # no values fitted outside
-                        par_soft_limits=((0, 0.5), (1, 6),  (0, 0.25)),  # no simulations outside
-                        default_pars_lim=np.array([0.1, 10, 0]))  # when a parameter is fixed
+                        par_hard_limits=((0., 1.),  (1., 15.), (0., 1.)),  # no values fitted outside
+                        par_soft_limits=((0., 0.5), (1., 6.),  (0., 0.25)),  # no simulations outside
+                        default_pars_lim=np.array([0.1, 10., 0.]))  # when a parameter is fixed
 viz_agent = VisualizeAgent(parameters, agent_stuff['name'])
 
 # Play the game to test everything
