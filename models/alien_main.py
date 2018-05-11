@@ -10,9 +10,10 @@ from visualize_agent import VisualizeAgent
 
 # TDs / bugs
 # First trial is currently not recorded (the data files are missing the alien in the first trial)
+# After a context change, the previous TS should be suppressed -> decrease Q_TS
 
 # What should be done?
-interactive_game = False
+interactive_game = True
 simulate_agents = False
 create_sanity_plots = False
 check_genrec_values = False
@@ -23,7 +24,7 @@ fit_human_data = False
 # Model fitting parameters
 n_iter = 5
 n_agents = 1000
-agent_start_id = 100
+agent_start_id = 0
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/'
 
@@ -65,10 +66,11 @@ viz_agent = VisualizeAgent(parameters, agent_stuff['name'])
 # Play the game to test everything
 if interactive_game:
     agent_stuff['id'] = agent_start_id
-    agent_stuff['learning_style'] = 'flat'
+    agent_stuff['learning_style'] = 'hierarchical'
     agent_stuff['mix_probs'] = False
-    parameter_of_interest = 'beta'
+    # parameter_of_interest = 'beta'
     gen_pars = parameters.default_pars_lim
+    gen_pars[np.array(parameters.par_names) == 'epsilon'] = 0
 
     # Un-comment any of the following lines to adjust parameters:
     # agent_stuff['learning_style'] = input('Learning style ("flat" or "hierarchical"):')
@@ -132,8 +134,8 @@ if check_genrec_values:
 if quick_generate_and_recover:
 
     # Specify which agent will be tested
-    learning_style = 'flat'
-    mix_probs = False
+    learning_style = 'hierarchical'
+    mix_probs = True
 
     # Specify where data will be saved
     save_agent_path = data_path

@@ -9,7 +9,7 @@ class Agent(object):
         self.n_actions = task_stuff['n_actions']
         self.n_TS = agent_stuff['n_TS']
         self.learning_style = agent_stuff['learning_style']
-        self.select_deterministic = self.learning_style == 'flat'  # Hack to select the right TS each time for the flat agent
+        self.select_deterministic = 'flat' in self.learning_style  # Hack to select the right TS each time for the flat agent
         self.mix_probs = agent_stuff['mix_probs']
         self.id = agent_stuff['id']
         [self.alpha, self.beta, self.epsilon] = all_params_lim
@@ -18,11 +18,11 @@ class Agent(object):
         assert(self.beta >= 1)
         assert(self.epsilon >= 0)
         assert(self.mix_probs in [True, False])
-        assert(self.learning_style in ['flat', 'hierarchical'])
+        assert(self.learning_style in ['s-flat', 'flat', 'hierarchical'])
 
         # Set up values at low (stimulus-action) level
         self.initial_q_low = 5. / 3.  # 3 possible actions, 5 was the reward during training
-        if self.learning_style == 'flat':
+        if 'flat' in self.learning_style:
             n_TS = task_stuff['n_contexts']
         elif self.learning_style == 'hierarchical':
             n_TS = self.n_TS
@@ -31,41 +31,47 @@ class Agent(object):
             np.random.normal(0, self.initial_q_low / 100, Q_low_dim)  # jitter avoids identical values
 
         # Set up values at high (context-TS) level
-        if self.learning_style == 'flat':
+        Q_high_dim = [task_stuff['n_contexts'], self.n_TS]
+        if self.learning_style == 's-flat':
+            self.Q_high = np.zeros(Q_high_dim)
+            self.Q_high[:, 0] = 1  # First col == 1 => There is just one TS that every context uses
+        elif self.learning_style == 'flat':
             self.Q_high = np.eye(task_stuff['n_contexts'])  # agent always selects the appropriate table
         elif self.learning_style == 'hierarchical':
             self.initial_q_high = self.initial_q_low
-            Q_high_dim = [task_stuff['n_contexts'], self.n_TS]
             self.Q_high = self.initial_q_high * np.ones(Q_high_dim) +\
                 np.random.normal(0, self.initial_q_high / 100, Q_high_dim)  # jitter avoids identical values
 
         # Initialize action probs, current TS and action, LL
         self.p_TS = np.ones(self.n_TS) / self.n_TS  # P(TS|context)
         self.p_actions = np.ones(self.n_actions) / self.n_actions  # P(action|TS)
+        self.Q_actions = np.nan
+        self.old_Q_low = np.nan
+        self.old_Q_high = np.nan
+        self.RPEs_low = np.nan
+        self.RPEs_high = np.nan
+        self.new_Q_high = np.nan
+        self.new_Q_low = np.nan
         self.TS = []
         self.prev_action = []
         self.LL = 0
 
     def select_action(self, stimulus):
-        # Translate TS values and action values into probabilities
-        self.p_TS = self.get_p_from_Q(Q=self.Q_high[stimulus[0], :],
-                                      select_deterministic=self.select_deterministic)  # works for flat & hierarchical
-        p_actions = [self.get_p_from_Q(Q=self.Q_low[TS_i, stimulus[1], :]) for TS_i in range(self.n_TS)]
-
-        if self.mix_probs:  # P(action|context, alien) = \sum_TS P(action|TS_i, alien) P(TS_i|context)
-            self.TS = np.argmax(self.p_TS)  # just for saving in agent_data
-            self.p_actions = np.sum(np.dot(self.p_TS * np.eye(self.n_TS), p_actions), axis=0)  # * = elementwise multiplication
-        else:  # Select one TS based on Q(TS|context), then select one action based on Q(action|context, alien)
-            self.TS = np.random.choice(range(self.n_TS), p=self.p_TS)  # Tricky to add noise here because needs to be deterministic for flat agents
-            self.p_actions = p_actions[self.TS]
-
+        # Translate TS values and action values into action probabilities
+        Q_lows_current_stimulus = self.Q_low[:, stimulus[1], :]
+        self.p_TS = self.get_p_from_Q(Q=self.Q_high[stimulus[0], :], select_deterministic=self.select_deterministic)
+        self.TS = np.random.choice(range(self.n_TS), p=self.p_TS)
+        if self.mix_probs:
+            self.Q_actions = np.dot(self.p_TS, Q_lows_current_stimulus)  # Weighted average for Q_low of all TS
+        else:
+            self.Q_actions = Q_lows_current_stimulus[self.TS]  # Q_low of the highest-valued TS
+        self.p_actions = self.get_p_from_Q(Q=self.Q_actions)
         self.prev_action = self.noisy_selection(probabilities=self.p_actions, epsilon=self.epsilon)
         return self.prev_action
 
     def learn(self, stimulus, action, reward):
-        [old_Q_a, RPE_a, new_Q_a, old_Q_TS, RPE_TS, new_Q_TS] = self.update_Qs(stimulus, action, reward)
+        self.update_Qs(stimulus, action, reward)
         self.update_LL(action)
-        return [old_Q_a, RPE_a, new_Q_a, old_Q_TS, RPE_TS, new_Q_TS]
 
     def get_p_from_Q(self, Q, select_deterministic=False):
         if select_deterministic:
@@ -90,22 +96,21 @@ class Agent(object):
         return np.random.choice(range(len(probabilities)), p=p)
 
     def update_Qs(self, stimulus, action, reward):
-        old_Q_low = self.Q_low[self.TS, stimulus[1], action].copy()
-        old_Q_high = self.Q_high[stimulus[0], self.TS].copy()
-        RPEs_low = reward - self.Q_low[:, stimulus[1], action]  # Q_low for all TSs, given alien & action
-        RPEs_high = reward - self.Q_high[stimulus[0], :]  # Q_high for all TSs, given context
+        self.old_Q_high = self.Q_high[stimulus[0], :].copy()
+        self.old_Q_low = self.Q_low[:, stimulus[1], action].copy()
+        self.RPEs_high = reward - self.Q_high[stimulus[0], :]  # Q_high for all TSs, given context
+        self.RPEs_low = reward - self.Q_low[:, stimulus[1], action]  # Q_low for all TSs, given alien & action
         if self.mix_probs:
-            self.Q_low[:, stimulus[1], action] += self.alpha * self.p_TS * RPEs_low  # flat agent: p_TS has just one 1
+            self.Q_low[:, stimulus[1], action] += self.alpha * self.p_TS * self.RPEs_low  # flat agent: p_TS has just one 1
             if self.learning_style == 'hierarchical':
-                self.Q_high[stimulus[0], :] += self.alpha_high * self.p_TS * RPEs_high
+                self.Q_high[stimulus[0], :] += self.alpha_high * self.p_TS * self.RPEs_high
         else:
-            self.Q_low[self.TS, stimulus[1], action] += self.alpha * RPEs_low[self.TS]
+            self.Q_low[self.TS, stimulus[1], action] += self.alpha * self.RPEs_low[self.TS]
             if self.learning_style == 'hierarchical':
-                self.Q_high[stimulus[0], self.TS] += self.alpha_high * RPEs_high[self.TS]
+                self.Q_high[stimulus[0], self.TS] += self.alpha_high * self.RPEs_high[self.TS]
         # Return old values, RPE, new values
-        new_Q_high = self.Q_high[stimulus[0], self.TS].copy()
-        new_Q_low = self.Q_low[self.TS, stimulus[1], action].copy()
-        return [old_Q_low, RPEs_low[self.TS], new_Q_low, old_Q_high, RPEs_high[self.TS], new_Q_high]
+        self.new_Q_high = self.Q_high[stimulus[0], :].copy()
+        self.new_Q_low = self.Q_low[:, stimulus[1], action].copy()
 
     def update_LL(self, action):
         self.LL += np.log(self.p_actions[action])

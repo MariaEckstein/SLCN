@@ -41,27 +41,47 @@ class FitParameters(object):
                 task.alien = int(input('Alien (0, 1, 2, 3):'))
                 stimulus = [task.context, task.alien]
                 suggested_action = agent.select_action(stimulus)  # calculate p_actions
-                print('TS.     Selected:  {0}, value: {1} (all values: {2}; all ps: {3})\n'
-                      'Action. Suggested: {4}, value: {5} (all values: {6}; all ps: {7})'.format(
-                    str(agent.TS), str(np.round(agent.Q_high[task.context, agent.TS], 2)),
-                    str(np.round(agent.Q_high[task.context, :], 2)), str(np.round(agent.p_TS, 2)),
-                    str(suggested_action), str(np.round(agent.Q_low[agent.TS, task.alien, suggested_action], 2)),
-                    str(np.round(agent.Q_low[agent.TS, task.alien, :], 2)), str(np.round(agent.p_actions, 2))))
+                if self.agent_stuff['mix_probs']:
+                    print('TS.     all values:   {0}; all ps:   {1}\n'
+                          'Action. comb. values: {3}; comb. ps: {4}; suggested: {2}\n'
+                          '\tall values:\n{5}'.format(
+                            str(np.round(agent.Q_high[task.context, :], 2)), str(np.round(agent.p_TS, 2)),
+                            str(suggested_action),
+                            str(np.round(agent.Q_actions, 2)), str(np.round(agent.p_actions, 2)),
+                            str(np.round(agent.Q_low[:, stimulus[1], :], 2))))
+                else:
+                    print('TS.     Selected:  {0}, value: {1} (all values: {2}; all ps: {3})\n'
+                          'Action. Suggested: {4}, value: {5} (all values: {6}; all ps: {7})'.format(
+                            str(agent.TS), str(np.round(agent.Q_high[task.context, agent.TS], 2)),
+                            str(np.round(agent.Q_high[task.context, :], 2)), str(np.round(agent.p_TS, 2)),
+                            str(suggested_action), str(np.round(agent.Q_low[agent.TS, task.alien, suggested_action], 2)),
+                            str(np.round(agent.Q_low[agent.TS, task.alien, :], 2)), str(np.round(agent.p_actions, 2))))
                 action = int(input('Action (0, 1, 2):'))
             else:
                 task.prepare_trial(trial)
                 stimulus = task.present_stimulus(trial)
                 action = agent.select_action(stimulus)
             [reward, correct] = task.produce_reward(action)
-            [old_Q_a, RPE_a, new_Q_a, old_Q_TS, RPE_TS, new_Q_TS] = \
-                agent.learn(stimulus, action, reward)
+            agent.learn(stimulus, action, reward)
             if interactive:
-                print('Reward: {0} ({1})\n'
-                      'Q_action. Old: {2}, RPE: {3}, New: {4}\n'
-                      'Q_TS.     Old: {5}, RPE: {6}, New: {7}'.format(
-                    str(np.round(reward, 2)), str(correct),
-                    str(np.round(old_Q_a, 2)), str(np.round(RPE_a, 2)), str(np.round(new_Q_a, 2)),
-                    str(np.round(old_Q_TS, 2)), str(np.round(RPE_TS, 2)), str(np.round(new_Q_TS, 2))))
+                if self.agent_stuff['mix_probs']:
+                    print('Reward: {0} ({1})\n'
+                          'Q_TS.     Old: {2}, RPE: {3}, New: {4}\n'
+                          'Q_action. Old: {5}, RPE: {6}, New: {7}'.format(
+                            str(np.round(reward, 2)), str(correct),
+                            str(np.round(agent.old_Q_high, 2)), str(np.round(agent.RPEs_high, 2)),
+                            str(np.round(agent.new_Q_high, 2)),
+                            str(np.round(agent.old_Q_low, 2)), str(np.round(agent.RPEs_low, 2)),
+                            str(np.round(agent.new_Q_low, 2))))
+                else:
+                    print('Reward: {0} ({1})\n'
+                          'Q_TS.     Old: {2}, RPE: {3}, New: {4}\n'
+                          'Q_action. Old: {5}, RPE: {6}, New: {7}'.format(
+                        str(np.round(reward, 2)), str(correct),
+                        str(np.round(agent.old_Q_high[agent.TS], 2)), str(np.round(agent.RPEs_high[agent.TS], 2)),
+                        str(np.round(agent.new_Q_high[agent.TS], 2)),
+                        str(np.round(agent.old_Q_low[agent.TS], 2)), str(np.round(agent.RPEs_low[agent.TS], 2)),
+                        str(np.round(agent.new_Q_low[agent.TS], 2))))
             record_data.add_behavior(task, stimulus, action, reward, correct, trial)
             record_data.add_decisions(agent, trial, suff='', all_Q_columns=all_Q_columns)
 
