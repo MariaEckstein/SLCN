@@ -13,7 +13,7 @@ read_or_create_genrec = "create"  # can be "read" (read in the genrec.csv) or "c
 parameter_names = c("alpha", "beta", "epsilon")
 
 gg_save = T
-data_dir = "C:/Users/maria/MEGAsync/Berkeley/TaskSets/AlienGenRec"
+data_dir = "C:/Users/maria/MEGAsync/Berkeley/TaskSets/AlienGenRec/2018_05_11FlatStimulusAlphaEpsilon7Blocks"
 plot_dir = file.path(data_dir, "plots")
 if (!dir.exists(plot_dir)) {
   dir.create(plot_dir)
@@ -92,7 +92,7 @@ summary(all_files)
 # Check if TS values and action values are correlated for the current TS and current action
 gg_Q_high_low = ggplot(all_files, aes(Q_TS, Q_action, color = sID, shape = mix_probs)) +
   geom_point() +
-  facet_grid(learning_style ~ method)
+  facet_grid( ~ learning_style)
 gg_p_high_low = gg_Q_high_low + aes(p_TS, p_action)
 
 # Check if TS values and action values are correlated for any TS and any action

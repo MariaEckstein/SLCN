@@ -4,15 +4,22 @@ import numpy as np
 class SimulateInteractive(object):
     def __init__(self, agent, mix_probs):
         self.agent = agent
+        self.mix_probs = mix_probs
         self.task_context = np.nan
         self.task_alien = np.nan
-        self.mix_probs = mix_probs
+        self.suggested_action = np.nan
         self.TS_values = np.nan
         self.action_values = np.nan
 
-    def print_values_pre(self, context, alien, suggested_action):
-        self.task_context = context
-        self.task_alien = alien
+    def trial(self, trial):
+        print('\n\tTRIAL {0}'.format(str(trial)))
+        self.task_context = int(input('Context (0, 1, 2):'))
+        self.task_alien = int(input('Alien (0, 1, 2, 3):'))
+        stimulus = [self.task_context, self.task_alien]
+        self.suggested_action = self.agent.select_action(stimulus)  # calculate p_actions
+        return stimulus
+
+    def print_values_pre(self):
         self.TS_values = np.round(self.agent.Q_high[self.task_context, :], 2)
         self.action_values = np.round(self.agent.Q_low[:, self.task_alien, :], 2)
         if self.mix_probs:
@@ -20,7 +27,7 @@ class SimulateInteractive(object):
                   'Action. comb. values: {3}; comb. ps: {4}; suggested: {2}\n'
                   '\tall values:\n{5}'.format(
                     str(self.TS_values), str(np.round(self.agent.p_TS, 2)),
-                    str(suggested_action),
+                    str(self.suggested_action),
                     str(np.round(self.agent.Q_actions, 2)), str(np.round(self.agent.p_actions, 2)),
                     str(self.action_values)))
         else:
@@ -28,7 +35,7 @@ class SimulateInteractive(object):
                   'Action. Suggested: {4}, value: {5} (all values: {6}; all ps: {7})'.format(
                     str(self.agent.TS), str(self.TS_values[self.agent.TS]),
                     str(self.TS_values), str(np.round(self.agent.p_TS, 2)),
-                    str(suggested_action), str(self.action_values[self.agent.TS, suggested_action]),
+                    str(self.suggested_action), str(self.action_values[self.agent.TS, self.suggested_action]),
                     str(self.action_values[self.agent.TS, :]), str(np.round(self.agent.p_actions, 2))))
 
     def print_values_post(self, action, reward, correct):

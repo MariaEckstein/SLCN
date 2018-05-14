@@ -39,12 +39,9 @@ class FitParameters(object):
 
         for trial in range(task.n_trials):
             if interactive:
-                print('\n\tTRIAL {0}'.format(str(trial)))
-                task.context = int(input('Context (0, 1, 2):'))
-                task.alien = int(input('Alien (0, 1, 2, 3):'))
-                stimulus = [task.context, task.alien]
-                suggested_action = agent.select_action(stimulus)  # calculate p_actions
-                sim_int.print_values_pre(task.context, task.alien, suggested_action)
+                stimulus = sim_int.trial(trial)
+                [task.context, task.alien] = stimulus
+                sim_int.print_values_pre()
                 action = int(input('Action (0, 1, 2):'))
             else:
                 task.prepare_trial(trial)
