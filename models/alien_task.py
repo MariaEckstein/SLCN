@@ -41,4 +41,4 @@ class Task(object):
         reward = self.TS[self.context, self.alien, action]
         correct = reward > 1
         noised_reward = max(0, reward + np.round(np.random.normal(0, 0.5), 1))
-        return [noised_reward, correct]
+        return [np.round(noised_reward, 2), correct]

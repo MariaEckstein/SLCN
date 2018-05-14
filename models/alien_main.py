@@ -23,8 +23,8 @@ fit_human_data = False
 
 # Model fitting parameters
 n_iter = 5
-n_agents = 1000
-agent_start_id = 0
+n_agents = 200
+agent_start_id = 100
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/'
 
@@ -56,11 +56,11 @@ agent_stuff = {'name': 'alien',
                'n_TS': 3,
                'mix_probs': False}
 
-parameters = Parameters(par_names=['alpha', 'beta', 'epsilon'],
+parameters = Parameters(par_names=['alpha', 'beta', 'epsilon'],  # Rewards <= 10 means than beta is 10 times as much!
                         fit_pars=np.ones(6, dtype=bool),  # which parameters will be fitted?
                         par_hard_limits=((0., 1.),  (1., 15.), (0., 1.)),  # no values fitted outside
                         par_soft_limits=((0., 0.5), (1., 6.),  (0., 0.25)),  # no simulations outside
-                        default_pars_lim=np.array([0.1, 10., 0.]))  # when a parameter is fixed
+                        default_pars_lim=np.array([0.1, 1., 0.]))  # when a parameter is fixed
 viz_agent = VisualizeAgent(parameters, agent_stuff['name'])
 
 # Play the game to test everything
@@ -135,7 +135,7 @@ if quick_generate_and_recover:
 
     # Specify which agent will be tested
     learning_style = 'hierarchical'
-    mix_probs = True
+    mix_probs = False
 
     # Specify where data will be saved
     save_agent_path = data_path
@@ -149,7 +149,7 @@ if quick_generate_and_recover:
         print("Agent " + str(agent_id))
 
         # Specify model
-        fit_pars = np.array(parameters.par_names) != 'epsilon'
+        fit_pars = np.array(parameters.par_names) != 'epsilon'  # np.ones(len(parameters.par_names), dtype=bool)  #
         agent_stuff['learning_style'] = learning_style
         agent_stuff['mix_probs'] = mix_probs
         agent_stuff['id'] = agent_id

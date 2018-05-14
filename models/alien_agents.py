@@ -13,15 +13,17 @@ class Agent(object):
         self.mix_probs = agent_stuff['mix_probs']
         self.id = agent_stuff['id']
         [self.alpha, self.beta, self.epsilon] = all_params_lim
+        self.suppress_previous_TS = 1
         self.alpha_high = self.alpha  # TD
-        assert(self.alpha > 0)  # Make sure that alpha is a number and is > 0
-        assert(self.beta >= 1)
-        assert(self.epsilon >= 0)
-        assert(self.mix_probs in [True, False])
-        assert(self.learning_style in ['s-flat', 'flat', 'hierarchical'])
+        self.beta_high = 10 * self.beta
+        assert self.alpha > 0  # Make sure that alpha is a number and is > 0
+        assert self.beta >= 1
+        assert self.epsilon >= 0
+        assert self.mix_probs in [True, False]
+        assert self.learning_style in ['s-flat', 'flat', 'hierarchical']
 
         # Set up values at low (stimulus-action) level
-        self.initial_q_low = 5. / 3.  # 3 possible actions, 5 was the reward during training
+        self.initial_q_low = 5. / 3.  # Average reward per alien during training / number of actions
         if 'flat' in self.learning_style:
             n_TS = task_stuff['n_contexts']
         elif self.learning_style == 'hierarchical':
@@ -46,26 +48,27 @@ class Agent(object):
         self.p_TS = np.ones(self.n_TS) / self.n_TS  # P(TS|context)
         self.p_actions = np.ones(self.n_actions) / self.n_actions  # P(action|TS)
         self.Q_actions = np.nan
-        self.old_Q_low = np.nan
-        self.old_Q_high = np.nan
         self.RPEs_low = np.nan
         self.RPEs_high = np.nan
-        self.new_Q_high = np.nan
-        self.new_Q_low = np.nan
-        self.TS = []
+        self.TS = np.nan
         self.prev_action = []
+        self.context = []
         self.LL = 0
 
     def select_action(self, stimulus):
+        # If context switches, suppress previous TS
+        if self.context != stimulus[0]:
+            self.Q_high[stimulus[0], np.argmax(self.p_TS)] *= (1 - self.suppress_previous_TS)
+        self.context = stimulus[0]
         # Translate TS values and action values into action probabilities
         Q_lows_current_stimulus = self.Q_low[:, stimulus[1], :]
-        self.p_TS = self.get_p_from_Q(Q=self.Q_high[stimulus[0], :], select_deterministic=self.select_deterministic)
+        self.p_TS = self.get_p_from_Q(Q=self.Q_high[stimulus[0], :], beta=self.beta_high, select_deterministic=self.select_deterministic)
         self.TS = np.random.choice(range(self.n_TS), p=self.p_TS)
         if self.mix_probs:
             self.Q_actions = np.dot(self.p_TS, Q_lows_current_stimulus)  # Weighted average for Q_low of all TS
         else:
             self.Q_actions = Q_lows_current_stimulus[self.TS]  # Q_low of the highest-valued TS
-        self.p_actions = self.get_p_from_Q(Q=self.Q_actions)
+        self.p_actions = self.get_p_from_Q(Q=self.Q_actions, beta=self.beta)
         self.prev_action = self.noisy_selection(probabilities=self.p_actions, epsilon=self.epsilon)
         return self.prev_action
 
@@ -73,7 +76,7 @@ class Agent(object):
         self.update_Qs(stimulus, action, reward)
         self.update_LL(action)
 
-    def get_p_from_Q(self, Q, select_deterministic=False):
+    def get_p_from_Q(self, Q, beta, select_deterministic=False):
         if select_deterministic:
             assert(np.sum(Q == 1) == 1)  # Verify that exactly 1 Q-value == 1 (Q_high for the flat agent)
             p_actions = np.array(Q == 1, dtype=int)  # select the one TS that has a value of 1 (all others are 0)
@@ -81,9 +84,9 @@ class Agent(object):
             # Softmax
             p_actions = np.empty(len(Q))
             for i in range(len(Q)):
-                denominator = 1. + sum([np.exp(self.beta * (Q[j] - Q[i])) for j in range(len(Q)) if j != i])
+                denominator = 1. + sum([np.exp(beta * (Q[j] - Q[i])) for j in range(len(Q)) if j != i])
                 p_actions[i] = 1. / denominator
-        assert math.isclose(sum(p_actions), 1, rel_tol=1e-5)  # THROWS AN ERROR ON THE CLUSTER... Verify that probabilities sum up to 1
+        assert np.round(sum(p_actions), 3) == 1
         return p_actions
 
     @staticmethod
@@ -93,11 +96,10 @@ class Agent(object):
             p = probabilities
         else:
             p = np.ones(len(probabilities)) / len(probabilities)  # uniform
+        assert np.round(sum(p), 3) == 1
         return np.random.choice(range(len(probabilities)), p=p)
 
     def update_Qs(self, stimulus, action, reward):
-        self.old_Q_high = self.Q_high[stimulus[0], :].copy()
-        self.old_Q_low = self.Q_low[:, stimulus[1], action].copy()
         self.RPEs_high = reward - self.Q_high[stimulus[0], :]  # Q_high for all TSs, given context
         self.RPEs_low = reward - self.Q_low[:, stimulus[1], action]  # Q_low for all TSs, given alien & action
         if self.mix_probs:
@@ -108,9 +110,6 @@ class Agent(object):
             self.Q_low[self.TS, stimulus[1], action] += self.alpha * self.RPEs_low[self.TS]
             if self.learning_style == 'hierarchical':
                 self.Q_high[stimulus[0], self.TS] += self.alpha_high * self.RPEs_high[self.TS]
-        # Return old values, RPE, new values
-        self.new_Q_high = self.Q_high[stimulus[0], :].copy()
-        self.new_Q_low = self.Q_low[:, stimulus[1], action].copy()
 
     def update_LL(self, action):
         self.LL += np.log(self.p_actions[action])
