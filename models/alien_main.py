@@ -32,9 +32,9 @@ data_path = base_path + '/AlienGenRec/'
 n_actions = 3
                 # TS0
 TSs = np.array([[[1, 6, 1],  # alien0, items0-2
-                [1, 1, 4],  # alien1, items0-2
-                [5, 1, 1],  # etc.
-                [10, 1, 1]],
+                 [1, 1, 4],  # alien1, items0-2
+                 [5, 1, 1],  # etc.
+                 [10, 1, 1]],
                 # TS1
                [[1, 1, 2],  # alien0, items0-2
                 [1, 8, 1],  # etc.
@@ -52,6 +52,8 @@ task_stuff = {'n_trials_per_alien': 13,  # 13
               'n_actions': n_actions,
               'n_contexts': 3,
               'TS': TSs}
+comp_stuff = {'phases': ['contexts', 'context-aliens', 'items', 'aliens'],
+              'n_blocks': {'contexts': 3, 'context-aliens': 3, 'items': 3, 'aliens': 3}}
 agent_stuff = {'name': 'alien',
                'n_TS': 3,
                'mix_probs': False}
@@ -82,6 +84,7 @@ if interactive_game:
           str(agent_stuff['learning_style']), str(agent_stuff['mix_probs']), str(np.round(gen_pars, 2))))
     fit_params = FitParameters(parameters=parameters,
                                task_stuff=task_stuff,
+                               comp_stuff=comp_stuff,
                                agent_stuff=agent_stuff)
     agent_data = fit_params.get_agent_data(way='interactive',
                                            all_params_lim=gen_pars)
@@ -162,6 +165,7 @@ if quick_generate_and_recover:
         agent_stuff['fit_par'] = fit_par_names
         fit_params = FitParameters(parameters=parameters,
                                    task_stuff=task_stuff,
+                                   comp_stuff=comp_stuff,
                                    agent_stuff=agent_stuff)
 
         # Simulate agent based on random parameters

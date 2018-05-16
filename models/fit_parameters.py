@@ -1,8 +1,10 @@
 import numpy as np
+import ast
 import pandas as pd
 from scipy.optimize import minimize
 from scipy.optimize import brute
 from alien_task import Task
+from competition_phase import CompetitionPhase
 from alien_agents import Agent
 from alien_record_data import RecordData
 from simulate_interactive import SimulateInteractive
@@ -12,9 +14,10 @@ from simulate_interactive import SimulateInteractive
 
 
 class FitParameters(object):
-    def __init__(self, parameters, task_stuff, agent_stuff):
+    def __init__(self, parameters, task_stuff, comp_stuff, agent_stuff):
         self.parameters = parameters
         self.task_stuff = task_stuff
+        self.comp_stuff = comp_stuff
         self.agent_stuff = agent_stuff
         assert self.agent_stuff['name'] in ['alien', 'PS_']
         self.n_fit_par = sum(parameters.fit_pars)
@@ -29,6 +32,7 @@ class FitParameters(object):
 
     def simulate_agent(self, all_params_lim, all_Q_columns, interactive=False):
 
+        # Initial learning
         task = Task(self.task_stuff)
         agent = Agent(self.agent_stuff, all_params_lim, self.task_stuff)
         record_data = RecordData(agent_id=agent.id,
@@ -37,22 +41,42 @@ class FitParameters(object):
         if interactive:
             sim_int = SimulateInteractive(agent, self.agent_stuff['mix_probs'])
 
-        for trial in range(task.n_trials):
+        # for trial in range(task.n_trials):
+        #     if interactive:
+        #         stimulus = sim_int.trial(trial)
+        #         [task.context, task.alien] = stimulus
+        #         sim_int.print_values_pre()
+        #         action = int(input('Action (0, 1, 2):'))
+        #     else:
+        #         task.prepare_trial(trial)
+        #         stimulus = task.present_stimulus(trial)
+        #         action = agent.select_action(stimulus)
+        #     [reward, correct] = task.produce_reward(action)
+        #     agent.learn(stimulus, action, reward)
+        #     if interactive:
+        #         sim_int.print_values_post(action, reward, correct)
+        #     record_data.add_behavior(task, stimulus, action, reward, correct, trial)
+        #     record_data.add_decisions(agent, trial, suff='', all_Q_columns=all_Q_columns)
+
+        # Competition phase
+        comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
+        if interactive:
+            agent.Q_high = np.array([[7, 1, 1], [1, 5, 1], [1, 1, 3]])  # np.array(ast.literal_eval(input('Agent.Q_high[contexts, TS]:')))
+            # Q_low_TS0 = ast.literal_eval(input('Agent.Q_low[TS0, aliens, actions]'))
+            # Q_low_TS1 = ast.literal_eval(input('Agent.Q_low[TS1, aliens, actions]'))
+            # Q_low_TS2 = ast.literal_eval(input('Agent.Q_low[TS2, aliens, actions]'))
+            agent.Q_low = task.TS  # np.array([Q_low_TS0, Q_low_TS1, Q_low_TS2])
+        for trial in range(sum(comp.n_trials)):
+            comp.prepare_trial(trial)
+            stimuli = comp.present_stimulus(trial)
+            selected = agent.competition_selection(stimuli, comp.current_phase)
             if interactive:
-                stimulus = sim_int.trial(trial)
-                [task.context, task.alien] = stimulus
-                sim_int.print_values_pre()
-                action = int(input('Action (0, 1, 2):'))
-            else:
-                task.prepare_trial(trial)
-                stimulus = task.present_stimulus(trial)
-                action = agent.select_action(stimulus)
-            [reward, correct] = task.produce_reward(action)
-            agent.learn(stimulus, action, reward)
-            if interactive:
-                sim_int.print_values_post(action, reward, correct)
-            record_data.add_behavior(task, stimulus, action, reward, correct, trial)
-            record_data.add_decisions(agent, trial, suff='', all_Q_columns=all_Q_columns)
+                print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
+                    trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
+
+        # Rainbow phase
+        agent.phase = 'rainbow'
+
 
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()
@@ -83,13 +107,13 @@ class FitParameters(object):
         # Let the agent do the task
         n_trials = len(agent_data)
         for trial in range(n_trials):
-            if self.agent_stuff['name'] == 'alien':
+            if 'alien' in self.agent_stuff['name']:
                 context = int(agent_data['context'][trial])
                 sad_alien = int(agent_data['sad_alien'][trial])
                 stimulus = np.array([context, sad_alien])
                 agent.select_action(stimulus)  # calculate p_actions
                 action = int(agent_data['item_chosen'][trial])
-            elif self.agent_stuff['name'] == 'PS_':
+            elif 'PS' in self.agent_stuff['name']:
                 stimulus = np.nan
                 agent.select_action(stimulus)  # calculate p_actions
                 action = int(agent_data['selected_box'][trial])
