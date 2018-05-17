@@ -43,12 +43,13 @@ class SimulateInteractive(object):
         action_values_new = np.round(self.agent.Q_low[:, self.task_alien, :], 2)
         if self.mix_probs:
             print('Reward: {0} ({1})\n'
-                  'Q_TS.     Old: {2}, RPE: {3}, New: {4}\n'
-                  'Q_action. Old: {5}, RPE: {6}, New: {7}'.format(
+                  'Q_TS.     Old: {2}, RPE: {3}, p_TS: {4}, New: {5}\n'
+                  'Q_action. Old: {6}, RPE: {7}, p_TS: {8}, New: {9}'.format(
                     str(np.round(reward, 2)), str(correct),
-                    str(self.TS_values), str(np.round(self.agent.RPEs_high, 2)), str(TS_values_new),
+                    str(self.TS_values), str(np.round(self.agent.RPEs_high, 2)),
+                    str(np.round(self.agent.p_TS, 2)), str(TS_values_new),
                     str(self.action_values[:, action]), str(np.round(self.agent.RPEs_low, 2)),
-                    str(action_values_new[:, action])))
+                    str(np.round(self.agent.p_TS, 2)), str(action_values_new[:, action])))
         else:
             print('Reward: {0} ({1})\n'
                   'Q_TS.     Old: {2}, RPE: {3}, New: {4}\n'

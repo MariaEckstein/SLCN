@@ -28,8 +28,8 @@ class RecordData(object):
         self.subj_file['beta' + suff] = agent.beta
         self.subj_file['epsilon' + suff] = agent.epsilon
         # self.subj_file['perseverance' + suff] = agent.perseverance
-        # self.subj_file['forget' + suff] = agent.forget
-        # self.subj_file['forget_high' + suff] = agent.forget_high
+        self.subj_file['forget' + suff] = agent.forget
+        self.subj_file['forget_high' + suff] = agent.forget_high
         # self.subj_file['mix' + suff] = agent.mix
 
     def add_behavior(self, task, stimulus, action, reward, correct, trial, suff=''):

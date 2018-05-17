@@ -14,10 +14,11 @@ class Agent(object):
         self.select_deterministic = 'flat' in self.learning_style  # Hack to select the right TS each time for the flat agent
         self.mix_probs = agent_stuff['mix_probs']
         self.id = agent_stuff['id']
-        [self.alpha, self.beta, self.epsilon] = all_params_lim
+        [self.alpha, self.beta, self.epsilon, self.forget] = all_params_lim
         self.suppress_previous_TS = 1
         self.alpha_high = self.alpha  # TD
         self.beta_high = 10 * self.beta
+        self.forget_high = self.forget
         self.phase = np.nan
         assert self.alpha > 0  # Make sure that alpha is a number and is > 0
         assert self.beta >= 1
@@ -68,23 +69,24 @@ class Agent(object):
         self.context = stimulus[0]
         # Translate TS values and action values into action probabilities
         Q_ai_given_s_TSi = self.Q_low[:, stimulus[1], :]
-        if self.phase in ['rainbow', 'cloudy']:
-            self.Q_high[self.n_contexts+1] = np.mean(self.Q_high, axis=0)  # Q(TS) = \sum_{c_i} Q(TS|c_i) p(c_i)
-        self.p_TS = self.get_p_from_Q(Q=self.Q_high[stimulus[0], :], beta=self.beta_high, select_deterministic=self.select_deterministic)
+        # if self.phase in ['rainbow', 'cloudy']:
+        #     self.Q_high[self.n_contexts+1] = np.mean(self.Q_high, axis=0)  # Q(TS) = \sum_{c_i} Q(TS|c_i) p(c_i)
+        self.p_TS = self.get_p_from_Q(Q=self.Q_high[stimulus[0], :], beta=self.beta_high, epsilon=0, select_deterministic=self.select_deterministic)
         self.TS = np.random.choice(range(self.n_TS), p=self.p_TS)
         if self.mix_probs:
             self.Q_actions = np.dot(self.p_TS, Q_ai_given_s_TSi)  # Weighted average for Q_low of all TS
         else:
             self.Q_actions = Q_ai_given_s_TSi[self.TS]  # Q_low of the highest-valued TS
-        self.p_actions = self.get_p_from_Q(Q=self.Q_actions, beta=self.beta)
-        self.prev_action = self.noisy_selection(probabilities=self.p_actions, epsilon=self.epsilon)
+        self.p_actions = self.get_p_from_Q(Q=self.Q_actions, beta=self.beta, epsilon=self.epsilon)
+        self.prev_action = np.random.choice(range(self.n_actions), p=self.p_actions)
+        self.forget_Qs()
         return self.prev_action
 
     def learn(self, stimulus, action, reward):
         self.update_Qs(stimulus, action, reward)
         self.update_LL(action)
 
-    def get_p_from_Q(self, Q, beta, select_deterministic=False):
+    def get_p_from_Q(self, Q, beta, epsilon, select_deterministic=False):
         if select_deterministic:
             assert(np.sum(Q == 1) == 1)  # Verify that exactly 1 Q-value == 1 (Q_high for the flat agent)
             p_actions = np.array(Q == 1, dtype=int)  # select the one TS that has a value of 1 (all others are 0)
@@ -94,20 +96,13 @@ class Agent(object):
             for i in range(len(Q)):
                 denominator = 1. + sum([np.exp(beta * (Q[j] - Q[i])) for j in range(len(Q)) if j != i])
                 p_actions[i] = 1. / denominator
+            # Add epsilon noise
+            p_actions = epsilon / self.n_actions + (1 - epsilon) * p_actions
         assert np.round(sum(p_actions), 3) == 1
         return p_actions
 
-    @staticmethod
-    def noisy_selection(probabilities, epsilon):
-        # Epsilon-greedy
-        if np.random.random() > epsilon:
-            p = probabilities
-        else:
-            p = np.ones(len(probabilities)) / len(probabilities)  # uniform
-        assert np.round(sum(p), 3) == 1
-        return np.random.choice(range(len(probabilities)), p=p)
-
     def update_Qs(self, stimulus, action, reward):
+        # Calculate prediction errors
         self.RPEs_high = reward - self.Q_high[stimulus[0], :]  # Q_high for all TSs, given context
         self.RPEs_low = reward - self.Q_low[:, stimulus[1], action]  # Q_low for all TSs, given alien & action
         if self.mix_probs:
@@ -118,6 +113,11 @@ class Agent(object):
             self.Q_low[self.TS, stimulus[1], action] += self.alpha * self.RPEs_low[self.TS]
             if self.learning_style == 'hierarchical':
                 self.Q_high[stimulus[0], self.TS] += self.alpha_high * self.RPEs_high[self.TS]
+
+    def forget_Qs(self):
+        self.Q_low -= self.forget * (self.Q_low - 1)  # decays toward 1 (average of incorrect responses)
+        if self.learning_style == 'hierarchical':
+            self.Q_high -= self.forget_high * (self.Q_high - 1)  # decays toward 1 (average of incorrect responses)
 
     def update_LL(self, action):
         self.LL += np.log(self.p_actions[action])

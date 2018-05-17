@@ -27,8 +27,7 @@ class FitParameters(object):
         if way in ['simulate', 'interactive']:
             return self.simulate_agent(all_params_lim, all_Q_columns, interactive=way == 'interactive')
         elif way == 'real_data':
-            file_name = data_path + '/' + self.agent_stuff['name'] + str(self.agent_stuff['id']) + '.csv'
-            return pd.read_csv(file_name)
+            return pd.read_csv(data_path)
 
     def simulate_agent(self, all_params_lim, all_Q_columns, interactive=False):
 
@@ -41,41 +40,41 @@ class FitParameters(object):
         if interactive:
             sim_int = SimulateInteractive(agent, self.agent_stuff['mix_probs'])
 
-        # for trial in range(task.n_trials):
-        #     if interactive:
-        #         stimulus = sim_int.trial(trial)
-        #         [task.context, task.alien] = stimulus
-        #         sim_int.print_values_pre()
-        #         action = int(input('Action (0, 1, 2):'))
-        #     else:
-        #         task.prepare_trial(trial)
-        #         stimulus = task.present_stimulus(trial)
-        #         action = agent.select_action(stimulus)
-        #     [reward, correct] = task.produce_reward(action)
-        #     agent.learn(stimulus, action, reward)
-        #     if interactive:
-        #         sim_int.print_values_post(action, reward, correct)
-        #     record_data.add_behavior(task, stimulus, action, reward, correct, trial)
-        #     record_data.add_decisions(agent, trial, suff='', all_Q_columns=all_Q_columns)
-
-        # Competition phase
-        comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
-        if interactive:
-            agent.Q_high = np.array([[7, 1, 1], [1, 5, 1], [1, 1, 3]])  # np.array(ast.literal_eval(input('Agent.Q_high[contexts, TS]:')))
-            # Q_low_TS0 = ast.literal_eval(input('Agent.Q_low[TS0, aliens, actions]'))
-            # Q_low_TS1 = ast.literal_eval(input('Agent.Q_low[TS1, aliens, actions]'))
-            # Q_low_TS2 = ast.literal_eval(input('Agent.Q_low[TS2, aliens, actions]'))
-            agent.Q_low = task.TS  # np.array([Q_low_TS0, Q_low_TS1, Q_low_TS2])
-        for trial in range(sum(comp.n_trials)):
-            comp.prepare_trial(trial)
-            stimuli = comp.present_stimulus(trial)
-            selected = agent.competition_selection(stimuli, comp.current_phase)
+        for trial in range(task.n_trials):
             if interactive:
-                print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
-                    trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
+                stimulus = sim_int.trial(trial)
+                [task.context, task.alien] = stimulus
+                sim_int.print_values_pre()
+                action = int(input('Action (0, 1, 2):'))
+            else:
+                task.prepare_trial(trial)
+                stimulus = task.present_stimulus(trial)
+                action = agent.select_action(stimulus)
+            [reward, correct] = task.produce_reward(action)
+            agent.learn(stimulus, action, reward)
+            if interactive:
+                sim_int.print_values_post(action, reward, correct)
+            record_data.add_behavior(task, stimulus, action, reward, correct, trial)
+            record_data.add_decisions(agent, trial, suff='', all_Q_columns=all_Q_columns)
 
-        # Rainbow phase
-        agent.phase = 'rainbow'
+        # # Competition phase
+        # comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
+        # if interactive:
+        #     agent.Q_high = np.array([[7, 1, 1], [1, 5, 1], [1, 1, 3]])  # np.array(ast.literal_eval(input('Agent.Q_high[contexts, TS]:')))
+        #     # Q_low_TS0 = ast.literal_eval(input('Agent.Q_low[TS0, aliens, actions]'))
+        #     # Q_low_TS1 = ast.literal_eval(input('Agent.Q_low[TS1, aliens, actions]'))
+        #     # Q_low_TS2 = ast.literal_eval(input('Agent.Q_low[TS2, aliens, actions]'))
+        #     agent.Q_low = task.TS  # np.array([Q_low_TS0, Q_low_TS1, Q_low_TS2])
+        # for trial in range(sum(comp.n_trials)):
+        #     comp.prepare_trial(trial)
+        #     stimuli = comp.present_stimulus(trial)
+        #     selected = agent.competition_selection(stimuli, comp.current_phase)
+        #     if interactive:
+        #         print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
+        #             trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
+        #
+        # # Rainbow phase
+        # agent.phase = 'rainbow'
 
 
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
