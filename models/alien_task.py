@@ -19,6 +19,7 @@ class Task(object):
         self.context = np.nan
         self.alien = np.nan
         self.TS = task_stuff['TS']
+        self.phase = np.nan
 
         # Create context order
         self.contexts = np.empty(0, dtype=int)
@@ -26,6 +27,11 @@ class Task(object):
             randomized_contexts = np.random.choice(range(self.n_contexts), size=self.n_contexts, replace=False)
             new_block = np.concatenate([i * np.ones(self.block_length, dtype=int) for i in randomized_contexts])
             self.contexts = np.append(self.contexts, new_block)
+
+    def set_phase(self, new_phase):
+        assert self.phase in ['1InitialLearning', '2CloudySeason', '3PickAliens', 'Refresher2', 'Refresher3',
+                              '5RainbowSeason', 'Mixed']
+        self.phase = new_phase
 
     def prepare_trial(self, trial):
         self.context = self.contexts[trial]

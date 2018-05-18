@@ -125,25 +125,25 @@ class Agent(object):
 
     def competition_selection(self, stimuli, phase):
         self.Q_stimuli = [self.get_Q_for_stimulus(stimulus, phase) for stimulus in stimuli]
-        self.p_stimuli = self.get_p_from_Q(self.Q_stimuli, self.beta)
+        self.p_stimuli = self.get_p_from_Q(self.Q_stimuli, self.beta, self.epsilon)
         selected_index = np.random.choice(range(len(stimuli)), p=self.p_stimuli)
         return stimuli[selected_index]
 
     def marginalize(self, Q, beta):
         # Calculates the weighted average of the entries in Q: \sum_{a_i} p(a_i) * Q(a_i)
-        p = self.get_p_from_Q(Q, beta=beta)
+        p = self.get_p_from_Q(Q, beta, self.epsilon)
         return np.dot(p, Q)
 
     def get_p_TSi(self):
         # \pi(TS_i) = \sum_{c_j} \pi(TS_i|c_j) p(c_j)
-        p_TSi_given_cj = [self.get_p_from_Q(self.Q_high[c, :], beta=self.beta_high) for c in range(self.n_contexts)]
+        p_TSi_given_cj = [self.get_p_from_Q(self.Q_high[c, :], self.beta_high, self.epsilon) for c in range(self.n_contexts)]
         return np.mean(p_TSi_given_cj, axis=0)
 
     def get_Q_for_stimulus(self, stimulus, phase):
         if phase == 'contexts':
             # Calculate "stimulus values": Q(c) = \sum_{TS_i} \pi(TS_i|c) Q(TS_i|c)
             Q_TSi_given_c = self.Q_high[stimulus, :]
-            return self.marginalize(Q_TSi_given_c, beta=self.beta_high)
+            return self.marginalize(Q_TSi_given_c, self.beta_high)
 
         elif phase == 'context-aliens':
             # Also "stimulus values"
@@ -152,11 +152,11 @@ class Agent(object):
 
             # Q(s|TS) = \sum_{a_i} \pi(a_i|s,TS) Q(a_i|s,TS)
             Q_ai_given_s_TSi = self.Q_low[:, alien, :]
-            Q_s_given_TSi = [self.marginalize(Q_ai_given_s_TSi[TSi, :], beta=self.beta) for TSi in range(self.n_TS)]
+            Q_s_given_TSi = [self.marginalize(Q_ai_given_s_TSi[TSi, :], self.beta) for TSi in range(self.n_TS)]
 
             # \pi(TS_i|c) = softmax(Q(TS_i|c))
             Q_TSi_given_c = self.Q_high[context, :]
-            p_TSi_given_c = self.get_p_from_Q(Q_TSi_given_c, beta=self.beta_high)
+            p_TSi_given_c = self.get_p_from_Q(Q_TSi_given_c, self.beta_high, self.epsilon)
 
             # Q(s,c) = \sum_{TS_i} \pi(TS_i|c) Q(s|TS_i)
             return np.dot(Q_s_given_TSi, p_TSi_given_c)
@@ -166,7 +166,7 @@ class Agent(object):
 
             # Q(a|TS) = \sum_{s_i} \pi(a|s_i,TS) Q(a|s_i,TS)
             Q_a_given_s_TS = self.Q_low[:, :, item]
-            Q_a_given_TS = [self.marginalize(Q_a_given_s_TS[TSi, :], beta=self.beta) for TSi in range(self.n_TS)]
+            Q_a_given_TS = [self.marginalize(Q_a_given_s_TS[TSi, :], self.beta) for TSi in range(self.n_TS)]
 
             # Q(a) = \sum_{TS_i} Q(a|TS_i) \pi(TS_i)
             p_TSi = self.get_p_TSi()

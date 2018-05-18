@@ -13,7 +13,7 @@ read_or_create_genrec = "create"  # can be "read" (read in the genrec.csv) or "c
 parameter_names = c("alpha", "beta", "epsilon", "forget", "LL")
 
 gg_save = T
-data_dir = "C:/Users/maria/MEGAsync/Berkeley/TaskSets/AlienGenRec/FlatAlphaBetaForget/RandomSimulations/"
+data_dir = "C:/Users/maria/MEGAsync/Berkeley/TaskSets/AlienGenRec/HierarchicalAlphaBeta/0RandomSimulations/NIter20/"
 plot_dir = file.path(data_dir, "plots")
 if (!dir.exists(plot_dir)) {
   dir.create(plot_dir)
@@ -68,7 +68,7 @@ for (par in parameter_names) { #intersect(unique(plot_dat$fit_par), unique(plot_
       geom_point() +
       geom_abline(slope = 1, linetype = "dotted") +
       labs(x = paste0(par, "_gen"), y = paste0(par, "_rec")) +
-      facet_grid(~ learning_style)
+      facet_grid(mix_probs ~ learning_style)
     ggsave(file.path(plot_dir, paste0("gg_genrec_", par, ".png")), gg_gen_rec_par)
   }
 }

@@ -4,8 +4,6 @@ import os
 import pandas as pd
 from parameters import Parameters
 from fit_parameters import FitParameters
-from gen_rec import GenRec
-from visualize_agent import VisualizeAgent
 
 
 # TDs / bugs
@@ -60,7 +58,7 @@ agent_stuff = {'name': 'alien',
 
 parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'forget'],  # Rewards <= 10 means than beta is 10 times as much!
                         fit_pars=np.ones(6, dtype=bool),  # which parameters will be fitted?
-                        par_hard_limits=((0., 1.),  (1., 15.), (0., 1.), (0., 1.)),  # no values fitted outside
+                        par_hard_limits=((0., 1.),  (0., 15.), (0., 1.), (0., 1.)),  # no values fitted outside
                         par_soft_limits=((0., 0.5), (1., 6.),  (0., 0.25), (0., 0.1)),  # no simulations outside
                         default_pars_lim=np.array([0.1, 1., 0., 0.]))  # when a parameter is fixed
 gen_pars = parameters.default_pars_lim
@@ -196,25 +194,28 @@ if fit_human_data:
                                     save_path=save_fitted_human_path,
                                     file_name='alien')
 
-# Simulate specific agents
-human_simulation_base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/AlienGenRec/FlatStimulusAlphaBeta/'
-save_fitted_human_path = human_simulation_base_path + 'FittedParticipants/'
-save_simulated_human_path = human_simulation_base_path + 'SimulatedParticipants/'
-if not os.path.isdir(save_simulated_human_path):
-    os.makedirs(save_simulated_human_path)
+# Simulate agents using the parameters that have been fit to humans
 if simulate_agents:
+    human_simulation_base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/AlienGenRec/FlatStimulusAlphaBeta/'
+    save_fitted_human_path = human_simulation_base_path + '1FittedParticipants/'
+    save_simulated_human_path = human_simulation_base_path + '2SimulatedParticipants/'
+    if not os.path.isdir(save_simulated_human_path):
+        os.makedirs(save_simulated_human_path)
 
-    # Specify which agents will be simulated
+    # Find files of the fitted human participants
     file_names = glob.glob(save_fitted_human_path + '/*alien*csv')
     for file_name in file_names:
         subj_file = pd.read_csv(file_name)
+        print('PARTICIPANT {0}'.format(subj_file['sID'][0]))
+
+        # Get simulation details and fitted parameters of the human participants
         agent_stuff['learning_style'] = subj_file['learning_style'][0]
         agent_stuff['mix_probs'] = subj_file['mix_probs'][0]
         gen_pars = np.empty(len(parameters.par_names))
         for i, par_name in enumerate(parameters.par_names):
             gen_pars[i] = subj_file[par_name + '_rec'][0]
 
-        # Simulate a number of n_agents data sets
+        # Simulate n_simulated_agents_per_participant and save the files
         agent_id = 0
         while agent_id < n_simulated_agents_per_participant:
             agent_stuff['id'] = agent_id
