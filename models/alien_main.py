@@ -58,11 +58,11 @@ agent_stuff = {'name': 'alien',
                'learning_style': 'hierarchical',
                'mix_probs': False}
 
-parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'forget'],  # Rewards <= 10 means than beta is 10 times as much!
+parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'forget', 'suppress_prev_TS'],  # Rewards <= 10 means than beta is 10 times as much!
                         fit_pars=np.ones(6, dtype=bool),  # which parameters will be fitted?
-                        par_hard_limits=((0., 1.),  (0., 15.), (0., 1.), (0., 1.)),  # no values fitted outside
-                        par_soft_limits=((0., 0.5), (1., 6.),  (0., 0.25), (0., 0.1)),  # no simulations outside
-                        default_pars_lim=np.array([0.1, 1., 0., 0.]))  # when a parameter is fixed
+                        par_hard_limits=((0., 1.),  (0., 15.), (0., 1.),   (0., 1.),  (0., 1.)),  # no values fitted outside
+                        par_soft_limits=((0., 0.5), (1., 6.),  (0., 0.25), (0., 0.1), (0., 1.)),  # no simulations outside
+                        default_pars_lim=np.array([0.1, 1., 0., 0., 0.]))  # when a parameter is fixed
 gen_pars = parameters.default_pars_lim
 gen_pars[np.array(parameters.par_names) == 'epsilon'] = 0
 
@@ -98,7 +98,7 @@ if simulate_agents:
         gen_pars = parameters.create_random_params(scale='lim', mode='soft')
         gen_pars[np.array(parameters.par_names) == 'epsilon'] = 0
         gen_pars[np.array(parameters.par_names) == 'forget'] = 0
-        # gen_pars[np.array(parameters.par_names) == 'suppress_prev_TS'] = 0
+        gen_pars[np.array(parameters.par_names) == 'suppress_prev_TS'] = 1
         print('Simulating {0} agent {1} with parameters {2}'.format(
             agent_stuff['learning_style'], agent_id, np.round(gen_pars, 2)))
         agent_stuff['id'] = agent_id

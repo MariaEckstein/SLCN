@@ -14,8 +14,7 @@ class Agent(object):
         self.select_deterministic = 'flat' in self.learning_style  # Hack to select the right TS each time for the flat agent
         self.mix_probs = agent_stuff['mix_probs']
         self.id = agent_stuff['id']
-        [self.alpha, self.beta, self.epsilon, self.forget] = all_params_lim
-        self.suppress_previous_TS = 1
+        [self.alpha, self.beta, self.epsilon, self.forget, self.suppress_prev_TS] = all_params_lim
         self.alpha_high = self.alpha  # TD
         self.beta_high = 10 * self.beta
         self.forget_high = self.forget
@@ -65,7 +64,7 @@ class Agent(object):
     def select_action(self, stimulus):
         # If context switches, suppress previous TS
         if self.context != stimulus[0]:
-            self.Q_high[stimulus[0], np.argmax(self.p_TS)] *= (1 - self.suppress_previous_TS)
+            self.Q_high[stimulus[0], np.argmax(self.p_TS)] *= (1 - self.suppress_prev_TS)
         self.context = stimulus[0]
         # Translate TS values and action values into action probabilities
         Q_ai_given_s_TSi = self.Q_low[:, stimulus[1], :]
