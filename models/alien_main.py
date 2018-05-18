@@ -6,6 +6,12 @@ from parameters import Parameters
 from fit_parameters import FitParameters
 
 
+# Things to keep in mind / knobs to turn;
+# separate alphas / betas for low level & level
+# separate alphas / betas for different phases
+# suppress previous TS before or after initializing a new context (handle_context_switches)?
+# initialize new TS with Q(TS) [average over previous contexts]; suppress previous TS
+
 # TDs / bugs
 # First trial is currently not recorded (the data files are missing the alien in the first trial)
 
@@ -17,7 +23,7 @@ simulate_agents = True
 
 # Model fitting parameters
 n_iter = 1
-n_agents = 30
+n_agents = 15
 agent_start_id = 400
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/'

@@ -54,32 +54,32 @@ class Agent(object):
         self.RPEs_high = np.nan
         self.TS = np.nan
         self.prev_action = []
-        self.context = []
+        self.context = 99
         self.LL = 0
+        self.seen_contexts = []
 
         # Stuff for competition phase
         self.p_stimuli = np.nan
         self.Q_stimuli = np.nan
 
     def select_action(self, stimulus):
-        # If context switches, suppress previous TS
         if self.context != stimulus[0]:
-            self.Q_high[stimulus[0], np.argmax(self.p_TS)] *= (1 - self.suppress_prev_TS)
+            self.handle_context_switches(stimulus[0])
         self.context = stimulus[0]
         # Translate TS values and action values into action probabilities
-        Q_ai_given_s_TSi = self.Q_low[:, stimulus[1], :]
-        # if self.phase in ['rainbow', 'cloudy']:
-        #     self.Q_high[self.n_contexts+1] = np.mean(self.Q_high, axis=0)  # Q(TS) = \sum_{c_i} Q(TS|c_i) p(c_i)
         self.p_TS = self.get_p_from_Q(Q=self.Q_high[stimulus[0], :], beta=self.beta_high, epsilon=0, select_deterministic=self.select_deterministic)
-        self.TS = np.random.choice(range(self.n_TS), p=self.p_TS)
+        self.TS = np.random.choice(len(self.p_TS), p=self.p_TS)
         if self.mix_probs:
-            self.Q_actions = np.dot(self.p_TS, Q_ai_given_s_TSi)  # Weighted average for Q_low of all TS
+            self.Q_actions = np.dot(self.p_TS, self.Q_low[:, stimulus[1], :])  # Weighted average for Q_low of all TS
         else:
-            self.Q_actions = Q_ai_given_s_TSi[self.TS]  # Q_low of the highest-valued TS
+            self.Q_actions = self.Q_low[self.TS, stimulus[1], :]  # Q_low of the highest-valued TS
         self.p_actions = self.get_p_from_Q(Q=self.Q_actions, beta=self.beta, epsilon=self.epsilon)
         self.prev_action = np.random.choice(range(self.n_actions), p=self.p_actions)
         self.forget_Qs()
         return self.prev_action
+
+    def handle_context_switches(self, context):
+        self.Q_high[context, np.argmax(self.p_TS)] *= (1 - self.suppress_prev_TS)
 
     def learn(self, stimulus, action, reward):
         self.update_Qs(stimulus, action, reward)
@@ -96,7 +96,7 @@ class Agent(object):
                 denominator = 1. + sum([np.exp(beta * (Q[j] - Q[i])) for j in range(len(Q)) if j != i])
                 p_actions[i] = 1. / denominator
             # Add epsilon noise
-            p_actions = epsilon / self.n_actions + (1 - epsilon) * p_actions
+            p_actions = epsilon / len(self.p_actions) + (1 - epsilon) * p_actions
         assert np.round(sum(p_actions), 3) == 1
         return p_actions
 
