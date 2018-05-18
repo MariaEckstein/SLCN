@@ -6,17 +6,24 @@ from parameters import Parameters
 from fit_parameters import FitParameters
 
 
+# Things to keep in mind / knobs to turn;
+# separate alphas / betas for low level & level
+# separate alphas / betas for different phases
+# suppress previous TS before or after initializing a new context (handle_context_switches)?
+# initialize new TS with Q(TS) [average over previous contexts]; suppress previous TS
+
 # TDs / bugs
 # First trial is currently not recorded (the data files are missing the alien in the first trial)
 
 # What should be done?
-interactive_game = False
-quick_generate_and_recover = False
+interactive_game = True
+quick_generate_and_recover = True
+interactive = False
 fit_human_data = False
-simulate_agents = True
+simulate_agents = False
 
 # Model fitting parameters
-n_iter = 20
+n_iter = 1
 n_agents = 200
 agent_start_id = 500
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
@@ -43,8 +50,10 @@ TSs = np.array([[[1, 6, 1],  # alien0, items0-2
                 [1, 3, 1],
                 [2, 1, 1]]])
 
-task_stuff = {'n_trials_per_alien': 13,  # 13
-              'n_blocks': 7,  # 7 = 3 (initial learn) + 2 (refr2) + 2 (refr3)
+task_stuff = {'phases': ['1InitialLearning', '2CloudySeason', 'Refresher2', '3PickAliens',
+                         'Refresher3', '5RainbowSeason', 'Mixed'],
+              'n_trials_per_alien': np.array([13, 10, 7, np.nan, 7, 1, 7]),
+              'n_blocks': np.array([3, 3, 2, np.nan, 2, 3, 3]),
               'n_aliens': 4,
               'n_actions': n_actions,
               'n_contexts': 3,
@@ -56,11 +65,11 @@ agent_stuff = {'name': 'alien',
                'learning_style': 'hierarchical',
                'mix_probs': False}
 
-parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'forget'],  # Rewards <= 10 means than beta is 10 times as much!
+parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'forget', 'suppress_prev_TS'],  # Rewards <= 10 means than beta is 10 times as much!
                         fit_pars=np.ones(6, dtype=bool),  # which parameters will be fitted?
-                        par_hard_limits=((0., 1.),  (0., 15.), (0., 1.), (0., 1.)),  # no values fitted outside
-                        par_soft_limits=((0., 0.5), (1., 6.),  (0., 0.25), (0., 0.1)),  # no simulations outside
-                        default_pars_lim=np.array([0.1, 1., 0., 0.]))  # when a parameter is fixed
+                        par_hard_limits=((0., 1.),  (0., 15.), (0., 1.),   (0., 1.),  (0., 1.)),  # no values fitted outside
+                        par_soft_limits=((0., 0.5), (1., 6.),  (0., 0.25), (0., 0.1), (0.5, 1.)),  # no simulations outside
+                        default_pars_lim=np.array([0.1, 1., 0., 0., 0.]))  # when a parameter is fixed
 gen_pars = parameters.default_pars_lim
 gen_pars[np.array(parameters.par_names) == 'epsilon'] = 0
 
@@ -69,14 +78,14 @@ if interactive_game:
     agent_stuff['id'] = agent_start_id
 
     # Adjust parameters
-    for feature_name in ['learning_style', 'mix_probs']:
-        feat = input('{0} (leave blank for "{1}"):'.format(feature_name, agent_stuff[feature_name]))
-        if feat:
-            agent_stuff[feature_name] = feat
-    for par_name in parameters.par_names:
-        par = input('{0} (leave blank for {1}):'.format(par_name, gen_pars[np.array(parameters.par_names) == par_name]))
-        if par:
-            gen_pars[np.array(parameters.par_names) == par_name] = par
+    # for feature_name in ['learning_style', 'mix_probs']:
+    #     feat = input('{0} (leave blank for "{1}"):'.format(feature_name, agent_stuff[feature_name]))
+    #     if feat:
+    #         agent_stuff[feature_name] = feat
+    # for par_name in parameters.par_names:
+    #     par = input('{0} (leave blank for {1}):'.format(par_name, gen_pars[np.array(parameters.par_names) == par_name]))
+    #     if par:
+    #         gen_pars[np.array(parameters.par_names) == par_name] = par
 
     print('\tAGENT CHARACTERISTICS:\n'
           'Learning style: {0}\nMix probs: {1}\nParameters: {2}'.format(
@@ -92,10 +101,11 @@ if interactive_game:
 if quick_generate_and_recover:
 
     # Adjust parameters
-    for feature_name in ['learning_style', 'mix_probs']:
-        feat = input('{0} (leave blank for "{1}"):'.format(feature_name, agent_stuff[feature_name]))
-        if feat:
-            agent_stuff[feature_name] = feat
+    if interactive:
+        for feature_name in ['learning_style', 'mix_probs']:
+            feat = input('{0} (leave blank for "{1}"):'.format(feature_name, agent_stuff[feature_name]))
+            if feat:
+                agent_stuff[feature_name] = feat
 
     # Decide which parameters will be fit (others will just be known)
     fit_pars = np.array(parameters.par_names) == 'epsilon'  # np.ones(len(parameters.par_names), dtype=bool)  #

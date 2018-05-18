@@ -11,7 +11,7 @@ class SimulateInteractive(object):
         self.TS_values = np.nan
         self.action_values = np.nan
 
-    def trial(self, trial):
+    def get_context_alien_suggested_action(self, trial):
         print('\n\tTRIAL {0}'.format(str(trial)))
         self.task_context = int(input('Context (0, 1, 2):'))
         self.task_alien = int(input('Alien (0, 1, 2, 3):'))

@@ -40,9 +40,10 @@ class FitParameters(object):
             sim_int = SimulateInteractive(agent, self.agent_stuff['mix_probs'])
 
         task.set_phase('1InitialLearning')
-        for trial in range(task.n_trials):
+        n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
+        for trial in range(n_trials):
             if interactive:
-                stimulus = sim_int.trial(trial)
+                stimulus = sim_int.get_context_alien_suggested_action(trial)
                 [task.context, task.alien] = stimulus
                 sim_int.print_values_pre()
                 action = int(input('Action (0, 1, 2):'))
@@ -57,26 +58,43 @@ class FitParameters(object):
             record_data.add_behavior(task, stimulus, action, reward, correct, trial)
             record_data.add_decisions(agent, trial, suff='', all_Q_columns=all_Q_columns)
 
-        task.set_phase('2CloudySeason')
-
-
-        task.set_phase('3PickAliens')
-        comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
-        if interactive:
-            agent.Q_high = np.array([[7, 1, 1], [1, 5, 1], [1, 1, 3]])  # np.array(ast.literal_eval(input('Agent.Q_high[contexts, TS]:')))
-            # Q_low_TS0 = ast.literal_eval(input('Agent.Q_low[TS0, aliens, actions]'))
-            # Q_low_TS1 = ast.literal_eval(input('Agent.Q_low[TS1, aliens, actions]'))
-            # Q_low_TS2 = ast.literal_eval(input('Agent.Q_low[TS2, aliens, actions]'))
-            agent.Q_low = task.TS  # np.array([Q_low_TS0, Q_low_TS1, Q_low_TS2])
-        for trial in range(sum(comp.n_trials)):
-            comp.prepare_trial(trial)
-            stimuli = comp.present_stimulus(trial)
-            selected = agent.competition_selection(stimuli, comp.current_phase)
-            if interactive:
-                print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
-                    trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
-
-        task.set_phase('5Rainbow')
+        # task.set_phase('2CloudySeason')
+        # n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
+        # for trial in range(n_trials):
+        #     if interactive:
+        #         stimulus = sim_int.get_context_alien_suggested_action(trial)
+        #         [task.context, task.alien] = stimulus
+        #         sim_int.print_values_pre()
+        #         action = int(input('Action (0, 1, 2):'))
+        #     else:
+        #         task.prepare_trial(trial)
+        #         stimulus = task.present_stimulus(trial)
+        #         action = agent.select_action(stimulus)
+        #     [reward, correct] = task.produce_reward(action)
+        #     agent.learn(stimulus, action, reward)
+        #     if interactive:
+        #         sim_int.print_values_post(action, reward, correct)
+        #     record_data.add_behavior(task, stimulus, action, reward, correct, trial)
+        #     record_data.add_decisions(agent, trial, suff='', all_Q_columns=all_Q_columns)
+        #
+        #
+        # task.set_phase('3PickAliens')
+        # comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
+        # if interactive:
+        #     agent.Q_high = np.array([[7, 1, 1], [1, 5, 1], [1, 1, 3]])  # np.array(ast.literal_eval(input('Agent.Q_high[contexts, TS]:')))
+        #     # Q_low_TS0 = ast.literal_eval(input('Agent.Q_low[TS0, aliens, actions]'))
+        #     # Q_low_TS1 = ast.literal_eval(input('Agent.Q_low[TS1, aliens, actions]'))
+        #     # Q_low_TS2 = ast.literal_eval(input('Agent.Q_low[TS2, aliens, actions]'))
+        #     agent.Q_low = task.TS  # np.array([Q_low_TS0, Q_low_TS1, Q_low_TS2])
+        # for trial in range(sum(comp.n_trials)):
+        #     comp.prepare_trial(trial)
+        #     stimuli = comp.present_stimulus(trial)
+        #     selected = agent.competition_selection(stimuli, comp.current_phase)
+        #     if interactive:
+        #         print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
+        #             trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
+        #
+        # task.set_phase('5RainbowSeason')
 
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()
@@ -108,6 +126,8 @@ class FitParameters(object):
         n_trials = len(agent_data)
         for trial in range(n_trials):
             if 'alien' in self.agent_stuff['name']:
+                if np.isnan(agent_data['context'][trial]):
+                    break
                 context = int(agent_data['context'][trial])
                 sad_alien = int(agent_data['sad_alien'][trial])
                 stimulus = np.array([context, sad_alien])

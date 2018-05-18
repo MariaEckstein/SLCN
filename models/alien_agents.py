@@ -14,10 +14,9 @@ class Agent(object):
         self.select_deterministic = 'flat' in self.learning_style  # Hack to select the right TS each time for the flat agent
         self.mix_probs = agent_stuff['mix_probs']
         self.id = agent_stuff['id']
-        [self.alpha, self.beta, self.epsilon, self.forget] = all_params_lim
-        self.suppress_previous_TS = 1
+        [self.alpha, self.beta, self.epsilon, self.forget, self.suppress_prev_TS] = all_params_lim
         self.alpha_high = self.alpha  # TD
-        self.beta_high = 10 * self.beta
+        self.beta_high = self.beta
         self.forget_high = self.forget
         self.phase = np.nan
         assert self.alpha > 0  # Make sure that alpha is a number and is > 0
@@ -36,16 +35,14 @@ class Agent(object):
             np.random.normal(0, self.initial_q_low / 100, Q_low_dim)  # jitter avoids identical values
 
         # Set up values at high (context-TS) level
-        Q_high_dim = [self.n_contexts, self.n_TS]
         if self.learning_style == 's-flat':
-            self.Q_high = np.zeros(Q_high_dim)
-            self.Q_high[:, 0] = 1  # First col == 1 => There is just one TS that every context uses
+            self.Q_high = np.zeros([self.n_contexts, self.n_TS])
+            self.Q_high[:, 0] = 1  # First col == 1 => Every context uses the same 1 TS
         elif self.learning_style == 'flat':
-            self.Q_high = np.eye(self.n_contexts)  # agent always selects the appropriate table
+            self.Q_high = np.eye(self.n_contexts)  # np.eye => agent always selects appropriate TS
         elif self.learning_style == 'hierarchical':
             self.initial_q_high = self.initial_q_low
-            self.Q_high = self.initial_q_high * np.ones(Q_high_dim) +\
-                np.random.normal(0, self.initial_q_high / 100, Q_high_dim)  # jitter avoids identical values
+            self.Q_high = np.nan
 
         # Initialize action probs, current TS and action, LL
         self.p_TS = np.ones(self.n_TS) / self.n_TS  # P(TS|context)
@@ -55,32 +52,40 @@ class Agent(object):
         self.RPEs_high = np.nan
         self.TS = np.nan
         self.prev_action = []
-        self.context = []
+        self.context = 99
         self.LL = 0
+        self.seen_contexts = []
 
         # Stuff for competition phase
         self.p_stimuli = np.nan
         self.Q_stimuli = np.nan
 
     def select_action(self, stimulus):
-        # If context switches, suppress previous TS
-        if self.context != stimulus[0]:
-            self.Q_high[stimulus[0], np.argmax(self.p_TS)] *= (1 - self.suppress_previous_TS)
-        self.context = stimulus[0]
-        # Translate TS values and action values into action probabilities
-        Q_ai_given_s_TSi = self.Q_low[:, stimulus[1], :]
-        # if self.phase in ['rainbow', 'cloudy']:
-        #     self.Q_high[self.n_contexts+1] = np.mean(self.Q_high, axis=0)  # Q(TS) = \sum_{c_i} Q(TS|c_i) p(c_i)
+        if self.context != stimulus[0]:  # detect context switch
+            self.handle_context_switches(stimulus[0])
         self.p_TS = self.get_p_from_Q(Q=self.Q_high[stimulus[0], :], beta=self.beta_high, epsilon=0, select_deterministic=self.select_deterministic)
-        self.TS = np.random.choice(range(self.n_TS), p=self.p_TS)
+        self.TS = np.random.choice(len(self.p_TS), p=self.p_TS)
         if self.mix_probs:
-            self.Q_actions = np.dot(self.p_TS, Q_ai_given_s_TSi)  # Weighted average for Q_low of all TS
+            self.Q_actions = np.dot(self.p_TS, self.Q_low[:, stimulus[1], :])  # Weighted average for Q_low of all TS
         else:
-            self.Q_actions = Q_ai_given_s_TSi[self.TS]  # Q_low of the highest-valued TS
+            self.Q_actions = self.Q_low[self.TS, stimulus[1], :]  # Q_low of the highest-valued TS
         self.p_actions = self.get_p_from_Q(Q=self.Q_actions, beta=self.beta, epsilon=self.epsilon)
         self.prev_action = np.random.choice(range(self.n_actions), p=self.p_actions)
         self.forget_Qs()
         return self.prev_action
+
+    def handle_context_switches(self, context):
+        if context not in self.seen_contexts:  # if a completely new context is encountered
+            jitter = np.random.normal(0, self.initial_q_high / 100, [self.n_contexts, 1])
+            new_TS = self.initial_q_high * np.ones([self.n_contexts, 1]) + jitter  # create new TS
+            if not self.seen_contexts:  # if this is the first context ever encountered (very first trial)
+                self.Q_high = new_TS
+            else:
+                self.Q_high = np.append(self.Q_high, new_TS, axis=1)  # add column with new TS
+            # print('Initial TS values for context {0}: {1}'.format(context, np.round(new_TS, 3)))
+            self.seen_contexts.append(context)
+        self.Q_high[context, np.argmax(self.p_TS)] *= (1 - self.suppress_prev_TS)  # suppress previous TS
+        self.context = context
 
     def learn(self, stimulus, action, reward):
         self.update_Qs(stimulus, action, reward)
@@ -97,7 +102,7 @@ class Agent(object):
                 denominator = 1. + sum([np.exp(beta * (Q[j] - Q[i])) for j in range(len(Q)) if j != i])
                 p_actions[i] = 1. / denominator
             # Add epsilon noise
-            p_actions = epsilon / self.n_actions + (1 - epsilon) * p_actions
+            p_actions = epsilon / len(p_actions) + (1 - epsilon) * p_actions
         assert np.round(sum(p_actions), 3) == 1
         return p_actions
 
