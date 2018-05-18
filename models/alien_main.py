@@ -24,7 +24,7 @@ simulate_agents = True
 # Model fitting parameters
 n_iter = 1
 n_agents = 15
-agent_start_id = 400
+agent_start_id = 415
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/'
 human_data_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1'   # CLUSTER: human_data_path = base_path + '/humanData/'
@@ -104,7 +104,7 @@ if simulate_agents:
         gen_pars = parameters.create_random_params(scale='lim', mode='soft')
         gen_pars[np.array(parameters.par_names) == 'epsilon'] = 0
         gen_pars[np.array(parameters.par_names) == 'forget'] = 0
-        gen_pars[np.array(parameters.par_names) == 'suppress_prev_TS'] = 1
+        gen_pars[np.array(parameters.par_names) == 'suppress_prev_TS'] = 0
         print('Simulating {0} agent {1} with parameters {2}'.format(
             agent_stuff['learning_style'], agent_id, np.round(gen_pars, 2)))
         agent_stuff['id'] = agent_id

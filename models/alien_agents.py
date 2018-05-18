@@ -43,8 +43,8 @@ class Agent(object):
             self.Q_high = np.eye(self.n_contexts)  # agent always selects the appropriate table
         elif self.learning_style == 'hierarchical':
             self.initial_q_high = self.initial_q_low
-            self.Q_high = self.initial_q_high * np.ones(Q_high_dim) +\
-                np.random.normal(0, self.initial_q_high / 100, Q_high_dim)  # jitter avoids identical values
+            self.Q_high = np.nan  # self.initial_q_high * np.ones(Q_high_dim) +\
+                # np.random.normal(0, self.initial_q_high / 100, Q_high_dim)  # jitter avoids identical values
 
         # Initialize action probs, current TS and action, LL
         self.p_TS = np.ones(self.n_TS) / self.n_TS  # P(TS|context)
@@ -63,7 +63,7 @@ class Agent(object):
         self.Q_stimuli = np.nan
 
     def select_action(self, stimulus):
-        if self.context != stimulus[0]:
+        if (self.context != stimulus[0]) and (self.learning_style == 'hierarchical'):
             self.handle_context_switches(stimulus[0])
         self.context = stimulus[0]
         # Translate TS values and action values into action probabilities
@@ -79,6 +79,14 @@ class Agent(object):
         return self.prev_action
 
     def handle_context_switches(self, context):
+        if context not in self.seen_contexts:
+            jitter = np.random.normal(0, self.initial_q_high / 100, [self.n_contexts, 1])
+            new_TS = self.initial_q_high * np.ones([self.n_contexts, 1]) + jitter  # create new TS
+            if not self.seen_contexts:  # if this is the first context ever encountered (very first trial)
+                self.Q_high = new_TS.copy()
+            else:
+                self.Q_high = np.append(self.Q_high, new_TS, axis=1)  # add column with new TS
+            self.seen_contexts.append(context)
         self.Q_high[context, np.argmax(self.p_TS)] *= (1 - self.suppress_prev_TS)
 
     def learn(self, stimulus, action, reward):
