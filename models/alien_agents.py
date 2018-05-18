@@ -14,7 +14,7 @@ class Agent(object):
         self.select_deterministic = 'flat' in self.learning_style  # Hack to select the right TS each time for the flat agent
         self.mix_probs = agent_stuff['mix_probs']
         self.id = agent_stuff['id']
-        [self.alpha, self.beta, self.epsilon, self.forget, self.suppress_prev_TS] = all_params_lim
+        [self.alpha, self.beta, self.epsilon, self.forget, self.suppress_prev_TS, self.create_TS_biased] = all_params_lim
         self.alpha_high = self.alpha  # TD
         self.beta_high = 10 * self.beta
         self.forget_high = self.forget
@@ -79,16 +79,17 @@ class Agent(object):
         return self.prev_action
 
     def handle_context_switches(self, context):
-        # Add a new TS if we encounter a new context
-        if context not in self.seen_contexts:
+        if context not in self.seen_contexts:  # encounter new context
             jitter = np.random.normal(0, self.initial_q_high / 100, [self.n_contexts, 1])
-            new_TS = self.initial_q_high * np.ones([self.n_contexts, 1]) + jitter  # create new TS
+            rand_TS = self.initial_q_high * np.ones([self.n_contexts, 1]) + jitter  # create new random TS
             if not self.seen_contexts:  # if this is the first context ever encountered (very first trial)
-                self.Q_high = new_TS.copy()
-            else:
+                self.Q_high = rand_TS.copy()
+            if self.seen_contexts:
+                biased_TS = (np.mean(self.Q_high, axis=1) * np.ones([1, 3])).transpose()  # create new biased TS
+                new_TS = self.create_TS_biased * biased_TS + (1 - self.create_TS_biased) * rand_TS
                 self.Q_high = np.append(self.Q_high, new_TS, axis=1)  # add column with new TS
                 favored_TS_prev_context = np.argmax(self.Q_high[self.context, :])
-                self.Q_high[context, favored_TS_prev_context] *= (1 - self.suppress_prev_TS)
+                self.Q_high[context, favored_TS_prev_context] *= (1 - self.suppress_prev_TS)  # suppress TS of prev. c.
             self.seen_contexts.append(context)
 
     def learn(self, stimulus, action, reward):

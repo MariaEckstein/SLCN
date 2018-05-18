@@ -17,9 +17,9 @@ from fit_parameters import FitParameters
 
 # What should be done?
 interactive_game = False
-quick_generate_and_recover = False
+quick_generate_and_recover = True
 fit_human_data = False
-simulate_agents = True
+simulate_agents = False
 
 # Model fitting parameters
 n_iter = 1
@@ -64,11 +64,11 @@ agent_stuff = {'name': 'alien',
                'learning_style': 'hierarchical',
                'mix_probs': False}
 
-parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'forget', 'suppress_prev_TS'],  # Rewards <= 10 means than beta is 10 times as much!
+parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'forget', 'suppress_prev_TS', 'create_TS_biased'],  # Rewards <= 10 means than beta is 10 times as much!
                         fit_pars=np.ones(6, dtype=bool),  # which parameters will be fitted?
-                        par_hard_limits=((0., 1.),  (0., 15.), (0., 1.),   (0., 1.),  (0., 1.)),  # no values fitted outside
-                        par_soft_limits=((0., 0.5), (1., 6.),  (0., 0.25), (0., 0.1), (0., 1.)),  # no simulations outside
-                        default_pars_lim=np.array([0.1, 1., 0., 0., 0.]))  # when a parameter is fixed
+                        par_hard_limits=((0., 1.),  (0., 15.), (0., 1.),   (0., 1.),  (0., 1.), (0., 1.)),  # no values fitted outside
+                        par_soft_limits=((0., 0.5), (1., 6.),  (0., 0.25), (0., 0.1), (0., 1.), (0., 1.)),  # no simulations outside
+                        default_pars_lim=np.array([0.1, 1., 0., 0., 0., 0.]))  # when a parameter is fixed
 gen_pars = parameters.default_pars_lim
 gen_pars[np.array(parameters.par_names) == 'epsilon'] = 0
 
