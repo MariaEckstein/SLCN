@@ -31,8 +31,7 @@ class Agent(object):
             Q_low_dim = [self.n_contexts, self.n_aliens, self.n_actions]
         elif self.learning_style == 'hierarchical':
             Q_low_dim = [self.n_TS, self.n_aliens, self.n_actions]
-        self.Q_low = self.initial_q_low * np.ones(Q_low_dim) +\
-            np.random.normal(0, self.initial_q_low / 100, Q_low_dim)  # jitter avoids identical values
+        self.Q_low = np.random.normal(self.initial_q_low, self.initial_q_low / 100, Q_low_dim)  # jitter avoids identic.
 
         # Set up values at high (context-TS) level
         Q_high_dim = [self.n_contexts, self.n_TS]
@@ -43,8 +42,7 @@ class Agent(object):
             self.Q_high = np.eye(self.n_contexts)  # agent always selects the appropriate table
         elif self.learning_style == 'hierarchical':
             self.initial_q_high = self.initial_q_low
-            self.Q_high = np.nan  # self.initial_q_high * np.ones(Q_high_dim) +\
-                # np.random.normal(0, self.initial_q_high / 100, Q_high_dim)  # jitter avoids identical values
+            self.Q_high = np.nan
 
         # Initialize action probs, current TS and action, LL
         self.p_TS = np.ones(self.n_TS) / self.n_TS  # P(TS|context)
@@ -78,19 +76,27 @@ class Agent(object):
         self.forget_Qs()
         return self.prev_action
 
-    def handle_context_switches(self, context):
-        if context not in self.seen_contexts:  # encounter new context
-            jitter = np.random.normal(0, self.initial_q_high / 100, [self.n_contexts, 1])
-            rand_TS = self.initial_q_high * np.ones([self.n_contexts, 1]) + jitter  # create new random TS
+    def get_new_context_values(self):
+        biased_context = np.array([list(np.mean(self.Q_high, axis=0))])  # biased TS values for new context
+        rand_context = np.random.normal(self.initial_q_high, self.initial_q_high / 100, biased_context.shape)
+        return self.create_TS_biased * biased_context + (1 - self.create_TS_biased) * rand_context
+
+    def handle_context_switches(self, context, phase='1InitialLearning'):
+        # Create a new TS and initialize TS values for the new context
+        if context not in self.seen_contexts:  # completely new, unseen context
+            rand_TS = np.random.normal(self.initial_q_high, self.initial_q_high / 100, [self.n_contexts, 1])  # add new TS and create uniform values for new context
             if not self.seen_contexts:  # if this is the first context ever encountered (very first trial)
                 self.Q_high = rand_TS.copy()
-            if self.seen_contexts:
-                biased_TS = (np.mean(self.Q_high, axis=1) * np.ones([1, 3])).transpose()  # create new biased TS
-                new_TS = self.create_TS_biased * biased_TS + (1 - self.create_TS_biased) * rand_TS
-                self.Q_high = np.append(self.Q_high, new_TS, axis=1)  # add column with new TS
-                favored_TS_prev_context = np.argmax(self.Q_high[self.context, :])
-                self.Q_high[context, favored_TS_prev_context] *= (1 - self.suppress_prev_TS)  # suppress TS of prev. c.
-            self.seen_contexts.append(context)
+            else:
+                if phase != '2CloudySeason':
+                    self.Q_high = np.append(self.Q_high, rand_TS, axis=1)  # add column with new TS values
+                self.Q_high[context, :] = self.get_new_context_values()
+            if phase != '2CloudySeason':
+                self.seen_contexts.append(context)
+        # Suppress TS of the previous context in new context
+        if len(self.seen_contexts) > 1:
+            p_TS_prev_context = self.get_p_from_Q(self.Q_high[self.context, :], self.beta_high, self.epsilon)
+            self.Q_high[context, :] *= (1 - self.suppress_prev_TS * p_TS_prev_context)
 
     def learn(self, stimulus, action, reward):
         self.update_Qs(stimulus, action, reward)

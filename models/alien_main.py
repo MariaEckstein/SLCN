@@ -16,8 +16,8 @@ from fit_parameters import FitParameters
 # First trial is currently not recorded (the data files are missing the alien in the first trial)
 
 # What should be done?
-interactive_game = False
-quick_generate_and_recover = True
+interactive_game = True
+quick_generate_and_recover = False
 fit_human_data = False
 simulate_agents = False
 

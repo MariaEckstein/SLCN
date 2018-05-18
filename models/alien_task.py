@@ -32,7 +32,7 @@ class Task(object):
             self.contexts = np.append(self.contexts, new_block)
 
     def set_phase(self, new_phase):
-        assert self.phase in self.phases
+        assert new_phase in self.phases
         self.phase = new_phase
 
     def prepare_trial(self, trial):

@@ -13,7 +13,7 @@ class SimulateInteractive(object):
 
     def trial(self, trial):
         print('\n\tTRIAL {0}'.format(str(trial)))
-        self.task_context = int(input('Context (0, 1, 2):'))
+        self.task_context = int(input('Context (0, 1, 2; or 3 for cloudy):'))
         self.task_alien = int(input('Alien (0, 1, 2, 3):'))
         stimulus = [self.task_context, self.task_alien]
         self.suggested_action = self.agent.select_action(stimulus)  # calculate p_actions
