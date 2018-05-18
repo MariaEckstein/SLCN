@@ -6,31 +6,33 @@ class Task(object):
     def __init__(self, task_stuff):
 
         # Get parameters from task_stuff
-        self.n_blocks = task_stuff['n_blocks']
-        self.n_contexts = task_stuff['n_contexts']
-        self.n_aliens = task_stuff['n_aliens']
+        self.phases = task_stuff['phases']
         self.n_trials_per_alien = task_stuff['n_trials_per_alien']
-        self.block_length = self.n_aliens * self.n_trials_per_alien
-        self.n_trials = self.n_contexts * self.n_blocks * self.block_length
+        self.n_blocks = task_stuff['n_blocks']
+        self.n_aliens = task_stuff['n_aliens']
+        self.block_lengths = self.n_aliens * self.n_trials_per_alien
         self.n_actions = task_stuff['n_actions']
+        self.n_contexts = task_stuff['n_contexts']
+        self.TS = task_stuff['TS']
+        self.n_trials_per_phase = self.n_contexts * self.n_blocks * self.block_lengths
 
         # Info about current trial etc.
         self.shuffled_aliens = np.random.choice(range(4), size=4, replace=False)
         self.context = np.nan
         self.alien = np.nan
-        self.TS = task_stuff['TS']
         self.phase = np.nan
 
         # Create context order
         self.contexts = np.empty(0, dtype=int)
-        for block in range(self.n_blocks):
+        n_blocks_initial_learn = int(self.n_blocks[np.array(self.phases) == '1InitialLearning'])
+        for block in range(n_blocks_initial_learn):
             randomized_contexts = np.random.choice(range(self.n_contexts), size=self.n_contexts, replace=False)
-            new_block = np.concatenate([i * np.ones(self.block_length, dtype=int) for i in randomized_contexts])
+            new_block = np.concatenate([i * np.ones(self.block_lengths[np.array(self.phases) == '1InitialLearning'], dtype=int)
+                                        for i in randomized_contexts])
             self.contexts = np.append(self.contexts, new_block)
 
     def set_phase(self, new_phase):
-        assert self.phase in ['1InitialLearning', '2CloudySeason', '3PickAliens', 'Refresher2', 'Refresher3',
-                              '5RainbowSeason', 'Mixed']
+        assert self.phase in self.phases
         self.phase = new_phase
 
     def prepare_trial(self, trial):

@@ -40,7 +40,8 @@ class FitParameters(object):
             sim_int = SimulateInteractive(agent, self.agent_stuff['mix_probs'])
 
         # task.set_phase('1InitialLearning')
-        for trial in range(task.n_trials):
+        n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
+        for trial in range(n_trials):
             if interactive:
                 stimulus = sim_int.trial(trial)
                 [task.context, task.alien] = stimulus
@@ -108,6 +109,8 @@ class FitParameters(object):
         n_trials = len(agent_data)
         for trial in range(n_trials):
             if 'alien' in self.agent_stuff['name']:
+                if np.isnan(agent_data['context'][trial]):
+                    break
                 context = int(agent_data['context'][trial])
                 sad_alien = int(agent_data['sad_alien'][trial])
                 stimulus = np.array([context, sad_alien])

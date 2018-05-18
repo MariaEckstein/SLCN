@@ -7,10 +7,10 @@ class RecordData(object):
     def __init__(self, agent_id, mode='add_to_existing_data', agent_data=(), task=()):
         if mode == 'create_from_scratch':
             colnames = ['trial_type', 'trial_index', 'correct', 'reward', 'item_chosen', 'sad_alien', 'TS', 'block-type']
-            self.subj_file = pd.DataFrame(data=np.zeros([task.n_trials, len(colnames)]),
+            self.subj_file = pd.DataFrame(data=np.zeros([int(np.nansum(task.n_trials_per_phase)), len(colnames)]),
                                           columns=colnames)
-            self.subj_file['n_trials_per_alien'] = task.n_trials_per_alien
-            self.subj_file['n_blocks'] = task.n_blocks
+            self.subj_file['n_trials_per_alien'] = str(task.n_trials_per_alien)
+            self.subj_file['n_blocks'] = str(task.n_blocks)
             self.subj_file['sID'] = agent_id
             self.subj_file['RT'] = np.nan
         else:

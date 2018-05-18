@@ -43,8 +43,10 @@ TSs = np.array([[[1, 6, 1],  # alien0, items0-2
                 [1, 3, 1],
                 [2, 1, 1]]])
 
-task_stuff = {'n_trials_per_alien': 13,  # 13
-              'n_blocks': 7,  # 7 = 3 (initial learn) + 2 (refr2) + 2 (refr3)
+task_stuff = {'phases': ['1InitialLearning', '2CloudySeason', 'Refresher2', '3PickAliens',
+                         'Refresher3', '5RainbowSeason', 'Mixed'],
+              'n_trials_per_alien': np.array([13, 10, 7, np.nan, 7, 1, 7]),
+              'n_blocks': np.array([3, 3, 2, np.nan, 2, 3, 3]),
               'n_aliens': 4,
               'n_actions': n_actions,
               'n_contexts': 3,
