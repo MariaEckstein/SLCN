@@ -79,6 +79,7 @@ class Agent(object):
         return self.prev_action
 
     def handle_context_switches(self, context):
+        # Add a new TS if we encounter a new context
         if context not in self.seen_contexts:
             jitter = np.random.normal(0, self.initial_q_high / 100, [self.n_contexts, 1])
             new_TS = self.initial_q_high * np.ones([self.n_contexts, 1]) + jitter  # create new TS
@@ -86,8 +87,9 @@ class Agent(object):
                 self.Q_high = new_TS.copy()
             else:
                 self.Q_high = np.append(self.Q_high, new_TS, axis=1)  # add column with new TS
+                favored_TS_prev_context = np.argmax(self.Q_high[self.context, :])
+                self.Q_high[context, favored_TS_prev_context] *= (1 - self.suppress_prev_TS)
             self.seen_contexts.append(context)
-        self.Q_high[context, np.argmax(self.p_TS)] *= (1 - self.suppress_prev_TS)
 
     def learn(self, stimulus, action, reward):
         self.update_Qs(stimulus, action, reward)
