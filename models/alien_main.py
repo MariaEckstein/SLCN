@@ -16,9 +16,9 @@ fit_human_data = False
 simulate_agents = True
 
 # Model fitting parameters
-n_iter = 20
-n_agents = 200
-agent_start_id = 500
+n_iter = 1
+n_agents = 30
+agent_start_id = 400
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/'
 human_data_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1'   # CLUSTER: human_data_path = base_path + '/humanData/'
@@ -87,6 +87,29 @@ if interactive_game:
                                agent_stuff=agent_stuff)
     agent_data = fit_params.get_agent_data(way='interactive',
                                            all_params_lim=gen_pars)
+# Simulate agents
+if simulate_agents:
+
+    # Simulate n_simulated_agents_per_participant and save the files
+    agent_id = agent_start_id
+    while agent_id < agent_start_id + n_agents:
+        gen_pars = parameters.create_random_params(scale='lim', mode='soft')
+        gen_pars[np.array(parameters.par_names) == 'epsilon'] = 0
+        gen_pars[np.array(parameters.par_names) == 'forget'] = 0
+        # gen_pars[np.array(parameters.par_names) == 'suppress_prev_TS'] = 0
+        print('Simulating {0} agent {1} with parameters {2}'.format(
+            agent_stuff['learning_style'], agent_id, np.round(gen_pars, 2)))
+        agent_stuff['id'] = agent_id
+        fit_params = FitParameters(parameters=parameters,
+                                   task_stuff=task_stuff,
+                                   comp_stuff=comp_stuff,
+                                   agent_stuff=agent_stuff)
+        agent_data = fit_params.get_agent_data(way='simulate',
+                                               all_params_lim=gen_pars)
+        sim_save_path = '{0}sim_{1}.csv'.format(data_path, str(agent_id))
+        agent_data.to_csv(sim_save_path)
+
+        agent_id += 1
 
 # Generate and recover
 if quick_generate_and_recover:
@@ -195,7 +218,7 @@ if fit_human_data:
                                     file_name='alien')
 
 # Simulate agents using the parameters that have been fit to humans
-if simulate_agents:
+if False:
     human_simulation_base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/AlienGenRec/FlatStimulusAlphaBeta/'
     save_fitted_human_path = human_simulation_base_path + '1FittedParticipants/'
     save_simulated_human_path = human_simulation_base_path + '2SimulatedParticipants/'
