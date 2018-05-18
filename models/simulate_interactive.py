@@ -20,7 +20,7 @@ class SimulateInteractive(object):
         return stimulus
 
     def print_values_pre(self):
-        self.TS_values = np.round(self.agent.Q_high[self.task_context, :], 2)
+        self.TS_values = np.round(self.agent.Q_high[:, self.task_context], 2)
         self.action_values = np.round(self.agent.Q_low[:, self.task_alien, :], 2)
         if self.mix_probs:
             print('TS.     all values:   {0}; all ps:   {1}\n'
@@ -39,7 +39,7 @@ class SimulateInteractive(object):
                     str(self.action_values[self.agent.TS, :]), str(np.round(self.agent.p_actions, 2))))
 
     def print_values_post(self, action, reward, correct):
-        TS_values_new = np.round(self.agent.Q_high[self.task_context, :], 2)
+        TS_values_new = np.round(self.agent.Q_high[:, self.task_context], 2)
         action_values_new = np.round(self.agent.Q_low[:, self.task_alien, :], 2)
         if self.mix_probs:
             print('Reward: {0} ({1})\n'

@@ -49,7 +49,7 @@ class RecordData(object):
         self.subj_file.loc[trial, 'LL' + suff] = agent.LL
         self.subj_file.loc[trial, 'TS' + suff] = current_TS
         # Q_high and Q_low for the current trial's TS and chosen item, respectively
-        self.subj_file.loc[trial, 'Q_TS' + suff] = agent.Q_high[current_context, current_TS]
+        self.subj_file.loc[trial, 'Q_TS' + suff] = agent.Q_high[current_TS, current_context]
         self.subj_file.loc[trial, 'Q_action' + suff] = agent.Q_low[current_TS, current_alien, current_item_chosen]
         # p_high and p_low for the current trial's TS and chosen item, respectively
         self.subj_file.loc[trial, 'p_TS' + suff] = agent.p_TS[current_TS]
@@ -59,7 +59,7 @@ class RecordData(object):
             for TS in range(3):
                 self.subj_file.loc[trial, 'p_TS' + str(TS) + suff] = agent.p_TS[int(TS)]
                 for context in range(3):
-                    self.subj_file.loc[trial, 'Q_TS{0}_context{1}{2}'.format(str(TS), str(context), suff)] = agent.Q_high[int(context), TS]
+                    self.subj_file.loc[trial, 'Q_TS{0}_context{1}{2}'.format(str(TS), str(context), suff)] = agent.Q_high[TS, int(context)]
             for action in range(3):
                 self.subj_file.loc[trial, 'p_action' + str(action) + suff] = agent.p_actions[int(action)]
                 for alien in range(4):

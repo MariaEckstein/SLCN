@@ -81,7 +81,7 @@ class FitParameters(object):
         # task.set_phase('3PickAliens')
         # comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
         # if interactive:
-        #     agent.Q_high = np.array([[7, 1, 1], [1, 5, 1], [1, 1, 3]])  # np.array(ast.literal_eval(input('Agent.Q_high[contexts, TS]:')))
+        #     agent.Q_high = np.array([[7, 1, 1], [1, 5, 1], [1, 1, 3]])  # np.array(ast.literal_eval(input('Agent.Q_high[TS, contexts]:')))
         #     # Q_low_TS0 = ast.literal_eval(input('Agent.Q_low[TS0, aliens, actions]'))
         #     # Q_low_TS1 = ast.literal_eval(input('Agent.Q_low[TS1, aliens, actions]'))
         #     # Q_low_TS2 = ast.literal_eval(input('Agent.Q_low[TS2, aliens, actions]'))

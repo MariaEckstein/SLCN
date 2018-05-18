@@ -16,16 +16,17 @@ from fit_parameters import FitParameters
 # First trial is currently not recorded (the data files are missing the alien in the first trial)
 
 # What should be done?
-interactive_game = True
-quick_generate_and_recover = True
+interactive_game = False
+simulate_agents = True
+quick_generate_and_recover = False
 interactive = False
 fit_human_data = False
-simulate_agents = False
+simulate_agents_after_humans = False
 
 # Model fitting parameters
 n_iter = 1
-n_agents = 200
-agent_start_id = 500
+n_agents = 30
+agent_start_id = 300
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/'
 human_data_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1'   # CLUSTER: human_data_path = base_path + '/humanData/'
@@ -62,16 +63,14 @@ comp_stuff = {'phases': ['contexts', 'context-aliens', 'items', 'aliens'],
               'n_blocks': {'contexts': 3, 'context-aliens': 3, 'items': 3, 'aliens': 3}}
 agent_stuff = {'name': 'alien',
                'n_TS': 3,
-               'learning_style': 'hierarchical',
+               'learning_style': 's-flat',
                'mix_probs': False}
 
 parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'forget', 'suppress_prev_TS'],  # Rewards <= 10 means than beta is 10 times as much!
                         fit_pars=np.ones(6, dtype=bool),  # which parameters will be fitted?
                         par_hard_limits=((0., 1.),  (0., 15.), (0., 1.),   (0., 1.),  (0., 1.)),  # no values fitted outside
-                        par_soft_limits=((0., 0.5), (1., 6.),  (0., 0.25), (0., 0.1), (0.5, 1.)),  # no simulations outside
+                        par_soft_limits=((0., 0.5), (1., 6.),  (0., 0.25), (0., 0.2), (0.5, 1.)),  # no simulations outside
                         default_pars_lim=np.array([0.1, 1., 0., 0., 0.]))  # when a parameter is fixed
-gen_pars = parameters.default_pars_lim
-gen_pars[np.array(parameters.par_names) == 'epsilon'] = 0
 
 # Play the game to test everything
 if interactive_game:
@@ -82,10 +81,7 @@ if interactive_game:
     #     feat = input('{0} (leave blank for "{1}"):'.format(feature_name, agent_stuff[feature_name]))
     #     if feat:
     #         agent_stuff[feature_name] = feat
-    # for par_name in parameters.par_names:
-    #     par = input('{0} (leave blank for {1}):'.format(par_name, gen_pars[np.array(parameters.par_names) == par_name]))
-    #     if par:
-    #         gen_pars[np.array(parameters.par_names) == par_name] = par
+    gen_pars = parameters.create_random_params(scale='lim', mode='soft')
 
     print('\tAGENT CHARACTERISTICS:\n'
           'Learning style: {0}\nMix probs: {1}\nParameters: {2}'.format(
@@ -97,6 +93,38 @@ if interactive_game:
     agent_data = fit_params.get_agent_data(way='interactive',
                                            all_params_lim=gen_pars)
 
+# Simulate agents
+if simulate_agents:
+
+    # Adjust parameters
+    if interactive:
+        for feature_name in ['learning_style', 'mix_probs']:
+            feat = input('{0} (leave blank for "{1}"):'.format(feature_name, agent_stuff[feature_name]))
+            if feat:
+                agent_stuff[feature_name] = feat
+
+    # Simulate n_simulated_agents_per_participant and save the files
+    agent_id = agent_start_id
+    while agent_id < agent_start_id + n_agents:
+        gen_pars = parameters.create_random_params(scale='lim', mode='soft')
+        gen_pars[np.array(parameters.par_names) == 'epsilon'] = 0
+        # gen_pars[np.array(parameters.par_names) == 'forget'] = 0
+        gen_pars[np.array(parameters.par_names) == 'suppress_prev_TS'] = 0
+        print('Simulating {0} agent {1} with parameters {2}'.format(
+            agent_stuff['learning_style'], agent_id, np.round(gen_pars, 2)))
+        agent_stuff['id'] = agent_id
+        fit_params = FitParameters(parameters=parameters,
+                                   task_stuff=task_stuff,
+                                   comp_stuff=comp_stuff,
+                                   agent_stuff=agent_stuff)
+        agent_data = fit_params.get_agent_data(way='simulate',
+                                               all_params_lim=gen_pars)
+        sim_save_path = '{0}sim_{1}.csv'.format(data_path, str(agent_id))
+        agent_data.to_csv(sim_save_path)
+
+        agent_id += 1
+
+
 # Generate and recover
 if quick_generate_and_recover:
 
@@ -106,6 +134,10 @@ if quick_generate_and_recover:
             feat = input('{0} (leave blank for "{1}"):'.format(feature_name, agent_stuff[feature_name]))
             if feat:
                 agent_stuff[feature_name] = feat
+    # for par_name in parameters.par_names:
+    #     par = input('{0} (leave blank for {1}):'.format(par_name, gen_pars[np.array(parameters.par_names) == par_name]))
+    #     if par:
+    #         gen_pars[np.array(parameters.par_names) == par_name] = par
 
     # Decide which parameters will be fit (others will just be known)
     fit_pars = np.array(parameters.par_names) == 'epsilon'  # np.ones(len(parameters.par_names), dtype=bool)  #
@@ -205,7 +237,7 @@ if fit_human_data:
                                     file_name='alien')
 
 # Simulate agents using the parameters that have been fit to humans
-if simulate_agents:
+if simulate_agents_after_humans:
     human_simulation_base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/AlienGenRec/FlatStimulusAlphaBeta/'
     save_fitted_human_path = human_simulation_base_path + '1FittedParticipants/'
     save_simulated_human_path = human_simulation_base_path + '2SimulatedParticipants/'
