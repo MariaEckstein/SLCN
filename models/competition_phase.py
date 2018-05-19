@@ -12,11 +12,12 @@ class CompetitionPhase(object):
         items = range(task_stuff['n_actions'])
         item_pairs = [[item_i, item_j] for item_i in items for item_j in items if item_i < item_j]
         context_aliens = [[context, alien] for context in contexts for alien in aliens]
-        context_alien_pairs = [[c_a_i, c_a_j] for c_a_i in context_aliens for c_a_j in context_aliens if c_a_i < c_a_j]
-        self.stimuli = {'contexts': context_pairs,
-                        'context-aliens': context_alien_pairs,
-                        'aliens': alien_pairs,
-                        'items': item_pairs}
+        context_alien_pairs = [[c_a_i, c_a_j] for c_a_i in context_aliens for c_a_j in context_aliens
+                               if (c_a_i < c_a_j) and (c_a_i[0] == c_a_j[0])]  # same-season-pairs
+        self.stimuli = {'season': context_pairs,
+                        'alien-same-season': context_alien_pairs,
+                        'alien': alien_pairs,
+                        'item': item_pairs}
         self.n_trials = [self.n_blocks[phase] * len(self.stimuli[phase]) for phase in self.phases]
         self.switch_trials = [sum(self.n_trials[0:i]) for i in range(len(self.n_trials))]
         self.current_phase = self.phases[0]

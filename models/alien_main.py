@@ -9,22 +9,24 @@ from fit_parameters import FitParameters
 # Things to keep in mind / knobs to turn;
 # separate alphas / betas for low level & level
 # separate alphas / betas for different phases
-# suppress previous TS before or after initializing a new context (handle_context_switches)?
-# initialize new TS with Q(TS) [average over previous contexts]; suppress previous TS
 
 # TDs / bugs
 # First trial is currently not recorded (the data files are missing the alien in the first trial)
+# Get order of the phases right (competition after Refresher2) -> integrate competition_phase.py into alien_task.py
+# Rainbow season! currently agent gets reward and a TS is in place!
+# Save Q and p for competition phase?
+# Test if suppress_prev_TS is working!
 
 # What should be done?
-interactive_game = True
+interactive_game = False
 quick_generate_and_recover = False
 fit_human_data = False
-simulate_agents = False
+simulate_agents = True
 
 # Model fitting parameters
 n_iter = 1
-n_agents = 30
-agent_start_id = 400
+n_agents = 3
+agent_start_id = 500
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/'
 human_data_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1'   # CLUSTER: human_data_path = base_path + '/humanData/'
@@ -51,14 +53,14 @@ TSs = np.array([[[1, 6, 1],  # alien0, items0-2
 
 task_stuff = {'phases': ['1InitialLearning', '2CloudySeason', 'Refresher2', '3PickAliens',
                          'Refresher3', '5RainbowSeason', 'Mixed'],
-              'n_trials_per_alien': np.array([13, 10, 7, np.nan, 7, 1, 7]),
-              'n_blocks': np.array([3, 3, 2, np.nan, 2, 3, 3]),
+              'n_trials_per_alien': np.array([13, 10, 7, np.nan, 7, 1, 7]),  # np.array([1, 1, 1, np.nan, 1, 1, 1]), #
+              'n_blocks': np.array([3, 3, 2, np.nan, 2, 3, 3]),  # np.array([1, 1, 1, np.nan, 1, 1, 1]), #
               'n_aliens': 4,
               'n_actions': n_actions,
               'n_contexts': 3,
               'TS': TSs}
-comp_stuff = {'phases': ['contexts', 'context-aliens', 'items', 'aliens'],
-              'n_blocks': {'contexts': 3, 'context-aliens': 3, 'items': 3, 'aliens': 3}}
+comp_stuff = {'phases': ['season', 'alien-same-season', 'item', 'alien'],
+              'n_blocks': {'season': 3, 'alien-same-season': 3, 'item': 3, 'alien': 3}}
 agent_stuff = {'name': 'alien',
                'n_TS': 3,
                'learning_style': 'hierarchical',

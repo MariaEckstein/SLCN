@@ -39,8 +39,10 @@ class FitParameters(object):
         if interactive:
             sim_int = SimulateInteractive(agent, self.agent_stuff['mix_probs'])
 
-        for phase in ['1InitialLearning', '2CloudySeason']:
+        total_trials = 0
+        for phase in ['1InitialLearning', '2CloudySeason', 'Refresher2', 'Refresher3', '5RainbowSeason']:
             task.set_phase(phase)
+            agent.task_phase = phase
             n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
             for trial in range(n_trials):
                 if interactive:
@@ -56,17 +58,12 @@ class FitParameters(object):
                 agent.learn(stimulus, action, reward)
                 if interactive:
                     sim_int.print_values_post(action, reward, correct)
-                record_data.add_behavior(task, stimulus, action, reward, correct, trial)
-                record_data.add_decisions(agent, trial, suff='', all_Q_columns=all_Q_columns)
+                record_data.add_behavior(task, stimulus, action, reward, correct, total_trials, phase)
+                record_data.add_decisions(agent, total_trials, suff='', all_Q_columns=all_Q_columns)
+                total_trials += 1
 
         task.set_phase('3PickAliens')
         comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
-        if interactive:
-            agent.Q_high = np.array([[7, 1, 1], [1, 5, 1], [1, 1, 3]])  # np.array(ast.literal_eval(input('Agent.Q_high[contexts, TS]:')))
-            # Q_low_TS0 = ast.literal_eval(input('Agent.Q_low[TS0, aliens, actions]'))
-            # Q_low_TS1 = ast.literal_eval(input('Agent.Q_low[TS1, aliens, actions]'))
-            # Q_low_TS2 = ast.literal_eval(input('Agent.Q_low[TS2, aliens, actions]'))
-            agent.Q_low = task.TS  # np.array([Q_low_TS0, Q_low_TS1, Q_low_TS2])
         for trial in range(sum(comp.n_trials)):
             comp.prepare_trial(trial)
             stimuli = comp.present_stimulus(trial)
@@ -74,8 +71,8 @@ class FitParameters(object):
             if interactive:
                 print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
                 trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
-
-        task.set_phase('5RainbowSeason')
+            record_data.add_behavior_comp(stimuli, selected, total_trials, task.phase, comp.current_phase)
+            total_trials += 1
 
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()

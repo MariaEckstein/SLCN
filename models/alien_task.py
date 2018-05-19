@@ -23,13 +23,18 @@ class Task(object):
         self.phase = np.nan
 
         # Create context order
-        self.contexts = np.empty(0, dtype=int)
-        n_blocks_initial_learn = int(self.n_blocks[np.array(self.phases) == '1InitialLearning'])
-        for block in range(n_blocks_initial_learn):
+        self.contexts = np.empty(0, dtype=int)  # same sequence of contexts for initial learn & cloudy & refreshers
+        # n_blocks_initial_learn = int(self.n_blocks[np.array(self.phases) == '1InitialLearning'])
+        # for block in range(n_blocks_initial_learn):
+        n_trials_initial_learn = self.n_trials_per_phase[np.array(self.phases) == '1InitialLearning']
+        len_block_initial_learn = self.block_lengths[np.array(self.phases) == '1InitialLearning']
+        while len(self.contexts) < n_trials_initial_learn :
             randomized_contexts = np.random.choice(range(self.n_contexts), size=self.n_contexts, replace=False)
-            new_block = np.concatenate([i * np.ones(self.block_lengths[np.array(self.phases) == '1InitialLearning'], dtype=int)
-                                        for i in randomized_contexts])
-            self.contexts = np.append(self.contexts, new_block)
+            new_block = np.concatenate([i * np.ones(len_block_initial_learn, dtype=int) for i in randomized_contexts])
+            if len(self.contexts) == 0:
+                self.contexts = new_block.copy()
+            elif self.contexts[-1] != new_block[0]:
+                self.contexts = np.append(self.contexts, new_block)
 
     def set_phase(self, new_phase):
         assert new_phase in self.phases

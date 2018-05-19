@@ -12,7 +12,7 @@ class RecordData(object):
             self.subj_file['n_trials_per_alien'] = str(task.n_trials_per_alien)
             self.subj_file['n_blocks'] = str(task.n_blocks)
             self.subj_file['sID'] = agent_id
-            self.subj_file['RT'] = np.nan
+            self.subj_file['rt'] = np.nan
         else:
             self.subj_file = agent_data
 
@@ -34,13 +34,22 @@ class RecordData(object):
         self.subj_file['create_TS_biased' + suff] = agent.create_TS_biased
         # self.subj_file['mix' + suff] = agent.mix
 
-    def add_behavior(self, task, stimulus, action, reward, correct, trial, suff=''):
+    def add_behavior(self, task, stimulus, action, reward, correct, trial, phase, suff=''):
         self.subj_file.loc[trial, 'context' + suff] = stimulus[0]
         self.subj_file.loc[trial, 'sad_alien' + suff] = stimulus[1]
         self.subj_file.loc[trial, 'item_chosen' + suff] = action
         self.subj_file.loc[trial, 'reward' + suff] = reward
-        self.subj_file.loc[trial, 'correct'] = correct
+        self.subj_file.loc[trial, 'correct' + suff] = correct
         self.subj_file.loc[trial, 'trial_index'] = trial
+        self.subj_file.loc[trial, 'phase'] = phase
+
+    def add_behavior_comp(self, stimuli, selected, trial, phase, comp_phase, suff=''):
+        self.subj_file.loc[trial, 'item_left' + suff] = str(stimuli[0])
+        self.subj_file.loc[trial, 'item_right' + suff] = str(stimuli[1])
+        self.subj_file.loc[trial, 'item_chosen' + suff] = str(selected)
+        self.subj_file.loc[trial, 'assess'] = comp_phase
+        self.subj_file.loc[trial, 'trial_index'] = trial
+        self.subj_file.loc[trial, 'phase'] = phase
 
     def add_decisions(self, agent, trial, suff='', all_Q_columns=False):
         current_context = int(self.subj_file.loc[trial, 'context'])
