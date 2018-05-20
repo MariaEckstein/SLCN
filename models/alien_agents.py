@@ -30,16 +30,16 @@ class Agent(object):
         if 'flat' in self.learning_style:
             Q_low_dim = [self.n_contexts, self.n_aliens, self.n_actions]
         elif self.learning_style == 'hierarchical':
-            Q_low_dim = [self.n_TS, self.n_aliens, self.n_actions]
+            Q_low_dim = [self.n_TS+1, self.n_aliens, self.n_actions]  # 1 extra TS for rainbow season
         self.Q_low = np.random.normal(self.initial_q_low, self.initial_q_low / 100, Q_low_dim)  # jitter avoids identic.
 
         # Set up values at high (context-TS) level
-        Q_high_dim = [self.n_contexts, self.n_TS]
+        self.Q_high_dim = [self.n_contexts+2, self.n_TS]  # 2 extra contexts for cloudy & rainbow seasons
         if self.learning_style == 's-flat':
-            self.Q_high = np.zeros(Q_high_dim)
+            self.Q_high = np.zeros(self.Q_high_dim)
             self.Q_high[:, 0] = 1  # First col == 1 => There is just one TS that every context uses
         elif self.learning_style == 'flat':
-            self.Q_high = np.eye(self.n_contexts)  # agent always selects the appropriate table
+            self.Q_high = np.eye(self.Q_high_dim[0])  # agent always selects the appropriate table
         elif self.learning_style == 'hierarchical':
             self.initial_q_high = self.initial_q_low
             self.Q_high = np.nan
@@ -62,15 +62,17 @@ class Agent(object):
 
     def select_action(self, stimulus):
         context_switch = self.context != stimulus[0]
-        if self.task_phase != '2CloudySeason':
-            season = stimulus[0]
+        if self.task_phase == '2CloudySeason':
+            context = self.n_contexts  # cloudy season -> new hidden context
+        elif self.task_phase == '5RainbowSeason':
+            context = self.n_contexts+1  # rainbow season -> new rainbow context
         else:
-            season = self.n_contexts  # cloudy season -> hidden context
+            context = stimulus[0]
         if context_switch and (self.learning_style == 'hierarchical'):
-            self.create_new_TS_and_initialize_Q_high(season)
-            self.context = stimulus[0]
+            self.create_new_TS_and_initialize_Q_high(context)
+        self.context = context
         # Translate TS values and action values into action probabilities
-        self.p_TS = self.get_p_from_Q(Q=self.Q_high[season, :], beta=self.beta_high, epsilon=0, select_deterministic=self.select_deterministic)
+        self.p_TS = self.get_p_from_Q(Q=self.Q_high[context, :], beta=self.beta_high, epsilon=0, select_deterministic=self.select_deterministic)
         self.TS = np.random.choice(len(self.p_TS), p=self.p_TS)
         if self.mix_probs:
             self.Q_actions = np.dot(self.p_TS, self.Q_low[:, stimulus[1], :])  # Weighted average for Q_low of all TS
@@ -81,39 +83,42 @@ class Agent(object):
         self.forget_Qs()
         return self.prev_action
 
-    def create_new_TS_and_initialize_Q_high(self, season):
-        prev_season_Qs = []
-        if season not in self.seen_seasons:  # completely new, unseen season
-            self.add_new_TS_column()
-            self.Q_high[season, :] = self.calculate_biased_season_values()
-            self.seen_seasons.append(season)
-        elif self.task_phase == '2CloudySeason':
+    def create_new_TS_and_initialize_Q_high(self, context):
+        if context not in self.seen_seasons:  # completely new, unseen context in InitialLearning, Refreshers, Cloudy
+            prev_season_Qs = self.add_new_TS_column()
+            self.Q_high[context, :] = self.calculate_biased_season_values()
+            self.seen_seasons.append(context)
+        elif self.task_phase in ['2CloudySeason', '5RainbowSeason']:
             prev_season_Qs = self.Q_high[self.context, :]
-            self.Q_high[season, :] = self.calculate_biased_season_values()
+            self.Q_high[context, :] = self.calculate_biased_season_values()
         else:
             prev_season_Qs = self.Q_high[self.context, :]
         # Suppress prev. TS
-        if len(prev_season_Qs) > 0:
+        if (len(prev_season_Qs) > 0) and (self.task_phase != '5RainbowSeason'):
             prev_season_ps = self.get_p_from_Q(prev_season_Qs, self.beta_high, self.epsilon)
-            self.Q_high[season, :] *= (1 - self.suppress_prev_TS * prev_season_ps)
+            self.Q_high[context, :] *= (1 - self.suppress_prev_TS * prev_season_ps)
 
     def add_new_TS_column(self):
-        rand_TS = np.random.normal(self.initial_q_high, self.initial_q_high / 100, [self.n_contexts+1, 1])  # add new TS and create uniform values for new season
+        rand_TS = np.random.normal(self.initial_q_high, self.initial_q_high / 100, self.Q_high_dim)  # add new TS and create uniform values for new season
         if not self.seen_seasons:  # if this is the first season ever encountered (very first trial)
             self.Q_high = rand_TS.copy()
-        elif self.task_phase != '2CloudySeason':  # if other seasons have been encountered and it's not cloudy
+            return []
+        elif self.task_phase != '2CloudySeason':  # has encountered other seasons and it's not cloudy
             self.Q_high = np.append(self.Q_high, rand_TS, axis=1)  # add column with new TS values
+        return self.Q_high[self.context, :]
 
     def calculate_biased_season_values(self):
         rand_values = np.random.normal(self.initial_q_high, self.initial_q_high / 100, [1, self.Q_high.shape[1]])
         if self.seen_seasons:
-            biased_values = np.array([list(np.mean(self.Q_high, axis=0))])  # biased TS values for new season
+            mean_Q_orig_TSs = np.mean(self.Q_high[0:self.n_contexts, :], axis=0)  # biased TS values for new season
+            biased_values = np.array([list(mean_Q_orig_TSs)])  # bring in right shape
             return self.create_TS_biased * biased_values + (1 - self.create_TS_biased) * rand_values
         else:
             return rand_values
 
     def learn(self, stimulus, action, reward):
-        self.update_Qs(self.context, stimulus[1], action, reward)  # self.context => account for cloudy season
+        if self.task_phase != '5RainbowSeason':  # no value updating in rainbow season!
+            self.update_Qs(self.context, stimulus[1], action, reward)  # self.context => account for cloudy season
         self.update_LL(action)
 
     def get_p_from_Q(self, Q, beta, epsilon, select_deterministic=False):
@@ -131,17 +136,17 @@ class Agent(object):
         assert np.round(sum(p_actions), 3) == 1
         return p_actions
 
-    def update_Qs(self, season, alien, action, reward):
-        self.RPEs_high = reward - self.Q_high[season, :]  # Q_high for all TSs, given season
+    def update_Qs(self, context, alien, action, reward):
+        self.RPEs_high = reward - self.Q_high[context, :]  # Q_high for all TSs, given context
         self.RPEs_low = reward - self.Q_low[:, alien, action]  # Q_low for all TSs, given alien & action
         if self.mix_probs:
             self.Q_low[:, alien, action] += self.alpha * self.p_TS * self.RPEs_low  # flat agent: p_TS has just one 1
             if self.learning_style == 'hierarchical':
-                self.Q_high[season, :] += self.alpha_high * self.p_TS * self.RPEs_high
+                self.Q_high[context, :] += self.alpha_high * self.p_TS * self.RPEs_high
         else:
             self.Q_low[self.TS, alien, action] += self.alpha * self.RPEs_low[self.TS]
             if self.learning_style == 'hierarchical':
-                self.Q_high[season, self.TS] += self.alpha_high * self.RPEs_high[self.TS]
+                self.Q_high[context, self.TS] += self.alpha_high * self.RPEs_high[self.TS]
 
     def forget_Qs(self):
         self.Q_low -= self.forget * (self.Q_low - 1)  # decays toward 1 (average of incorrect responses)

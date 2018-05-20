@@ -16,6 +16,8 @@ from fit_parameters import FitParameters
 # Rainbow season! currently agent gets reward and a TS is in place!
 # Save Q and p for competition phase?
 # Test if suppress_prev_TS is working!
+# Make R code work for plotting!
+# Fix context and self.context!
 
 # What should be done?
 interactive_game = False
@@ -25,7 +27,7 @@ simulate_agents = True
 
 # Model fitting parameters
 n_iter = 1
-n_agents = 3
+n_agents = 15
 agent_start_id = 500
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/'
@@ -63,7 +65,7 @@ comp_stuff = {'phases': ['season', 'alien-same-season', 'item', 'alien'],
               'n_blocks': {'season': 3, 'alien-same-season': 3, 'item': 3, 'alien': 3}}
 agent_stuff = {'name': 'alien',
                'n_TS': 3,
-               'learning_style': 'hierarchical',
+               'learning_style': 's-flat',
                'mix_probs': False}
 
 parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'forget', 'suppress_prev_TS', 'create_TS_biased'],  # Rewards <= 10 means than beta is 10 times as much!
@@ -104,9 +106,9 @@ if simulate_agents:
     agent_id = agent_start_id
     while agent_id < agent_start_id + n_agents:
         gen_pars = parameters.create_random_params(scale='lim', mode='soft')
-        gen_pars[np.array(parameters.par_names) == 'epsilon'] = 0
-        gen_pars[np.array(parameters.par_names) == 'forget'] = 0
-        gen_pars[np.array(parameters.par_names) == 'suppress_prev_TS'] = 1
+        for par in parameters.par_names:
+            if par not in ['alpha', 'beta']:
+                gen_pars[np.array(parameters.par_names) == par] = 0
         print('Simulating {0} agent {1} with parameters {2}'.format(
             agent_stuff['learning_style'], agent_id, np.round(gen_pars, 2)))
         agent_stuff['id'] = agent_id

@@ -40,7 +40,8 @@ class FitParameters(object):
             sim_int = SimulateInteractive(agent, self.agent_stuff['mix_probs'])
 
         total_trials = 0
-        for phase in ['1InitialLearning', '2CloudySeason', 'Refresher2', 'Refresher3', '5RainbowSeason']:
+        for phase in ['1InitialLearning', '2CloudySeason', 'Refresher2']:
+            print(phase)
             task.set_phase(phase)
             agent.task_phase = phase
             n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
@@ -63,6 +64,7 @@ class FitParameters(object):
                 total_trials += 1
 
         task.set_phase('3PickAliens')
+        print(task.phase)
         comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
         for trial in range(sum(comp.n_trials)):
             comp.prepare_trial(trial)
@@ -73,6 +75,29 @@ class FitParameters(object):
                 trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
             record_data.add_behavior_comp(stimuli, selected, total_trials, task.phase, comp.current_phase)
             total_trials += 1
+
+        for phase in ['Refresher3', '5RainbowSeason']:
+            print(phase)
+            task.set_phase(phase)
+            agent.task_phase = phase
+            n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
+            for trial in range(n_trials):
+                if interactive:
+                    stimulus = sim_int.trial(trial)
+                    [task.context, task.alien] = stimulus
+                    sim_int.print_values_pre()
+                    action = int(input('Action (0, 1, 2):'))
+                else:
+                    task.prepare_trial(trial)
+                    stimulus = task.present_stimulus(trial)
+                    action = agent.select_action(stimulus)
+                [reward, correct] = task.produce_reward(action)
+                agent.learn(stimulus, action, reward)
+                if interactive:
+                    sim_int.print_values_post(action, reward, correct)
+                record_data.add_behavior(task, stimulus, action, reward, correct, total_trials, phase)
+                record_data.add_decisions(agent, total_trials, suff='', all_Q_columns=all_Q_columns)
+                total_trials += 1
 
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()
