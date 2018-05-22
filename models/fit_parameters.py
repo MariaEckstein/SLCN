@@ -73,7 +73,8 @@ class FitParameters(object):
             if interactive:
                 print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
                 trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
-            record_data.add_behavior_comp(stimuli, selected, total_trials, task.phase, comp.current_phase)
+            record_data.add_behavior_and_decisions_comp(stimuli, selected, agent.Q_stimuli, agent.p_stimuli,
+                                                        total_trials, task.phase, comp.current_phase)
             total_trials += 1
 
         for phase in ['Refresher3', '5RainbowSeason']:

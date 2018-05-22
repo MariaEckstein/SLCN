@@ -44,10 +44,14 @@ class RecordData(object):
         self.subj_file.loc[trial, 'phase'] = phase
         self.subj_file.loc[trial, 'trial_type'] = 'feed-aliens'
 
-    def add_behavior_comp(self, stimuli, selected, trial, phase, comp_phase, suff=''):
+    def add_behavior_and_decisions_comp(self, stimuli, selected, Q_stimuli, p_stimuli, trial, phase, comp_phase, suff=''):
         self.subj_file.loc[trial, 'item_left' + suff] = str(stimuli[0])
         self.subj_file.loc[trial, 'item_right' + suff] = str(stimuli[1])
         self.subj_file.loc[trial, 'item_chosen' + suff] = str(selected)
+        self.subj_file.loc[trial, 'Q_left' + suff] = Q_stimuli[0]
+        self.subj_file.loc[trial, 'Q_right' + suff] = Q_stimuli[1]
+        self.subj_file.loc[trial, 'p_left' + suff] = p_stimuli[0]
+        self.subj_file.loc[trial, 'p_right' + suff] = p_stimuli[1]
         self.subj_file.loc[trial, 'assess'] = comp_phase
         self.subj_file.loc[trial, 'trial_index'] = trial
         self.subj_file.loc[trial, 'phase'] = phase

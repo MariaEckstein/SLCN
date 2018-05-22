@@ -174,7 +174,8 @@ class Agent(object):
     def get_Q_for_stimulus(self, stimulus, phase):
         if phase == 'season':
             # Calculate "stimulus values": Q(c) = \sum_{TS_i} \pi(TS_i|c) Q(TS_i|c)
-            Q_TSi_given_c = self.Q_high[stimulus, :]
+            context = stimulus
+            Q_TSi_given_c = self.Q_high[context, :]
             return self.marginalize(Q_TSi_given_c, self.beta_high)
 
         elif phase == 'alien-same-season':

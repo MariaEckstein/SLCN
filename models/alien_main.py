@@ -28,8 +28,8 @@ simulate_agents = True
 
 # Model fitting parameters
 n_iter = 1
-n_agents = 35
-agent_start_id = 515
+n_agents = 50
+agent_start_id = 500
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/'
 human_data_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1'   # CLUSTER: human_data_path = base_path + '/humanData/'
