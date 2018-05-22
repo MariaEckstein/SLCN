@@ -23,25 +23,35 @@ class Task(object):
         self.phase = np.nan
 
         # Create context order
-        self.contexts = np.empty(0, dtype=int)  # same sequence of contexts for initial learn & cloudy & refreshers
-        # n_blocks_initial_learn = int(self.n_blocks[np.array(self.phases) == '1InitialLearning'])
-        # for block in range(n_blocks_initial_learn):
-        n_trials_initial_learn = self.n_trials_per_phase[np.array(self.phases) == '1InitialLearning']
-        len_block_initial_learn = self.block_lengths[np.array(self.phases) == '1InitialLearning']
-        while len(self.contexts) < n_trials_initial_learn :
-            randomized_contexts = np.random.choice(range(self.n_contexts), size=self.n_contexts, replace=False)
-            new_block = np.concatenate([i * np.ones(len_block_initial_learn, dtype=int) for i in randomized_contexts])
-            if len(self.contexts) == 0:
-                self.contexts = new_block.copy()
-            elif self.contexts[-1] != new_block[0]:
-                self.contexts = np.append(self.contexts, new_block)
+        self.contexts = dict()
+        for phase in self.phases:
+            contexts = np.empty(0, dtype=int)
+            n_trials = self.n_trials_per_phase[np.array(self.phases) == phase]
+            len_block = self.block_lengths[np.array(self.phases) == phase]
+            while len(contexts) < n_trials:
+                if phase != '5RainbowSeason':
+                    randomized_contexts = np.random.choice(range(self.n_contexts), size=self.n_contexts, replace=False)
+                else:
+                    randomized_contexts = [self.n_contexts + 1]
+                new_block = np.concatenate([i * np.ones(len_block, dtype=int) for i in randomized_contexts])
+
+                if phase == '5RainbowSeason':
+                    attach_new_block = True
+                elif len(contexts) > 0:
+                    attach_new_block = contexts[-1] != new_block[0]
+
+                if len(contexts) == 0:
+                    contexts = new_block.copy()
+                elif attach_new_block:
+                    contexts = np.append(contexts, new_block)
+            self.contexts[phase] = contexts
 
     def set_phase(self, new_phase):
         assert new_phase in self.phases
         self.phase = new_phase
 
     def prepare_trial(self, trial):
-        self.context = self.contexts[trial]
+        self.context = self.contexts[self.phase][trial]
         # Get a random order of the four aliens every 4 trials
         if trial % self.n_aliens == 0:  # Every 4th trials, starting at 0
             self.shuffled_aliens = np.random.choice(range(self.n_aliens), size=self.n_aliens, replace=False)
@@ -51,7 +61,10 @@ class Task(object):
         return np.array([self.context, self.alien])
 
     def produce_reward(self, action):
-        reward = self.TS[self.context, self.alien, action]
-        correct = reward > 1
-        noised_reward = max(0, reward + np.round(np.random.normal(0, 0.5), 1))
-        return [np.round(noised_reward, 2), correct]
+        if self.phase == '5RainbowSeason':
+            return [np.nan, np.nan]  # no rewards during rainbow season
+        else:
+            reward = self.TS[self.context, self.alien, action]
+            correct = reward > 1
+            noised_reward = max(0, reward + np.round(np.random.normal(0, 0.5), 1))
+            return [np.round(noised_reward, 2), correct]

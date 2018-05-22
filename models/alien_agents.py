@@ -64,10 +64,8 @@ class Agent(object):
         context_switch = self.context != stimulus[0]
         if self.task_phase == '2CloudySeason':
             context = self.n_contexts  # cloudy season -> new hidden context
-        elif self.task_phase == '5RainbowSeason':
-            context = self.n_contexts+1  # rainbow season -> new rainbow context
         else:
-            context = stimulus[0]
+            context = stimulus[0]  # rainbow season -> new rainbow context (see alien_task)
         if context_switch and (self.learning_style == 'hierarchical'):
             self.create_new_TS_and_initialize_Q_high(context)
         self.context = context

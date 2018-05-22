@@ -42,6 +42,7 @@ class RecordData(object):
         self.subj_file.loc[trial, 'correct' + suff] = correct
         self.subj_file.loc[trial, 'trial_index'] = trial
         self.subj_file.loc[trial, 'phase'] = phase
+        self.subj_file.loc[trial, 'trial_type'] = 'feed-aliens'
 
     def add_behavior_comp(self, stimuli, selected, trial, phase, comp_phase, suff=''):
         self.subj_file.loc[trial, 'item_left' + suff] = str(stimuli[0])
@@ -50,6 +51,7 @@ class RecordData(object):
         self.subj_file.loc[trial, 'assess'] = comp_phase
         self.subj_file.loc[trial, 'trial_index'] = trial
         self.subj_file.loc[trial, 'phase'] = phase
+        self.subj_file.loc[trial, 'trial_type'] = 'pick-aliens'
 
     def add_decisions(self, agent, trial, suff='', all_Q_columns=False):
         current_context = int(self.subj_file.loc[trial, 'context'])
