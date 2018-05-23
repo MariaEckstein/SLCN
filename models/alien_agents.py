@@ -28,7 +28,7 @@ class Agent(object):
         # Set up values at low (stimulus-action) level
         self.initial_q_low = 5. / 3.  # Average reward per alien during training / number of actions
         if 'flat' in self.learning_style:
-            Q_low_dim = [self.n_contexts, self.n_aliens, self.n_actions]
+            Q_low_dim = [self.n_contexts+2, self.n_aliens, self.n_actions]
         elif self.learning_style == 'hierarchical':
             Q_low_dim = [self.n_TS+1, self.n_aliens, self.n_actions]  # 1 extra TS for rainbow season
         self.Q_low = np.random.normal(self.initial_q_low, self.initial_q_low / 100, Q_low_dim)  # jitter avoids identic.
@@ -168,14 +168,14 @@ class Agent(object):
 
     def get_p_TSi(self):
         # \pi(TS_i) = \sum_{c_j} \pi(TS_i|c_j) p(c_j)
-        p_TSi_given_cj = [self.get_p_from_Q(self.Q_high[c, :], self.beta_high, self.epsilon) for c in range(self.n_contexts)]
+        p_TSi_given_cj = [self.get_p_from_Q(self.Q_high[c, :self.n_TS], self.beta_high, self.epsilon) for c in range(self.n_contexts)]
         return np.mean(p_TSi_given_cj, axis=0)
 
     def get_Q_for_stimulus(self, stimulus, phase):
         if phase == 'season':
             # Calculate "stimulus values": Q(c) = \sum_{TS_i} \pi(TS_i|c) Q(TS_i|c)
             context = stimulus
-            Q_TSi_given_c = self.Q_high[context, :]
+            Q_TSi_given_c = self.Q_high[context, :self.n_TS]
             return self.marginalize(Q_TSi_given_c, self.beta_high)
 
         elif phase == 'alien-same-season':
@@ -184,11 +184,11 @@ class Agent(object):
             alien = stimulus[1]
 
             # Q(s|TS) = \sum_{a_i} \pi(a_i|s,TS) Q(a_i|s,TS)
-            Q_ai_given_s_TSi = self.Q_low[:, alien, :]
+            Q_ai_given_s_TSi = self.Q_low[:self.n_TS, alien, :]
             Q_s_given_TSi = [self.marginalize(Q_ai_given_s_TSi[TSi, :], self.beta) for TSi in range(self.n_TS)]
 
             # \pi(TS_i|c) = softmax(Q(TS_i|c))
-            Q_TSi_given_c = self.Q_high[context, :]
+            Q_TSi_given_c = self.Q_high[context, :self.n_TS]
             p_TSi_given_c = self.get_p_from_Q(Q_TSi_given_c, self.beta_high, self.epsilon)
 
             # Q(s,c) = \sum_{TS_i} \pi(TS_i|c) Q(s|TS_i)
@@ -198,7 +198,7 @@ class Agent(object):
             item = stimulus
 
             # Q(a|TS) = \sum_{s_i} \pi(a|s_i,TS) Q(a|s_i,TS)
-            Q_a_given_s_TS = self.Q_low[:, :, item]
+            Q_a_given_s_TS = self.Q_low[:self.n_TS, :, item]
             Q_a_given_TS = [self.marginalize(Q_a_given_s_TS[TSi, :], self.beta) for TSi in range(self.n_TS)]
 
             # Q(a) = \sum_{TS_i} Q(a|TS_i) \pi(TS_i)
@@ -209,7 +209,7 @@ class Agent(object):
             alien = stimulus
 
             # Q(s|TS) = \sum_{a_i} \pi(a_i|s,TS) Q(a_i|s,TS)
-            Q_a_given_s_TS = self.Q_low[:, alien, :]
+            Q_a_given_s_TS = self.Q_low[:self.n_TS, alien, :]
             Q_s_given_TS = [self.marginalize(Q_a_given_s_TS[TSi, :], beta=self.beta) for TSi in range(self.n_TS)]
 
             # Q(s) = \sum_{TS_i} Q(s|TS_i) \pi(TS_i)
