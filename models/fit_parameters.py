@@ -41,11 +41,15 @@ class FitParameters(object):
 
         total_trials = 0
         for phase in ['1InitialLearning', '2CloudySeason', 'Refresher2']:
+            if phase == '2CloudySeason':
+                stop_here = True
             print(phase)
             task.set_phase(phase)
             agent.task_phase = phase
             n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
             for trial in range(n_trials):
+                if trial == 0 and phase == '2CloudySeason':
+                    agent.prev_context = 99
                 if interactive:
                     stimulus = sim_int.trial(trial)
                     [task.context, task.alien] = stimulus

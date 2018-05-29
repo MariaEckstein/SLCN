@@ -12,12 +12,9 @@ from fit_parameters import FitParameters
 # suppress at level of policy (i.e., within softmax Q_to_p)
 
 # TDs / bugs
-# First trial is currently not recorded (the data files are missing the alien in the first trial)
-# Get order of the phases right (competition after Refresher2) -> integrate competition_phase.py into alien_task.py
-# Rainbow season! currently agent gets reward and a TS is in place!
+# Calculate Q(TS) by hand from Q_low for flat agents in competition phase (alien-same-season)!
+# Record the right Q_high in cloudy season in alien_record_data (index 4)!
 # Save Q and p for competition phase?
-# Test if suppress_prev_TS is working!
-# Make R code work for plotting!
 # Fix context and self.context!
 
 # What should be done?
@@ -28,8 +25,8 @@ simulate_agents = True
 
 # Model fitting parameters
 n_iter = 1
-n_agents = 50
-agent_start_id = 500
+n_agents = 100
+agent_start_id = 800
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/'
 human_data_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1'   # CLUSTER: human_data_path = base_path + '/humanData/'
@@ -66,7 +63,7 @@ comp_stuff = {'phases': ['season', 'alien-same-season', 'item', 'alien'],
               'n_blocks': {'season': 3, 'alien-same-season': 3, 'item': 3, 'alien': 3}}
 agent_stuff = {'name': 'alien',
                'n_TS': 3,
-               'learning_style': 's-flat',
+               'learning_style': 'hierarchical',
                'mix_probs': False}
 
 parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'forget', 'suppress_prev_TS', 'create_TS_biased'],  # Rewards <= 10 means than beta is 10 times as much!
@@ -108,7 +105,7 @@ if simulate_agents:
     while agent_id < agent_start_id + n_agents:
         gen_pars = parameters.create_random_params(scale='lim', mode='soft')
         for par in parameters.par_names:
-            if par not in ['alpha', 'beta']:
+            if par not in ['alpha', 'beta', 'create_TS_biased']:
                 gen_pars[np.array(parameters.par_names) == par] = 0
         print('Simulating {0} agent {1} with parameters {2}'.format(
             agent_stuff['learning_style'], agent_id, np.round(gen_pars, 2)))
