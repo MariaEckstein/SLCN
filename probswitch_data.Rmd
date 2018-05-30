@@ -7,17 +7,25 @@ output: html_notebook
 
 ```{r Set up parameters}
 gg_save = T
-data = "fitted_human"  # Can be "human", "fitted_human", or "fitted_sim"
-library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); source("functions.R"); library("R.matlab")
+data = "human"  # Can be "human", "fitted_human", or "fitted_sim"
+library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); source("functions.R"); library("R.matlab"); library("zoo")
 
 base_dir = "C:/Users/maria/MEGAsync/SLCNdata/PSResults"
 plot_dir = file.path(base_dir, "plots")
   
 if (data == "fitted_human") {
   base_dir = file.path(base_dir, "humans")
+  ages = read.csv("C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo.csv")
 } else if (data == "fitted_sim") {
   base_dir = "C:/Users/maria/MEGAsync/SLCN/PSGenRec"
   genrec_dir = base_dir
+} else if (data == "human") {
+  ages = read.csv("C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo.csv")
+  ages$age_group = "Adults"
+  ages$age_group[ages$PreciseYrs < 18] = "Teens"
+  ages$age_group[ages$PreciseYrs < 13] = "Children"
+  ages$age_group = factor(ages$age_group, levels = c("Children", "Teens", "Adults"))
+  ages
 }
 unlink(plot_dir, recursive=TRUE)  # Delete old plots
 dir.create(plot_dir)
@@ -26,8 +34,11 @@ dir.create(plot_dir)
 all_params = data.frame()
 all_files = data.frame()
 all_files = read_in_files()
-all_files$learning_style = factor(all_files$learning_style)
-all_files$method = factor(all_files$method)
+all_files = merge(all_files, ages, by.x = "sID", by.y = "ID", all.x = T)
+if (data == "fitted_humans") {
+  all_files$learning_style = factor(all_files$learning_style)
+  all_files$method = factor(all_files$method)
+}
 all_files$age_group = factor(ifelse(all_files$sID > 300, "Adults", "Children"))
 summary(all_files)
 # Parameters
@@ -74,36 +85,179 @@ if (data == "fitted_sim") {
 }
 
 # Get within-subject differences
-all_paramsw1 = reshape(subset(all_params, select = c("sID", "age_group", "BIC", "learning_style", "method")),
-        timevar = "learning_style", idvar = c("sID", "age_group", "method"), direction = "wide")
-all_paramsw2 = reshape(all_paramsw1,
-        timevar = "method", idvar = c("sID", "age_group"), direction = "wide")
-ggplot(all_paramsw2, aes(sID, `BIC.Bayes.epsilon-greedy` - BIC.Bayes.softmax, color = sID)) +
-  geom_point(position = "jitter") +
-  geom_hline(yintercept = 0, linetype = "dotted")
-
-all_paramsl = melt(all_params, measure.vars = c("BIC", "AIC"), variable.name = "measure")
-gg_fit = ggplot(subset(all_paramsl, measure == "BIC"), aes(learning_style, value, color = learning_style)) +
-  stat_summary(fun.data = "mean_se", geom = "pointrange") +
-  # geom_point(position = "jitter", alpha = 0.5) +
-  facet_grid(age_group ~ method) +
-  labs(x = "", y = "BIC")
-  theme(legend.position = "none")
-
-fitted_paramsl = melt(all_params, measure.vars = c("alpha", "beta", "epsilon", "perseverance", "decay"), variable.name = "parameter")
-fitted_paramsl[fitted_paramsl$parameter == 'beta', 'value'] = fitted_paramsl[fitted_paramsl$parameter == 'beta', 'value'] / 10
-gg_params = ggplot(fitted_paramsl, aes(parameter, value, color = age_group, fill = age_group)) +
-  stat_summary(fun.data = "mean_se", geom = "pointrange", position = position_dodge(width = 0.8)) +
-  # geom_point(position = "jitter", alpha = 0.3) +
-  labs(x = "", y = "Parameter value", color = "Age group", fill = "Age group") +
-  facet_grid(learning_style ~ method)
-
-if (gg_save) {
-  ggsave(file.path(plot_dir, "gg_fit2.png"), gg_fit)
-  ggsave(file.path(plot_dir, "gg_params.png"), gg_params)
+if (data == "fitted_humans") {
+  all_paramsw1 = reshape(subset(all_params, select = c("sID", "age_group", "BIC", "learning_style", "method")),
+          timevar = "learning_style", idvar = c("sID", "age_group", "method"), direction = "wide")
+  all_paramsw2 = reshape(all_paramsw1,
+          timevar = "method", idvar = c("sID", "age_group"), direction = "wide")
+  ggplot(all_paramsw2, aes(sID, `BIC.Bayes.epsilon-greedy` - BIC.Bayes.softmax, color = sID)) +
+    geom_point(position = "jitter") +
+    geom_hline(yintercept = 0, linetype = "dotted")
+  
+  all_paramsl = melt(all_params, measure.vars = c("BIC", "AIC"), variable.name = "measure")
+  gg_fit = ggplot(subset(all_paramsl, measure == "BIC"), aes(learning_style, value, color = learning_style)) +
+    stat_summary(fun.data = "mean_se", geom = "pointrange") +
+    # geom_point(position = "jitter", alpha = 0.5) +
+    facet_grid(age_group ~ method) +
+    labs(x = "", y = "BIC")
+    theme(legend.position = "none")
+  
+  fitted_paramsl = melt(all_params, measure.vars = c("alpha", "beta", "epsilon", "perseverance", "decay"), variable.name = "parameter")
+  fitted_paramsl[fitted_paramsl$parameter == 'beta', 'value'] = fitted_paramsl[fitted_paramsl$parameter == 'beta', 'value'] / 10
+  gg_params = ggplot(fitted_paramsl, aes(parameter, value, color = age_group, fill = age_group)) +
+    stat_summary(fun.data = "mean_se", geom = "pointrange", position = position_dodge(width = 0.8)) +
+    # geom_point(position = "jitter", alpha = 0.3) +
+    labs(x = "", y = "Parameter value", color = "Age group", fill = "Age group") +
+    facet_grid(learning_style ~ method)
+  
+  if (gg_save) {
+    ggsave(file.path(plot_dir, "gg_fit2.png"), gg_fit)
+    ggsave(file.path(plot_dir, "gg_params.png"), gg_params)
+  }
 }
 
 paper_plots()
+all_files
+all_files_regr
+```
+```{r Relationship with age and puberty: P(right) ~ prev_action * reward}
+# Prepare data
+all_files_regr = subset(all_files, select = c("sID", "reward", "TrialID", "selected_box"))
+## Choice regressors
+all_files_regr$right = all_files_regr$selected_box
+all_files_regr$right[all_files_regr$reward == 0] = - all_files_regr$right[all_files_regr$reward == 0]
+all_files_regr$left = 1 - all_files_regr$selected_box
+all_files_regr$left[all_files_regr$reward == 0] = - all_files_regr$left[all_files_regr$reward == 0]
+## Reward regressors
+all_files_regr$reward = all_files_regr$reward
+all_files_regr$reward[all_files_regr$selected_box == 0] = - all_files_regr$reward[all_files_regr$selected_box == 0]
+all_files_regr$noReward = 1 - all_files_regr$reward
+all_files_regr$noReward[all_files_regr$selected_box == 0] = - all_files_regr$noReward[all_files_regr$selected_box == 0]
+all_files_regr$selected_box = factor(all_files_regr$selected_box)
+
+# Run regression models for each subject, for each n in n-back
+choice_predictors = c("left", "right")
+reward_predictors = c("reward", "noReward")
+
+nback_regr_dat = data.frame()
+for (subj in unique(all_files_regr$sID)) {
+  for (n in 1:12) {
+    subj_dat = subset(all_files_regr, sID == subj, !is.na(selected_box))
+    ## Add nback columns 
+    for (cond in c(choice_predictors, reward_predictors)) {
+      col_name = paste0("back", n, cond)
+      subj_dat[,col_name] = c(rep(NA, n), subj_dat[1:(nrow(subj_dat)-n), cond])
+    }
+    ## Choice model (predictors: left [reward: +1, no reward: -1], right [reward: +1, no reward: -1])
+    choice_formula = paste("selected_box ~ ", paste(paste0("back", n, choice_predictors), collapse = "+"))
+    choice_mod = glm(as.formula(choice_formula),
+              family = "binomial",
+              data = subj_dat)
+    choice_coefs = as.data.frame(summary(choice_mod)$coef)
+    choice_coefss = cbind(sID = subj, predictor = rownames(choice_coefs), back = n, data.frame(choice_coefs, row.names = NULL))
+    ## Reward model (predictors: reward [left: -1, right: +1], no reward [left: -1, right: +1])
+    reward_formula = paste("selected_box ~ ", paste(paste0("back", n, reward_predictors), collapse = "+"))
+    reward_mod = glm(as.formula(reward_formula),
+              family = "binomial",
+              data = subj_dat)
+    reward_coefs = as.data.frame(summary(reward_mod)$coef)
+    reward_coefss = cbind(sID = subj, predictor = rownames(reward_coefs), back = n, data.frame(reward_coefs, row.names = NULL))
+    
+    nback_regr_dat = rbind(nback_regr_dat, choice_coefss, reward_coefss)
+  }
+}
+
+# Beautify
+nback_regr_dat = merge(nback_regr_dat, ages, by.x = "sID", by.y = "ID", all.x = T)
+nback_regr_dat$predictor = gsub("back.", "", nback_regr_dat$predictor)
+nback_regr_dat$predictor = gsub("[0-99]", "", nback_regr_dat$predictor)
+
+# Plot
+gg_nback_regr_choice_agecont =
+  ggplot(subset(nback_regr_dat, predictor %in% c("left", "right") & back %in% seq(2, 12, 2)),
+         aes(PreciseYrs, Estimate, color = predictor, fill = predictor, alpha = factor(12 - back))) +
+  geom_smooth() +
+  geom_point() +
+  labs(x = "Age (years)", y = "P(right) ~ choice_reward", color = "Choice", fill = "Choice", alpha = "# Trials back: 12-...")
+gg_nback_regr_reward_agecont = gg_nback_regr_choice_agecont
+gg_nback_regr_reward_agecont$data = subset(nback_regr_dat, predictor %in% c("reward", "noReward") & back %in% seq(2, 12, 2) & Estimate < 15)
+
+gg_nback_regr_choice_agecats =
+  ggplot(subset(nback_regr_dat, predictor %in% c("left", "right")), aes(back, Estimate, color = predictor, group = predictor)) +
+  stat_summary(fun.data = mean_se, geom = "bar") +
+  stat_summary(fun.data = mean_se, geom = "pointrange", color = "black") +
+  geom_point(position = "jitter", alpha = 0.15) +
+  labs(x = "# trials back", y = "beta weight", color = "Side") +
+  facet_grid(~ age_group)
+gg_nback_regr_reward_agecats = gg_nback_regr_choice_agecats
+gg_nback_regr_reward_agecats$data = subset(nback_regr_dat, predictor %in% c("reward", "noReward") & Estimate < 15)
+
+# Save plots
+ggsave(file.path(plot_dir, "gg_nback_regr_reward_agecats.png"), gg_nback_regr_reward_agecats)
+ggsave(file.path(plot_dir, "gg_nback_regr_choice_agecats.png"), gg_nback_regr_choice_agecats)
+ggsave(file.path(plot_dir, "gg_nback_regr_reward_agecont.png"), gg_nback_regr_reward_agecont)
+ggsave(file.path(plot_dir, "gg_nback_regr_choice_agecont.png"), gg_nback_regr_choice_agecont)
+```
+```{r Relationship with age and puberty: Other measures}
+# Overall ACC
+sum_dat = ddply(all_files, .(sID, PreciseYrs, Gender, Category, PDS), summarize,
+                mean_ACC = mean(ACC, na.rm = T),
+                median_RT = median(RT, na.rm = T))
+
+gg_age_ACC = ggplot(sum_dat, aes(PreciseYrs, mean_ACC)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+  # stat_summary(fun.data = "mean_se", geom = "pointrange")
+gg_age_RT = gg_age_ACC + aes(y = median_RT)
+gg_PDS_ACC = gg_age_ACC + aes(x = PDS)
+gg_PDS_RT = gg_PDS_ACC + aes(y = median_RT)
+
+# Trials to reach criterion
+all_files$roll_ACC = rollmean(all_files$ACC, 3, fill = NA, align = "right")
+all_files$roll_ACC[all_files$trialsinceswitch >= 0 & all_files$trialsinceswitch < 2] = NA
+all_files$criterion_2of3 = all_files$roll_ACC >= 0.6
+criterion_dat = ddply(subset(all_files, criterion_2of3 == T & trialsinceswitch > 0), .(sID, PreciseYrs, Gender, Category, PDS, block), summarize,
+      trials_to_criterion = min(trialsinceswitch))
+
+gg_age_criterion = ggplot(criterion_dat, aes(PreciseYrs, trials_to_criterion)) +
+  geom_point()
+gg_PDS_criterion = gg_age_criterion + aes(x = round(PDS * 2) / 2)
+
+# Prominence of WSLS
+wsls_wide = reshape(subset(wsls, select = -age_group), direction = "wide", timevar = "reward", idvar = "sID")
+wsls_wide$wsls = with(wsls_wide, stay.1 + (1 - stay.0))
+wsls_wide = merge(wsls_wide, ages, by.x = "sID", by.y = "ID", all.x = T)
+wsls = merge(wsls, ages, by.x = "sID", by.y = "ID", all.x = T)
+
+ggplot(wsls, aes(PreciseYrs, stay, color = reward)) +
+  geom_point()
+
+gg_age_wsls = ggplot(wsls_wide, aes(PreciseYrs, wsls)) +
+  geom_point()
+gg_PDS_wsls = gg_age_wsls + aes(x = round(PDS * 2) / 2)
+
+summary(all_files$block)
+
+# Effect of reward history
+all_files
+rewhist_dat = ddply(all_files, .(sID, outcome_12_back), summarize,
+                    stay = sum(same_choice, na.rm = T))
+rewhist_dat = merge(rewhist_dat, ages, by.x = "sID", by.y = "ID", all.x = T)
+gg_age_rewhist = ggplot(subset(rewhist_dat, !is.na(outcome_12_back)), aes(PreciseYrs, stay, color = outcome_12_back)) +
+  stat_summary(fun.data = "mean_se", geom = "pointrange")
+gg_PDS_rewhist = gg_age_rewhist + aes(x = round(PDS * 2) / 2)
+
+# Save plots
+ggsave(file.path(plot_dir, "gg_age_criterion.png"), gg_age_criterion)
+ggsave(file.path(plot_dir, "gg_PDS_criterion.png"), gg_PDS_criterion)
+ggsave(file.path(plot_dir, "gg_PDS_ACC.png"), gg_PDS_ACC)
+ggsave(file.path(plot_dir, "gg_age_ACC.png"), gg_age_ACC)
+ggsave(file.path(plot_dir, "gg_age_RT.png"), gg_age_RT)
+ggsave(file.path(plot_dir, "gg_PDS_RT.png"), gg_PDS_RT)
+ggsave(file.path(plot_dir, "gg_age_wsls.png"), gg_age_wsls)
+ggsave(file.path(plot_dir, "gg_PDS_wsls.png"), gg_PDS_wsls)
+ggsave(file.path(plot_dir, "gg_age_rewhist.png"), gg_age_rewhist)
+ggsave(file.path(plot_dir, "gg_PDS_rewhist.png"), gg_PDS_rewhist)
 ```
 ```{r Start button}
 ```

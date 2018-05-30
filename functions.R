@@ -77,9 +77,8 @@ read_in_files = function() {
   all_files$choice_12_back = ifelse(all_files$choice_1_back, "left", "right")
   all_files$choice_12_back[!all_files$same_choice | is.na(all_files$same_choice)] = NA
   all_files$reward_port = factor(all_files$correct_box, levels = c(0, 1), labels = c("Left", "Right"))
-  all_files$age_group = "Children"
-  all_files$age_group[all_files$sID >= 300] = "Adults"
   all_files$age_group[all_files$sID >= 1000] = "Simulated"
+  all_files = subset(all_files, sID > 16)
   
   return(all_files)
 }
