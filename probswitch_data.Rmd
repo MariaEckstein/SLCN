@@ -199,15 +199,19 @@ ggsave(file.path(plot_dir, "gg_nback_regr_reward_agecont.png"), gg_nback_regr_re
 ggsave(file.path(plot_dir, "gg_nback_regr_choice_agecont.png"), gg_nback_regr_choice_agecont)
 ```
 ```{r Relationship with age and puberty: Other measures}
+# RT variability || age
+# RT ~ trialID || age
+# add regression lines to plots
+
 # Overall ACC
 sum_dat = ddply(all_files, .(sID, PreciseYrs, Gender, Category, PDS), summarize,
                 mean_ACC = mean(ACC, na.rm = T),
                 median_RT = median(RT, na.rm = T))
 
-gg_age_ACC = ggplot(sum_dat, aes(PreciseYrs, mean_ACC)) +
+gg_age_ACC =
+  ggplot(sum_dat, aes(PreciseYrs, mean_ACC)) +
   geom_point() +
-  geom_smooth(method = "lm")
-  # stat_summary(fun.data = "mean_se", geom = "pointrange")
+  geom_smooth()
 gg_age_RT = gg_age_ACC + aes(y = median_RT)
 gg_PDS_ACC = gg_age_ACC + aes(x = PDS)
 gg_PDS_RT = gg_PDS_ACC + aes(y = median_RT)
@@ -220,7 +224,8 @@ criterion_dat = ddply(subset(all_files, criterion_2of3 == T & trialsinceswitch >
       trials_to_criterion = min(trialsinceswitch))
 
 gg_age_criterion = ggplot(criterion_dat, aes(PreciseYrs, trials_to_criterion)) +
-  geom_point()
+  geom_point() +
+  geom_smooth()
 gg_PDS_criterion = gg_age_criterion + aes(x = round(PDS * 2) / 2)
 
 # Prominence of WSLS
@@ -229,23 +234,21 @@ wsls_wide$wsls = with(wsls_wide, stay.1 + (1 - stay.0))
 wsls_wide = merge(wsls_wide, ages, by.x = "sID", by.y = "ID", all.x = T)
 wsls = merge(wsls, ages, by.x = "sID", by.y = "ID", all.x = T)
 
-ggplot(wsls, aes(PreciseYrs, stay, color = reward)) +
-  geom_point()
-
-gg_age_wsls = ggplot(wsls_wide, aes(PreciseYrs, wsls)) +
-  geom_point()
-gg_PDS_wsls = gg_age_wsls + aes(x = round(PDS * 2) / 2)
-
-summary(all_files$block)
+gg_age_wsls = ggplot(wsls, aes(PreciseYrs, stay, color = reward)) +
+  geom_point() +
+  geom_smooth()
+gg_PDS_wsls = gg_age_wsls + aes(x = PDS)
 
 # Effect of reward history
 all_files
 rewhist_dat = ddply(all_files, .(sID, outcome_12_back), summarize,
                     stay = sum(same_choice, na.rm = T))
 rewhist_dat = merge(rewhist_dat, ages, by.x = "sID", by.y = "ID", all.x = T)
-gg_age_rewhist = ggplot(subset(rewhist_dat, !is.na(outcome_12_back)), aes(PreciseYrs, stay, color = outcome_12_back)) +
-  stat_summary(fun.data = "mean_se", geom = "pointrange")
-gg_PDS_rewhist = gg_age_rewhist + aes(x = round(PDS * 2) / 2)
+# gg_age_rewhist =
+  ggplot(subset(rewhist_dat, !is.na(outcome_12_back)), aes(PreciseYrs, stay, color = outcome_12_back)) +
+  geom_point() +
+    geom_smooth()
+gg_PDS_rewhist = gg_age_rewhist + aes(x = PDS)
 
 # Save plots
 ggsave(file.path(plot_dir, "gg_age_criterion.png"), gg_age_criterion)
