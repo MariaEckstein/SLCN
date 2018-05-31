@@ -14,9 +14,11 @@ class Agent(object):
         self.select_deterministic = 'flat' in self.learning_style  # Hack to select the right TS each time for the flat agent
         self.mix_probs = agent_stuff['mix_probs']
         self.id = agent_stuff['id']
-        [self.alpha, self.beta, self.epsilon, self.forget, self.suppress_prev_TS, self.create_TS_biased] = all_params_lim
-        self.alpha_high = self.alpha  # TD
-        self.beta_high = 10 * self.beta
+        [self.alpha, self.alpha_high,
+         self.beta, self.beta_high,
+         self.epsilon,
+         self.forget,
+         self.create_TS_biased] = all_params_lim
         self.forget_high = self.forget
         self.task_phase = np.nan
         assert self.alpha > 0  # Make sure that alpha is a number and is > 0
@@ -75,7 +77,7 @@ class Agent(object):
         self.p_TS = self.get_p_from_Q(Q=self.Q_high[context, :], beta=self.beta_high, epsilon=0, select_deterministic=self.select_deterministic)
         self.TS = np.random.choice(len(self.p_TS), p=self.p_TS)
         if self.mix_probs:
-            self.Q_actions = np.dot(self.p_TS, self.Q_low[:, stimulus[1], :])  # Weighted average for Q_low of all TS
+            self.Q_actions = np.dot(self.p_TS, self.Q_low[0:len(self.p_TS), stimulus[1], :])  # Weighted average for Q_low of all TS
         else:
             self.Q_actions = self.Q_low[self.TS, stimulus[1], :]  # Q_low of the highest-valued TS
         self.p_actions = self.get_p_from_Q(Q=self.Q_actions, beta=self.beta, epsilon=self.epsilon)
@@ -84,7 +86,7 @@ class Agent(object):
         return self.prev_action
 
     def create_new_TS_and_initialize_Q_high(self, context):
-        if context not in self.seen_seasons:  # completely new, unseen context in InitialLearning, Refreshers, Cloudy
+        if context not in self.seen_seasons:  # completely new, unseen context in InitialLearning, Refreshers, Cloudy, Rainbow
             self.add_new_TS_column()
             self.Q_high[context, :] = self.calculate_biased_season_values()
             self.seen_seasons.append(context)

@@ -26,7 +26,7 @@ simulate_agents = True
 # Model fitting parameters
 n_iter = 1
 n_agents = 100
-agent_start_id = 800
+agent_start_id = 200
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/'
 human_data_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1'   # CLUSTER: human_data_path = base_path + '/humanData/'
@@ -66,13 +66,13 @@ agent_stuff = {'name': 'alien',
                'learning_style': 'hierarchical',
                'mix_probs': False}
 
-parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'forget', 'suppress_prev_TS', 'create_TS_biased'],  # Rewards <= 10 means than beta is 10 times as much!
+parameters = Parameters(par_names=['alpha', 'alpha_high', 'beta', 'beta_high', 'epsilon', 'forget', 'create_TS_biased'],  # Rewards <= 10 means than beta is 10 times as much!
                         fit_pars=np.ones(6, dtype=bool),  # which parameters will be fitted?
-                        par_hard_limits=((0., 1.),  (0., 15.), (0., 1.),   (0., 1.),  (0., 1.), (0., 1.)),  # no values fitted outside
-                        par_soft_limits=((0., 0.5), (1., 6.),  (0., 0.25), (0., 0.1), (0., 1.), (0., 1.)),  # no simulations outside
-                        default_pars_lim=np.array([0.1, 1., 0., 0., 0., 0.]))  # when a parameter is fixed
+                        par_hard_limits=((0., 1.), (0., 1.), (0., 15.), (0., 15.), (0., 1.),  (0., 1.), (0., 1.)),  # no values fitted outside
+                        par_soft_limits=((0., .5), (0., .5), (1., 6.),  (1., 6.),  (0., .25), (0., .1), (0., 1.)),  # no simulations outside
+                        default_pars_lim=np.array([.1, .1, 1., 1., 0., 0., 0., 0., 0.]))  # when a parameter is fixed
 gen_pars = parameters.default_pars_lim
-gen_pars[np.array(parameters.par_names) == 'epsilon'] = 0
+# gen_pars[np.array(parameters.par_names) == 'epsilon'] = 0
 
 # Play the game to test everything
 if interactive_game:
@@ -105,7 +105,7 @@ if simulate_agents:
     while agent_id < agent_start_id + n_agents:
         gen_pars = parameters.create_random_params(scale='lim', mode='soft')
         for par in parameters.par_names:
-            if par not in ['alpha', 'beta', 'create_TS_biased']:
+            if par not in ['alpha', 'alpha_high', 'beta', 'beta_high', 'forget', 'create_TS_biased']:
                 gen_pars[np.array(parameters.par_names) == par] = 0
         print('Simulating {0} agent {1} with parameters {2}'.format(
             agent_stuff['learning_style'], agent_id, np.round(gen_pars, 2)))
