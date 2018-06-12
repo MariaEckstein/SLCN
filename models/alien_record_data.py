@@ -62,7 +62,7 @@ class RecordData(object):
         current_context = int(self.subj_file.loc[trial, 'context'])
         current_TS = int(agent.TS)
         current_alien = int(self.subj_file.loc[trial, 'sad_alien'])
-        current_item_chosen = int(self.subj_file.loc[trial, 'item_chosen'])
+        current_item_chosen = int(float(self.subj_file.loc[trial, 'item_chosen']))
         self.subj_file.loc[trial, 'LL' + suff] = agent.LL
         self.subj_file.loc[trial, 'TS' + suff] = current_TS
         # Q_high and Q_low for the current trial's TS and chosen item, respectively

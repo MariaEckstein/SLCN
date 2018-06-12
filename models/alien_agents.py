@@ -19,10 +19,16 @@ class Agent(object):
          self.epsilon,
          self.forget,
          self.create_TS_biased] = all_params_lim
+        self.beta = 6 * self.beta  # all parameters are on the same scale for fitting [0; 1]
+        if self.alpha_high < 1e-5:
+            self.alpha_high = self.alpha
+        if self.beta_high < 1e-5:
+            self.beta_high = self.beta
+        print(self.alpha, self.beta)
         self.forget_high = self.forget
         self.task_phase = np.nan
         assert self.alpha > 0  # Make sure that alpha is a number and is > 0
-        assert self.beta >= 1
+        assert self.beta >= 0
         assert self.epsilon >= 0
         assert self.mix_probs in [True, False]
         assert self.learning_style in ['s-flat', 'flat', 'hierarchical']
@@ -174,11 +180,10 @@ class Agent(object):
                 Q_TSi_given_c = self.Q_high[context, :self.n_TS]
                 return self.marginalize(Q_TSi_given_c, self.beta_high)
             else:
-                # Context value = mean value across aliens: Q(c) = \mean_{s_j} \sum_{a_i} Q(a_i|s_j,c) \pi(a_i|s_j,c)
+                # Context value = average value across aliens: Q(c) = \mean_{s_j} \sum_{a_i} Q(a_i|s_j,c) \pi(a_i|s_j,c)
                 return np.mean([self.marginalize(self.Q_low[context, alien, :], self.beta) for alien in range(self.n_aliens)])
 
         elif phase == 'alien-same-season':
-            # Also "stimulus values"
             context = stimulus[0]
             alien = stimulus[1]
 

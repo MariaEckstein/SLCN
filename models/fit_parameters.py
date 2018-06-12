@@ -1,5 +1,4 @@
 import numpy as np
-import ast
 import pandas as pd
 from scipy.optimize import minimize
 from scipy.optimize import brute
@@ -41,9 +40,6 @@ class FitParameters(object):
 
         total_trials = 0
         for phase in ['1InitialLearning', '2CloudySeason', 'Refresher2']:
-            if phase == '2CloudySeason':
-                stop_here = True
-            print(phase)
             task.set_phase(phase)
             agent.task_phase = phase
             n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
@@ -68,7 +64,6 @@ class FitParameters(object):
                 total_trials += 1
 
         task.set_phase('3PickAliens')
-        print(task.phase)
         comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
         for trial in range(sum(comp.n_trials)):
             comp.prepare_trial(trial)
@@ -82,7 +77,6 @@ class FitParameters(object):
             total_trials += 1
 
         for phase in ['Refresher3', '5RainbowSeason']:
-            print(phase)
             task.set_phase(phase)
             agent.task_phase = phase
             n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
@@ -134,13 +128,11 @@ class FitParameters(object):
         n_trials = len(agent_data)
         for trial in range(n_trials):
             if 'alien' in self.agent_stuff['name']:
-                if np.isnan(agent_data['context'][trial]):
-                    break
                 context = int(agent_data['context'][trial])
                 sad_alien = int(agent_data['sad_alien'][trial])
                 stimulus = np.array([context, sad_alien])
                 agent.select_action(stimulus)  # calculate p_actions
-                action = int(agent_data['item_chosen'][trial])
+                action = int(float(agent_data['item_chosen'][trial]))
             elif 'PS' in self.agent_stuff['name']:
                 stimulus = np.nan
                 agent.select_action(stimulus)  # calculate p_actions
@@ -154,6 +146,7 @@ class FitParameters(object):
         AIC = - 2 * agent.LL + self.n_fit_par
 
         if goal == 'calculate_NLL':
+            print(-agent.LL, params_inf)
             return -agent.LL
         elif goal == 'calculate_fit':
             return [-agent.LL, BIC, AIC]
@@ -163,27 +156,49 @@ class FitParameters(object):
             return record_data.get()
 
     def get_optimal_pars(self, agent_data, n_iter, default_pars_lim="default"):
-        # x0 = brute(func=self.calculate_NLL,
-        #            ranges=self.parameters.par_hard_limits,  # should be in the form (slice(-4, 4, 0.25), slice(-4, 4, 0.25))
-        #            args=agent_data,
-        #            full_output=True,
-        #            finish=None)  # should try! https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.brute.html#scipy.optimize.brute
-        # optimized_params = self.parameters.inf_to_lim(x0)
         if default_pars_lim == "default":
             default_pars_lim = self.parameters.default_pars_lim
 
-        # Find the minimum of n_iter different start values to get fit parameters
-        values = np.zeros([n_iter, self.n_fit_par + 1])
-        for iter in range(n_iter):
-            start_par_inf = self.parameters.create_random_params(scale='inf', get_all=False)
-            minimization = minimize(self.calculate_NLL,
-                                    x0=start_par_inf,
-                                    args=(agent_data, default_pars_lim),
-                                    method='Nelder-Mead')
-            values[iter, :] = np.concatenate(([minimization.fun], minimization.x))
-        minimum = values[:, 0] == min(values[:, 0])
-        fit_pars_inf = values[minimum][0]
-        fit_pars_inf = fit_pars_inf[1:]
+        # Calculate the minimum value by brute force
+        minimization = brute(func=self.calculate_NLL,
+                             ranges=((-4, 4), (-4, 4)),
+                             args=(agent_data, default_pars_lim),
+                             Ns=20,
+                             full_output=True,
+                             finish=None,
+                             disp=True)
+        fit_pars_inf = minimization[0]
+
+        # # Find the minimum of n_iter different start values to get fit parameters
+        # values = np.zeros([n_iter, self.n_fit_par + 1])
+        # for iter in range(n_iter):
+        #     start_par_inf = self.parameters.create_random_params(scale='inf', get_all=False)
+        #     minimization = minimize(self.calculate_NLL,
+        #                             x0=start_par_inf,
+        #                             args=(agent_data, default_pars_lim),
+        #                             options={'disp': False,  # prints whether minimization was successful
+        #                                      'xatol': .01,  # parameter values are in the range [0; 1]
+        #                                      'fatol': .5,   # function values (NLL) are around 150-350
+        #                                      'maxfev': 100},  # seems reasonable, given that it gets stuck sometimes
+        #                             method='Nelder-Mead')  # 'Nelder-Mead' works better than 'BFGS'; BFGS usually does not terminate successfully
+        #     print(minimization)
+        #     values[iter, :] = np.concatenate(([minimization.fun], minimization.x))
+        # print(values)
+        # minimum = values[:, 0] == min(values[:, 0])
+        # fit_pars_inf = values[minimum][0]
+        # fit_pars_inf = fit_pars_inf[1:]
+
+        # Polish results
+        minimization = minimize(self.calculate_NLL,
+                                x0=fit_pars_inf,
+                                args=(agent_data, default_pars_lim),
+                                options={'disp': True,  # prints whether minimization was successful
+                                         'xatol': .001,  # parameter values are in the range [0; 1]
+                                         'fatol': .1,   # function values (NLL) are around 150-350
+                                         'maxfev': 1000},  # seems reasonable, given that it gets stuck sometimes
+                                method='Nelder-Mead')  # 'Nelder-Mead' works better than 'BFGS'; BFGS usually does not terminate successfully
+        print(minimization)
+        fit_pars_inf = minimization.x
 
         # Combine fit parameters and fixed parameters and return all
         fixed_pars_01 = self.parameters.change_limits(default_pars_lim, 'lim_to_01')
