@@ -6,6 +6,15 @@ output: html_notebook
 # Set up parameters
 
 ```{r Set up parameters}
+
+# Questions:
+# Why did my regression with 4 parameters not work? P(right) ~ right_reward + left_reward + right_noreward + left_noreward
+
+# TD:
+# fit exponential -> y = k exp(-lambda t)
+# fix gg_age_rewhist.png -> there is something wrong with it
+
+
 gg_save = T
 data = "human"  # Can be "human", "fitted_human", or "fitted_sim"
 library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); source("functions.R"); library("R.matlab"); library("zoo")
@@ -25,6 +34,7 @@ if (data == "fitted_human") {
   ages$age_group[ages$PreciseYrs < 18] = "Teens"
   ages$age_group[ages$PreciseYrs < 13] = "Children"
   ages$age_group = factor(ages$age_group, levels = c("Children", "Teens", "Adults"))
+  ages$PDS[ages$age_group == "Adults"] = 6
   ages
 }
 unlink(plot_dir, recursive=TRUE)  # Delete old plots
@@ -39,7 +49,6 @@ if (data == "fitted_humans") {
   all_files$learning_style = factor(all_files$learning_style)
   all_files$method = factor(all_files$method)
 }
-all_files$age_group = factor(ifelse(all_files$sID > 300, "Adults", "Children"))
 summary(all_files)
 # Parameters
 if (data != "human") {
@@ -117,8 +126,6 @@ if (data == "fitted_humans") {
 }
 
 paper_plots()
-all_files
-all_files_regr
 ```
 ```{r Relationship with age and puberty: P(right) ~ prev_action * reward}
 # Prepare data
@@ -199,14 +206,12 @@ ggsave(file.path(plot_dir, "gg_nback_regr_reward_agecont.png"), gg_nback_regr_re
 ggsave(file.path(plot_dir, "gg_nback_regr_choice_agecont.png"), gg_nback_regr_choice_agecont)
 ```
 ```{r Relationship with age and puberty: Other measures}
-# RT variability || age
-# RT ~ trialID || age
-# add regression lines to plots
-
 # Overall ACC
 sum_dat = ddply(all_files, .(sID, PreciseYrs, Gender, Category, PDS), summarize,
                 mean_ACC = mean(ACC, na.rm = T),
-                median_RT = median(RT, na.rm = T))
+                median_RT = median(RT, na.rm = T),
+                n_blocks = max(block, na.rm = T),
+                stay = mean(stay, na.rm = T))
 
 gg_age_ACC =
   ggplot(sum_dat, aes(PreciseYrs, mean_ACC)) +
@@ -215,6 +220,10 @@ gg_age_ACC =
 gg_age_RT = gg_age_ACC + aes(y = median_RT)
 gg_PDS_ACC = gg_age_ACC + aes(x = PDS)
 gg_PDS_RT = gg_PDS_ACC + aes(y = median_RT)
+gg_age_n_blocks = gg_age_ACC + aes(y = n_blocks)
+gg_PDS_n_blocks = gg_age_n_blocks + aes(x = PDS)
+gg_age_overall_stay = gg_age_ACC + aes(y = stay)
+gg_PDS_overall_stay = gg_age_overall_stay + aes(x = PDS)
 
 # Trials to reach criterion
 all_files$roll_ACC = rollmean(all_files$ACC, 3, fill = NA, align = "right")
@@ -226,7 +235,7 @@ criterion_dat = ddply(subset(all_files, criterion_2of3 == T & trialsinceswitch >
 gg_age_criterion = ggplot(criterion_dat, aes(PreciseYrs, trials_to_criterion)) +
   geom_point() +
   geom_smooth()
-gg_PDS_criterion = gg_age_criterion + aes(x = round(PDS * 2) / 2)
+gg_PDS_criterion = gg_age_criterion + aes(x = PDS)
 
 # Prominence of WSLS
 wsls_wide = reshape(subset(wsls, select = -age_group), direction = "wide", timevar = "reward", idvar = "sID")
@@ -244,11 +253,35 @@ all_files
 rewhist_dat = ddply(all_files, .(sID, outcome_12_back), summarize,
                     stay = sum(same_choice, na.rm = T))
 rewhist_dat = merge(rewhist_dat, ages, by.x = "sID", by.y = "ID", all.x = T)
-# gg_age_rewhist =
+gg_age_rewhist =
   ggplot(subset(rewhist_dat, !is.na(outcome_12_back)), aes(PreciseYrs, stay, color = outcome_12_back)) +
   geom_point() +
     geom_smooth()
 gg_PDS_rewhist = gg_age_rewhist + aes(x = PDS)
+
+# RT variability || age
+RT_sd_dat = ddply(all_files, .(sID, PreciseYrs, PDS), summarize,
+      RT_sd = sd(RT, na.rm = T))
+gg_age_RT_sd = ggplot(RT_sd_dat, aes(PreciseYrs, RT_sd)) +
+  geom_point() +
+  geom_smooth()
+gg_PDS_RT_sd = gg_age_RT_sd + aes(x = PDS)
+
+# RT ~ trialID || age
+RT_slope_dat = data.frame()
+for (subj in unique(all_files$sID)) {
+  subj_dat = subset(all_files, sID == subj)
+  RT_mod = lm(RT ~ TrialID, data = subj_dat)
+  coefs = as.data.frame(summary(RT_mod)$coefficients)
+  coefss = cbind(sID = subj, predictor = rownames(coefs), data.frame(coefs, row.names = NULL))
+  RT_slope_dat = rbind(RT_slope_dat, rbind(coefss))
+}
+RT_slope_dat = merge(RT_slope_dat, ages, by.x = "sID", by.y = "ID", all.x = T)
+
+gg_age_RT_slope = ggplot(subset(RT_slope_dat, predictor == "TrialID"), aes(PreciseYrs, Estimate)) +# & `Pr...t..` < 0.05
+  geom_point() +
+  geom_smooth()
+gg_PDS_RT_slope = gg_age_RT_slope + aes(x = PDS)
 
 # Save plots
 ggsave(file.path(plot_dir, "gg_age_criterion.png"), gg_age_criterion)
@@ -257,10 +290,17 @@ ggsave(file.path(plot_dir, "gg_PDS_ACC.png"), gg_PDS_ACC)
 ggsave(file.path(plot_dir, "gg_age_ACC.png"), gg_age_ACC)
 ggsave(file.path(plot_dir, "gg_age_RT.png"), gg_age_RT)
 ggsave(file.path(plot_dir, "gg_PDS_RT.png"), gg_PDS_RT)
+ggsave(file.path(plot_dir, "gg_age_RT_sd.png"), gg_age_RT_sd)
+ggsave(file.path(plot_dir, "gg_PDS_RT_sd.png"), gg_PDS_RT_sd)
 ggsave(file.path(plot_dir, "gg_age_wsls.png"), gg_age_wsls)
 ggsave(file.path(plot_dir, "gg_PDS_wsls.png"), gg_PDS_wsls)
 ggsave(file.path(plot_dir, "gg_age_rewhist.png"), gg_age_rewhist)
 ggsave(file.path(plot_dir, "gg_PDS_rewhist.png"), gg_PDS_rewhist)
+ggsave(file.path(plot_dir, "gg_age_RT_slope.png"), gg_age_RT_slope)
+ggsave(file.path(plot_dir, "gg_age_n_blocks.png"), gg_age_n_blocks)
+ggsave(file.path(plot_dir, "gg_PDS_n_blocks.png"), gg_PDS_n_blocks)
+ggsave(file.path(plot_dir, "gg_age_overall_stay.png"), gg_age_overall_stay)
+ggsave(file.path(plot_dir, "gg_PDS_overall_stay.png"), gg_PDS_overall_stay)
 ```
 ```{r Start button}
 ```
