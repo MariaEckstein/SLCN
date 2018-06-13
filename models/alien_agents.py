@@ -20,7 +20,8 @@ class Agent(object):
          self.beta, self.beta_high,
          self.epsilon,
          self.forget,
-         self.create_TS_biased] = all_params_lim
+         self.create_TS_biased_prefer_new,
+         self.create_TS_biased_copy_old] = all_params_lim
         self.beta = 6 * self.beta  # all parameters are on the same scale for fitting [0; 1]
         if self.alpha_high < 1e-5:
             self.alpha_high = self.alpha
@@ -95,19 +96,22 @@ class Agent(object):
         return self.prev_action
 
     def create_new_TS(self, context):
-        if context not in self.seen_seasons:  # completely new context in InitialLearning, Refreshers, Cloudy, Rainbow
+        if context not in self.seen_seasons:  # completely new context in InitialLearn, Refreshers, Cloudy(!), Rainbow
             self.add_TS_to_Q_high()
             self.Q_high[context, :] = self.initialize_TS_values(bias='new_context')
             self.add_TS_to_Q_low()
             self.seen_seasons.append(context)
-        elif self.task_phase in ['2CloudySeason', '5RainbowSeason']:  # Cloudy or rainbow, after the first encounter
+        elif self.task_phase in ['2CloudySeason']:  # Cloudy, after the first encounter
             self.Q_high[context, :] = self.initialize_TS_values()
 
     def add_TS_to_Q_high(self):
-        uniform_TS = self.initial_q_high * np.ones([self.Q_high_dim[0], 1])  # add new TS (uniform values for all contexts)
+        uniform_TS = self.initial_q_high * np.ones([self.Q_high_dim[0], 1])  # uniform values for all contexts
         if not self.seen_seasons:  # if this is the first season ever encountered (very first trial)
             self.Q_high = uniform_TS.copy()
         else:
+            # biased_TS = np.mean(self.Q_high[:, :], axis=1)  # biased TS values for new context
+            # biased_TS.shape = (len(biased_TS), 1)  # make a column vector
+            # biased_TS = self.create_TS_biased_copy_old * biased_TS + (1 - self.create_TS_biased_copy_old) * uniform_TS
             self.Q_high = np.append(self.Q_high, uniform_TS, axis=1)  # add column with new TS values
 
     def add_TS_to_Q_low(self):
@@ -120,19 +124,12 @@ class Agent(object):
     def initialize_TS_values(self, bias=np.nan):
         uniform_values = self.initial_q_high * np.ones([1, self.Q_high.shape[1]])
         biased_values = np.mean(self.Q_high[0:self.n_contexts, :], axis=0)  # biased TS values for new season
-        biased_values = np.array([list(biased_values)])  # bring in right shape
+        biased_values.shape = (1, len(biased_values))  # = np.array([list(biased_values)])  # bring in right shape
+        biased_values = self.create_TS_biased_copy_old * biased_values + (1 - self.create_TS_biased_copy_old) * uniform_values
         if bias == 'new_context':
-            biased_values[:, -1] *= 1 + self.create_TS_biased  # boost value of newly created TS by x%
-            biased_values[:, :-1] *= 1 - self.create_TS_biased  # reduce value of all other TS by x%
-        # if bias == 'new_context':
-        #     biased_values = np.zeros(self.Q_high.shape[1])
-        #     biased_values[-1] = 2 * self.initial_q_high
-        # elif bias == 'old_contexts':
-        #     mean_Q_orig_TSs = np.mean(self.Q_high[0:self.n_contexts, :], axis=0)  # biased TS values for new season
-        #     biased_values = np.array([list(mean_Q_orig_TSs)])  # bring in right shape
-        # else:
-        #     raise ValueError('"bias" parameter in agent.initialize_TS_values() must be "new_context" or "old_context"!')
-        return self.create_TS_biased * biased_values + (1 - self.create_TS_biased) * uniform_values
+            biased_values[:, -1] *= 1 + self.create_TS_biased_prefer_new  # boost value of newly created TS by x%
+            biased_values[:, :-1] *= 1 - self.create_TS_biased_prefer_new  # reduce value of all other TS by x%
+        return biased_values
 
     def learn(self, stimulus, action, reward):
         if self.task_phase != '5RainbowSeason':  # no value updating in rainbow season!
