@@ -44,7 +44,7 @@ class SimulateInteractive(object):
         if self.mix_probs:
             print('Reward: {0} ({1})\n'
                   'Q_TS.     Old: {2}, RPE: {3}, p_TS: {4}, New: {5}\n'
-                  'Q_action. Old: {6}, RPE: {7}, p_TS: {8}, New: {9}'.format(
+                  'Q_action. Old: {6}, RPE: {7}, p_ac: {8}, New: {9}'.format(
                     str(np.round(reward, 2)), str(correct),
                     str(self.TS_values), str(np.round(self.agent.RPEs_high, 2)),
                     str(np.round(self.agent.p_TS, 2)), str(TS_values_new),
