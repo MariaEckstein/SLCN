@@ -26,9 +26,9 @@ simulate_agents = True
 # Model fitting parameters
 n_iter = 10
 n_agents = 100
-agent_start_id = 900
+agent_start_id = 700
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
-data_path = base_path + '/AlienGenRec/'
+data_path = base_path + '/AlienGenRec/MaxInsteadOfSoftmax/'
 human_data_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1'   # CLUSTER: existing_data_path = base_path + '/humanData/'
 n_simulated_agents_per_participant = 100
 
@@ -63,7 +63,7 @@ comp_stuff = {'phases': ['season', 'alien-same-season', 'item', 'alien'],
 agent_stuff = {'name': 'alien',
                'n_TS': 3,
                'learning_style': 'hierarchical',
-               'mix_probs': True}
+               'mix_probs': False}
 
 parameters = Parameters(par_names=['alpha', 'alpha_high', 'beta', 'beta_high', 'epsilon', 'forget', 'create_TS_biased_prefer_new', 'create_TS_biased_copy_old'],  # Rewards <= 10 means than beta is 10 times as much!
                         fit_pars=np.ones(6, dtype=bool),  # which parameters will be fitted?
@@ -80,7 +80,7 @@ if simulate_agents:
     while agent_id < agent_start_id + n_agents:
         gen_pars = parameters.create_random_params(scale='lim', mode='soft')
         for par in parameters.par_names:
-            if par not in ['alpha', 'beta', 'create_TS_biased_prefer_new', 'create_TS_biased_copy_old']:#, 'forget', 'alpha_high', 'beta_high'
+            if par not in ['alpha', 'beta', 'alpha_high', 'beta_high', 'create_TS_biased_copy_old', 'forget']:#, 'create_TS_biased_prefer_new'
                 gen_pars[np.array(parameters.par_names) == par] = 0
         print('Simulating {0} agent {1} with parameters {2}'.format(
             agent_stuff['learning_style'], agent_id, np.round(gen_pars, 2)))

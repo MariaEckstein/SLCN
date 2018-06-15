@@ -39,8 +39,8 @@ class Agent(object):
         # Set up values at low (stimulus-action) level
         self.initial_q_low = 5. / 3.  # Average reward per alien during training / number of actions
         if 'flat' in self.learning_style:
-            Q_low_dim = [self.n_contexts+2, self.n_aliens, self.n_actions]
-            self.Q_low = self.initial_q_low * np.ones(Q_low_dim)
+            self.Q_low_dim = [self.n_contexts+2, self.n_aliens, self.n_actions]
+            self.Q_low = self.initial_q_low * np.ones(self.Q_low_dim)
         elif self.learning_style == 'hierarchical':
             self.Q_low = np.nan  # will be created piece by piece in create_new_TS
             # Q_low_dim = [self.n_TS+2, self.n_aliens, self.n_actions]  # 1 extra TS for rainbow season
@@ -80,12 +80,12 @@ class Agent(object):
             context = self.n_contexts  # cloudy season -> new hidden context
         else:
             context = stimulus[0]  # rainbow season -> new rainbow context (see alien_task)
-        if context_switch and (self.learning_style == 'hierarchical'):
-            self.create_new_TS(context)
+        if context_switch:
+            self.handle_context_switch(context)
         self.Q_high_row = context  # or stimulus[0]?
         # Translate TS values and action values into action probabilities
         self.p_TS = self.get_p_from_Q(Q=self.Q_high[context, :], beta=self.beta_high, epsilon=0, select_deterministic=self.select_deterministic)
-        self.TS = np.random.choice(len(self.p_TS), p=self.p_TS)
+        self.TS = np.argmax(self.p_TS)  # np.random.choice(len(self.p_TS), p=self.p_TS)
         if self.mix_probs:
             self.Q_actions = np.dot(self.p_TS, self.Q_low[0:len(self.p_TS), stimulus[1], :])  # Weighted average for Q_low of all TS
         else:
@@ -95,14 +95,17 @@ class Agent(object):
         self.forget_Qs()
         return self.prev_action
 
-    def create_new_TS(self, context):
-        if context not in self.seen_seasons:  # completely new context in InitialLearn, Refreshers, Cloudy(!), Rainbow
-            self.add_TS_to_Q_high()
-            self.Q_high[context, :] = self.initialize_TS_values(bias='new_context')
-            self.add_TS_to_Q_low()
-            self.seen_seasons.append(context)
-        elif self.task_phase in ['2CloudySeason']:  # Cloudy, after the first encounter
-            self.Q_high[context, :] = self.initialize_TS_values()
+    def handle_context_switch(self, context):
+        if self.learning_style == 's-flat':
+            self.Q_low = self.initial_q_low * np.ones(self.Q_low_dim)
+        else:
+            if context not in self.seen_seasons:  # completely new context in InitialLearn, Refreshers, Cloudy(!), Rainbow
+                self.add_TS_to_Q_high()
+                self.Q_high[context, :] = self.initialize_TS_values(bias='new_context')
+                self.add_TS_to_Q_low()
+                self.seen_seasons.append(context)
+            elif self.task_phase in ['2CloudySeason']:  # Cloudy, after the first encounter
+                self.Q_high[context, :] = self.initialize_TS_values()
 
     def add_TS_to_Q_high(self):
         uniform_TS = self.initial_q_high * np.ones([self.Q_high_dim[0], 1])  # uniform values for all contexts
