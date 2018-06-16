@@ -24,7 +24,7 @@ fit_existing_data = True
 simulate_agents = False
 
 # Model fitting parameters
-n_iter = 30
+n_iter = 35
 n_agents = 100
 agent_start_id = 200
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
