@@ -101,24 +101,24 @@ class FitParameters(object):
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()
 
-    def calculate_NLL(self, params_inf, agent_data, default_pars_lim="default", goal='calculate_NLL'):
+    def calculate_NLL(self, params_lim, agent_data, default_pars_lim="default", goal='calculate_NLL'):
 
         # Combine params_inf (current guess for fitted parameters) and default_pars_lim (default parameters)
         if default_pars_lim == "default":
             default_pars_lim = self.parameters.default_pars_lim
-        pars_01 = self.parameters.change_limits(default_pars_lim, 'lim_to_01')
-        pars_inf = self.parameters.change_scale(pars_01, '01_to_inf')
+        # pars_01 = self.parameters.change_limits(default_pars_lim, 'lim_to_01')
+        # pars_inf = self.parameters.change_scale(pars_01, '01_to_inf')
         fit_par_idx = np.argwhere(self.parameters.fit_pars)
-        pars_inf[fit_par_idx] = params_inf
+        default_pars_lim[fit_par_idx] = params_lim
 
         # Bring parameters into the right scale and check that there was no error in conversion
-        pars_01 = self.parameters.change_scale(pars_inf, 'inf_to_01')
-        pars_lim = self.parameters.change_limits(pars_01, '01_to_lim')
+        # pars_01 = self.parameters.change_scale(pars_inf, 'inf_to_01')
+        # pars_lim = self.parameters.change_limits(pars_01, '01_to_lim')
         # for i, par in enumerate(self.parameters.par_names):
         #     assert((np.round(pars_lim[i], 2) == np.round(default_pars_lim[i], 2)) or self.parameters.fit_pars[i])
 
         # Create agent with these parameters
-        agent = Agent(self.agent_stuff, pars_lim, self.task_stuff)
+        agent = Agent(self.agent_stuff, default_pars_lim, self.task_stuff)
         if goal == 'add_decisions_and_fit':
             record_data = RecordData(agent_id=agent.id,
                                      mode='add_to_existing_data',
@@ -141,12 +141,13 @@ class FitParameters(object):
             agent.learn(stimulus, action, reward)
             if goal == 'add_decisions_and_fit':
                 record_data.add_decisions(agent, trial, suff='_rec')
+            # print(trial, agent.LL)
 
         BIC = - 2 * agent.LL + self.n_fit_par * np.log(n_trials)
         AIC = - 2 * agent.LL + self.n_fit_par
 
         if goal == 'calculate_NLL':
-            print(-agent.LL, params_inf)
+            # print(-agent.LL, params_lim)
             return -agent.LL
         elif goal == 'calculate_fit':
             return [-agent.LL, BIC, AIC]
@@ -158,55 +159,46 @@ class FitParameters(object):
     def get_optimal_pars(self, agent_data, n_iter, default_pars_lim="default"):
         if default_pars_lim == "default":
             default_pars_lim = self.parameters.default_pars_lim
+        values = np.full([n_iter + 1, self.n_fit_par + 1], np.nan)
 
         # Calculate the minimum value by brute force
         minimization = brute(func=self.calculate_NLL,
-                             ranges=((-4, 4), (-4, 4)),
+                             ranges=([self.parameters.par_hard_limits[i] for i in np.argwhere(self.parameters.fit_pars)]),
                              args=(agent_data, default_pars_lim),
-                             Ns=20,
+                             Ns=n_iter,  # n_fit_par-te Wurzel aus (n_iter * 1000) -> gleich viel effort wie unten
                              full_output=True,
                              finish=None,
                              disp=True)
-        fit_pars_inf = minimization[0]
-
-        # # Find the minimum of n_iter different start values to get fit parameters
-        # values = np.zeros([n_iter, self.n_fit_par + 1])
-        # for iter in range(n_iter):
-        #     start_par_inf = self.parameters.create_random_params(scale='inf', get_all=False)
-        #     minimization = minimize(self.calculate_NLL,
-        #                             x0=start_par_inf,
-        #                             args=(agent_data, default_pars_lim),
-        #                             options={'disp': False,  # prints whether minimization was successful
-        #                                      'xatol': .01,  # parameter values are in the range [0; 1]
-        #                                      'fatol': .5,   # function values (NLL) are around 150-350
-        #                                      'maxfev': 100},  # seems reasonable, given that it gets stuck sometimes
-        #                             method='Nelder-Mead')  # 'Nelder-Mead' works better than 'BFGS'; BFGS usually does not terminate successfully
-        #     print(minimization)
-        #     values[iter, :] = np.concatenate(([minimization.fun], minimization.x))
-        # print(values)
-        # minimum = values[:, 0] == min(values[:, 0])
-        # fit_pars_inf = values[minimum][0]
-        # fit_pars_inf = fit_pars_inf[1:]
+        start_par_lim = minimization[0]
+        print("Finished brute with values {0}!".format(str(np.round(start_par_lim, 3))))
+        values[-1, :] = np.concatenate(([minimization[1]], minimization[0]))
 
         # Polish results
-        minimization = minimize(self.calculate_NLL,
-                                x0=fit_pars_inf,
-                                args=(agent_data, default_pars_lim),
-                                options={'disp': True,  # prints whether minimization was successful
-                                         'xatol': .001,  # parameter values are in the range [0; 1]
-                                         'fatol': .1,   # function values (NLL) are around 150-350
-                                         'maxfev': 1000},  # seems reasonable, given that it gets stuck sometimes
-                                method='Nelder-Mead')  # 'Nelder-Mead' works better than 'BFGS'; BFGS usually does not terminate successfully
-        print(minimization)
-        fit_pars_inf = minimization.x
+        for iter in range(n_iter):
+            if iter > 0:  # Use brute-forced minimum for the first one; after that, sample start values randomly
+                start_par_lim = np.random.rand(sum(self.parameters.fit_pars))  # self.parameters.create_random_params(scale='lim', get_all=False)
+            minimization = minimize(self.calculate_NLL,
+                                    x0=start_par_lim,
+                                    args=(agent_data, default_pars_lim),
+                                    options={'disp': True,  # prints whether minimization was successful
+                                             'xatol': .001,  # parameter values are in the range [0; 1]
+                                             'fatol': .001,   # function values (NLL) are ~150-750, depeding on algo
+                                             'maxfev': 1000},  # seems reasonable, given that it gets stuck sometimes
+                                    method='Nelder-Mead')  # 'Nelder-Mead' is better than 'BFGS' (does not terminate successfully)
+            values[iter, :] = np.concatenate(([minimization.fun], minimization.x))
+            print("Finished iteration {0} of Nelder-Mead!".format(str(iter)))
+        print(values)
+        minimum = values[:, 0] == min(values[:, 0])
+        fit_pars_lim = values[minimum][0]
+        fit_pars_lim = fit_pars_lim[1:]
 
         # Combine fit parameters and fixed parameters and return all
-        fixed_pars_01 = self.parameters.change_limits(default_pars_lim, 'lim_to_01')
-        fixed_pars_inf = self.parameters.change_scale(fixed_pars_01, '01_to_inf')
+        # fixed_pars_01 = self.parameters.change_limits(default_pars_lim, 'lim_to_01')
+        # fixed_pars_inf = self.parameters.change_scale(fixed_pars_01, '01_to_inf')
         fit_par_idx = np.argwhere(self.parameters.fit_pars)
-        fixed_pars_inf[fit_par_idx] = fit_pars_inf
-        fixed_pars_01 = self.parameters.change_scale(fixed_pars_inf, 'inf_to_01')
-        default_pars_lim = self.parameters.change_limits(fixed_pars_01, '01_to_lim')
+        default_pars_lim[fit_par_idx] = fit_pars_lim
+        # fixed_pars_01 = self.parameters.change_scale(fixed_pars_inf, 'inf_to_01')
+        # default_pars_lim = self.parameters.change_limits(fixed_pars_01, '01_to_lim')
         return default_pars_lim
 
     def write_agent_data(self, agent_data, save_path, file_name=''):

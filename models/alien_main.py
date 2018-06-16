@@ -20,13 +20,13 @@ from fit_parameters import FitParameters
 # What should be done?
 interactive_game = False
 quick_generate_and_recover = False
-fit_existing_data = False
-simulate_agents = True
+fit_existing_data = True
+simulate_agents = False
 
 # Model fitting parameters
-n_iter = 10
+n_iter = 30
 n_agents = 100
-agent_start_id = 700
+agent_start_id = 200
 base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'  # CLUSTER: base_path = '/home/bunge/maria/Desktop/Aliens'
 data_path = base_path + '/AlienGenRec/MaxInsteadOfSoftmax/'
 human_data_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1'   # CLUSTER: existing_data_path = base_path + '/humanData/'
@@ -71,30 +71,6 @@ parameters = Parameters(par_names=['alpha', 'alpha_high', 'beta', 'beta_high', '
                         par_soft_limits=((0., .5), (0., .5), (0., 1.), (0., 1.), (0., .25), (0., .1), (0., 1.), (0., 1.)),  # no simulations outside
                         default_pars_lim=np.array([.1, 0.,    .1,       0.,       0.,        0.,       0.,       0.]))  # when a parameter is fixed
 gen_pars = parameters.default_pars_lim
-
-# Simulate agents
-if simulate_agents:
-
-    # Simulate n_simulated_agents_per_participant and save the files
-    agent_id = agent_start_id
-    while agent_id < agent_start_id + n_agents:
-        gen_pars = parameters.create_random_params(scale='lim', mode='soft')
-        for par in parameters.par_names:
-            if par not in ['alpha', 'beta', 'alpha_high', 'beta_high', 'create_TS_biased_copy_old', 'forget']:#, 'create_TS_biased_prefer_new'
-                gen_pars[np.array(parameters.par_names) == par] = 0
-        print('Simulating {0} agent {1} with parameters {2}'.format(
-            agent_stuff['learning_style'], agent_id, np.round(gen_pars, 2)))
-        agent_stuff['id'] = agent_id
-        fit_params = FitParameters(parameters=parameters,
-                                   task_stuff=task_stuff,
-                                   comp_stuff=comp_stuff,
-                                   agent_stuff=agent_stuff)
-        agent_data = fit_params.get_agent_data(way='simulate',
-                                               all_params_lim=gen_pars)
-        sim_save_path = '{0}sim_{1}.csv'.format(data_path, str(agent_id))
-        agent_data.to_csv(sim_save_path)
-
-        agent_id += 1
 
 # Fit parameters to existing data (agents or humans)
 existing_data_path = data_path
@@ -149,13 +125,37 @@ if fit_existing_data:
         print("Recovered parameters: " + str(np.round(rec_pars, 3)))
 
         # Calculate fit and add stuff
-        agent_data = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
+        agent_data = fit_params.calculate_NLL(params_lim=rec_pars[np.argwhere(parameters.fit_pars)],
                                               agent_data=agent_data,
                                               goal='add_decisions_and_fit')
         agent_data['sID'] = agent_id
         fit_params.write_agent_data(agent_data=agent_data,
                                     save_path=save_path,
                                     file_name='sim_rec')
+
+# Simulate agents
+if simulate_agents:
+
+    # Simulate n_simulated_agents_per_participant and save the files
+    agent_id = agent_start_id
+    while agent_id < agent_start_id + n_agents:
+        gen_pars = parameters.create_random_params(scale='lim', mode='soft')
+        for par in parameters.par_names:
+            if par not in ['alpha', 'beta']:#, 'alpha_high', 'beta_high', 'create_TS_biased_copy_old', 'forget', 'create_TS_biased_prefer_new'
+                gen_pars[np.array(parameters.par_names) == par] = 0
+        print('Simulating {0} agent {1} with parameters {2}'.format(
+            agent_stuff['learning_style'], agent_id, np.round(gen_pars, 2)))
+        agent_stuff['id'] = agent_id
+        fit_params = FitParameters(parameters=parameters,
+                                   task_stuff=task_stuff,
+                                   comp_stuff=comp_stuff,
+                                   agent_stuff=agent_stuff)
+        agent_data = fit_params.get_agent_data(way='simulate',
+                                               all_params_lim=gen_pars)
+        sim_save_path = '{0}sim_{1}.csv'.format(data_path, str(agent_id))
+        agent_data.to_csv(sim_save_path)
+
+        agent_id += 1
 
 # Play the game to test everything
 if interactive_game:
@@ -231,7 +231,7 @@ if quick_generate_and_recover:
         print("Recovered parameters: " + str(np.round(rec_pars, 3)))
 
         # Calculate model fit and add stuff
-        agent_data = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
+        agent_data = fit_params.calculate_NLL(params_lim=rec_pars,
                                               agent_data=agent_data,
                                               default_pars_lim=gen_pars,
                                               goal='add_decisions_and_fit')

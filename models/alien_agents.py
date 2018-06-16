@@ -30,9 +30,9 @@ class Agent(object):
         # print(self.alpha, self.beta)
         self.forget_high = self.forget
         self.task_phase = np.nan
-        assert self.alpha > 0  # Make sure that alpha is a number and is > 0
-        assert self.beta >= 0
-        assert self.epsilon >= 0
+        # assert self.alpha >= 0  # Make sure that alpha is a number and is > 0
+        # assert self.beta >= 0
+        # assert self.epsilon >= 0
         assert self.mix_probs in [True, False]
         assert self.learning_style in ['s-flat', 'flat', 'hierarchical']
 
@@ -47,13 +47,13 @@ class Agent(object):
 
         # Set up values at high (context-TS) level
         self.Q_high_dim = [self.n_contexts+2, self.n_TS]  # 2 extra contexts for cloudy & rainbow seasons
+        self.initial_q_high = self.initial_q_low
         if self.learning_style == 's-flat':
             self.Q_high = np.zeros(self.Q_high_dim)
             self.Q_high[:, 0] = 1  # First col == 1 => There is just one TS that every context uses
         elif self.learning_style == 'flat':
             self.Q_high = np.eye(self.Q_high_dim[0])  # agent always selects the appropriate table
         elif self.learning_style == 'hierarchical':
-            self.initial_q_high = self.initial_q_low
             self.Q_high = np.nan  # will be created piece by piece in create_new_TS
 
         # Initialize action probs, current TS and action, LL
@@ -98,7 +98,7 @@ class Agent(object):
     def handle_context_switch(self, context):
         if self.learning_style == 's-flat':
             self.Q_low = self.initial_q_low * np.ones(self.Q_low_dim)
-        else:
+        elif self.learning_style == 'hierarchical':
             if context not in self.seen_seasons:  # completely new context in InitialLearn, Refreshers, Cloudy(!), Rainbow
                 self.add_TS_to_Q_high()
                 self.Q_high[context, :] = self.initialize_TS_values(bias='new_context')

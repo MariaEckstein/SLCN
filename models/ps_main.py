@@ -111,12 +111,12 @@ if generate_and_recover:
                                                                all_params_lim=gen_pars)
                         rec_pars = fit_params.get_optimal_pars(agent_data=agent_data,
                                                                n_iter=n_iter)
-                        agent_data = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
+                        agent_data = fit_params.calculate_NLL(params_lim=rec_pars,
                                                               agent_data=agent_data,
                                                               goal='add_decisions_and_fit')
                         fit_params.write_agent_data(agent_data=agent_data,
                                                     save_path=save_agent_path)
-                        fit = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
+                        fit = fit_params.calculate_NLL(params_lim=rec_pars,
                                                        agent_data=agent_data,
                                                        goal='calculate_fit')
                         gen_rec.update_and_save_genrec(gen_pars=gen_pars,
@@ -154,7 +154,7 @@ if fit_human_data:
                 rec_pars = fit_params.get_optimal_pars(agent_data=agent_data,
                                                        n_iter=n_iter)
                 print('\nRecovered parameters:', rec_pars)
-                agent_data = fit_params.calculate_NLL(params_inf=parameters.lim_to_inf(rec_pars),
+                agent_data = fit_params.calculate_NLL(params_lim=rec_pars,
                                                       agent_data=agent_data,
                                                       goal='add_decisions_and_fit')
                 # Save participant data, included the fitted parameters
