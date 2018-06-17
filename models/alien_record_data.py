@@ -18,7 +18,7 @@ class RecordData(object):
 
     def add_parameters(self, agent, parameters, suff=''):
         if parameters:
-            self.subj_file['fit_pars'] = str(parameters.fit_pars)
+            self.subj_file['fit_pars'] = str(parameters['fit_pars'])
         self.subj_file['n_actions'] = agent.n_actions
         self.subj_file['n_TS'] = agent.n_TS
         self.subj_file['learning_style'] = agent.learning_style

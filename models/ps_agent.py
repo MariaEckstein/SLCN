@@ -2,14 +2,14 @@ import numpy as np
 
 
 class Agent(object):
-    def __init__(self, agent_stuff, all_params_lim, task_stuff):
+    def __init__(self, agent_stuff, all_pars, task_stuff):
         self.n_actions = task_stuff['n_actions']
         self.learning_style = agent_stuff['learning_style']
         self.id = agent_stuff['id']
         assert(self.method in ['epsilon-greedy', 'softmax'])
         assert(self.learning_style in ['Bayes', 'RL', 'estimate-switch'])
         [self.alpha, self.beta, self.epsilon, self.perseverance, self.decay,
-         self.w_reward, self.w_noreward, self.w_explore] = all_params_lim
+         self.w_reward, self.w_noreward, self.w_explore] = all_pars
         if self.learning_style == 'RL':
             self.initial_value = 1 / self.n_actions
             self.q = self.initial_value * np.ones(self.n_actions) #+ np.random.rand(self.n_actions) / 1000

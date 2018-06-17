@@ -3,7 +3,7 @@ import math
 
 
 class Agent(object):
-    def __init__(self, agent_stuff, all_params_lim, task_stuff=np.nan):
+    def __init__(self, agent_stuff, all_pars, task_stuff=np.nan):
 
         # Get parameters
         self.n_actions = task_stuff['n_actions']
@@ -21,7 +21,7 @@ class Agent(object):
          self.epsilon,
          self.forget,
          self.create_TS_biased_prefer_new,
-         self.create_TS_biased_copy_old] = all_params_lim
+         self.create_TS_biased_copy_old] = all_pars
         self.beta = 6 * self.beta  # all parameters are on the same scale for fitting [0; 1]
         if self.alpha_high < 1e-5:
             self.alpha_high = self.alpha

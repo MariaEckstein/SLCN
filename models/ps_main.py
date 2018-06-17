@@ -35,7 +35,7 @@ parameters = Parameters(par_names=['alpha', 'beta', 'epsilon', 'perseverance', '
                                          (-1, 1), (-1, 1), (-1, 1)),
                         par_soft_limits=((0, 1), (1, 6), (0, 0.25), (-0.3, 0.3), (0, 0.3),  # no simulations outside
                                          (-0.1, 0.3), (0.1, 0.5), (-0.5, 0.1)),
-                        default_pars_lim=np.array([0.25, 1+1e-10, 1e-10, 1e-10, 1e-10,  # when a parameter is fixed
+                        default_pars=np.array([0.25, 1+1e-10, 1e-10, 1e-10, 1e-10,  # when a parameter is fixed
                                                    0.1, 0.5, -0.2]))
 viz_agent = VisualizeAgent(parameters, agent_stuff['name'])
 gen_rec = GenRec(parameters=parameters,
@@ -108,15 +108,15 @@ if generate_and_recover:
                         # Create random parameters to simulate data, fit parameters and calculate fit, create genrec
                         gen_pars = parameters.create_random_params(scale='lim', get_all=True, mode='soft')
                         agent_data = fit_params.get_agent_data(way='simulate',
-                                                               all_params_lim=gen_pars)
+                                                               all_pars=gen_pars)
                         rec_pars = fit_params.get_optimal_pars(agent_data=agent_data,
                                                                n_iter=n_iter)
-                        agent_data = fit_params.calculate_NLL(params_lim=rec_pars,
+                        agent_data = fit_params.calculate_NLL(vary_pars=rec_pars,
                                                               agent_data=agent_data,
                                                               goal='add_decisions_and_fit')
                         fit_params.write_agent_data(agent_data=agent_data,
                                                     save_path=save_agent_path)
-                        fit = fit_params.calculate_NLL(params_lim=rec_pars,
+                        fit = fit_params.calculate_NLL(vary_pars=rec_pars,
                                                        agent_data=agent_data,
                                                        goal='calculate_fit')
                         gen_rec.update_and_save_genrec(gen_pars=gen_pars,
@@ -154,7 +154,7 @@ if fit_human_data:
                 rec_pars = fit_params.get_optimal_pars(agent_data=agent_data,
                                                        n_iter=n_iter)
                 print('\nRecovered parameters:', rec_pars)
-                agent_data = fit_params.calculate_NLL(params_lim=rec_pars,
+                agent_data = fit_params.calculate_NLL(vary_pars=rec_pars,
                                                       agent_data=agent_data,
                                                       goal='add_decisions_and_fit')
                 # Save participant data, included the fitted parameters

@@ -12,14 +12,14 @@ class VisualizeAgent:
 
     def plot_Qs(self, par_name, parameter_values, fit_params, p_or_Q):
         # Get default parameter values
-        gen_pars = self.parameters.default_pars_lim
+        gen_pars = self.parameters.default_pars
         par_index = np.argwhere(np.array(self.parameters.par_names) == par_name)
         for par_value in parameter_values:
             # Replace the parameter in question with the value of interest and simulate data
             gen_pars[par_index] = par_value
             print("Simulating data...")
             agent_data = fit_params.get_agent_data(way='simulate',
-                                                   all_params_lim=gen_pars,
+                                                   all_pars=gen_pars,
                                                    all_Q_columns=True)
             # Plot Q values over time
             for TS_or_action in ['_TS', '_action']:
@@ -55,7 +55,7 @@ class VisualizeAgent:
         # Simulate data with random parameter values (save Qs and action probs in agent_data)
         gen_pars = self.parameters.create_random_params(scale='lim', get_all=True, mode='soft')
         agent_data = fit_params.get_agent_data(way='simulate',
-                                               all_params_lim=gen_pars)
+                                               all_pars=gen_pars)
         # Calculate Qs and action probs based on the given parameter values and add to agent_data
         agent_data = fit_params.calculate_NLL(params_inf=self.parameters.lim_to_inf(gen_pars),
                                               agent_data=agent_data,
