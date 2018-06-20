@@ -11,15 +11,12 @@ output: html_notebook
 # Why did my regression with 4 parameters not work? P(right) ~ right_reward + left_reward + right_noreward + left_noreward
 
 # TD:
-# exponential -> transform plot axes with 1 / (1 + exp(-k/5))
 # plot exponential lines on top of each other
-# fix the old 11 10 01 00 plot!
-# add number of previous incorrect as a predictor in my models
 
 
 gg_save = T
 data = "human"  # Can be "human", "fitted_human", or "fitted_sim"
-library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); source("functions.R"); library("R.matlab"); library("zoo")
+library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo")
 
 base_dir = "C:/Users/maria/MEGAsync/SLCNdata/PSResults"
 plot_dir = file.path(base_dir, "plots")
@@ -60,7 +57,7 @@ for(filename in filenames) {
     subj_file = data.frame(RT = t(mat_file$RT))
     subj_file$selected_box = (t(mat_file$key) - 10) / 2
     subj_file$reward = t(mat_file$reward)
-    subj_file$correct_box = 1 - t(mat_file$better.box.left)
+    subj_file$correct_box = 1 - t(mat_file$better.box.left)  # left: 0; right: 1
     sID = as.numeric(strsplit(strsplit(filename, split = "PROBSWITCH_")[[1]][2], ".mat")[[1]])
     subj_file$sID = sID
     subj_file = subset(subj_file, !is.nan(reward) & selected_box %in% c(0, 1))
@@ -104,7 +101,7 @@ for(filename in filenames) {
   outcome_2_back = c(NA, NA, subj_file$reward[1:(nrow(subj_file) - 2)])
   subj_file$outcome_2_back = outcome_2_back
   
-  subj_file$choice_left = subj_file$selected_box == 0
+  subj_file$choice_left = subj_file$selected_box == 0  # left: 0; right: 1
   subj_file$choice_1_back = c(NA, subj_file$choice_left[1:(nrow(subj_file) - 1)])
   subj_file$choice_2_back = c(NA, NA, subj_file$choice_left[1:(nrow(subj_file) - 2)])
   
@@ -252,127 +249,152 @@ if (gg_save) {
   ggsave(file.path(plot_dir, "/gg_wsls.png"), gg_wsls)
 }
 ```
+
+# Run regression models
+
 ```{r Prepare data for regression}
 # Prepare data
-all_files_regr = subset(all_files, select = c("sID", "reward", "TrialID", "selected_box"))
+all_files_regr = subset(all_files, select = c("sID", "TrialID", "block", "reward", "selected_box"))
+## Times rewarded and times selected
+all_files_regr$selected = as.numeric(as.character(factor(all_files_regr$selected_box, levels = c(0, 1), labels = c(-1, 1))))  # 0 / -1: left; +1: right
 ## Choice regressors
-all_files_regr$right = all_files_regr$selected_box
-all_files_regr$right[all_files_regr$reward == 0] = - all_files_regr$right[all_files_regr$reward == 0]
-all_files_regr$left = 1 - all_files_regr$selected_box
-all_files_regr$left[all_files_regr$reward == 0] = - all_files_regr$left[all_files_regr$reward == 0]
+all_files_regr$right_rew = all_files_regr$selected_box
+all_files_regr$right_rew[all_files_regr$reward == 0] = -all_files_regr$right_rew[all_files_regr$reward == 0]
+all_files_regr$left_rew = 1 - all_files_regr$selected_box
+all_files_regr$left_rew[all_files_regr$reward == 0] = -all_files_regr$left_rew[all_files_regr$reward == 0]
 ## Reward regressors
 all_files_regr$reward = all_files_regr$reward
-all_files_regr$reward[all_files_regr$selected_box == 0] = - all_files_regr$reward[all_files_regr$selected_box == 0]
+all_files_regr$reward[all_files_regr$selected_box == 0] = -all_files_regr$reward[all_files_regr$selected_box == 0]
 all_files_regr$noReward = 1 - all_files_regr$reward
-all_files_regr$noReward[all_files_regr$selected_box == 0] = - all_files_regr$noReward[all_files_regr$selected_box == 0]
+all_files_regr$noReward[all_files_regr$selected_box == 0] = -all_files_regr$noReward[all_files_regr$selected_box == 0]
 all_files_regr$selected_box = factor(all_files_regr$selected_box)
+all_files_regr
 ```
-```{r Run regression P(right) ~ prev_action * reward and save in nback_regr_dat}
+
+```{r Run regression action ~ action_nback * reward_nback and save in nback_regr_dat}
 # Run regression models for each subject, for each n in n-back
-choice_predictors = c("left", "right")
+sel_rew_predictors = c("selected", "reward")
+# choice_predictors = c("left_rew", "right_rew")
 reward_predictors = c("reward", "noReward")
 
 nback_regr_dat = data.frame()
 for (subj in unique(all_files_regr$sID)) {
   for (n in 1:12) {
     subj_dat = subset(all_files_regr, sID == subj, !is.na(selected_box))
-    ## Add nback columns 
-    for (cond in c(choice_predictors, reward_predictors)) {
+    
+    ## Add nback columns
+    for (cond in c(reward_predictors, sel_rew_predictors)) {  # choice_predictors, 
       col_name = paste0("back", n, cond)
       subj_dat[,col_name] = c(rep(NA, n), subj_dat[1:(nrow(subj_dat)-n), cond])
     }
-    ## Choice model (predictors: left [reward: +1, no reward: -1], right [reward: +1, no reward: -1])
-    choice_formula = paste("selected_box ~ ", paste(paste0("back", n, choice_predictors), collapse = "+"))
-    choice_mod = glm(as.formula(choice_formula),
+    
+    ## Selected/rewarded model (predictors: selected [left: -1, right: +1], reward [left: -1, right: +1, none: 0])
+    sel_rew_formula = paste("selected_box ~", paste(paste0("back", n, sel_rew_predictors), collapse = " + "), "+ (1 | block)")
+    sel_rew_mod = glm(as.formula(sel_rew_formula),
               family = "binomial",
               data = subj_dat)
-    choice_coefs = as.data.frame(summary(choice_mod)$coef)
-    choice_coefss = cbind(sID = subj, predictor = rownames(choice_coefs), back = n, data.frame(choice_coefs, row.names = NULL))
-    ## Reward model (predictors: reward [left: -1, right: +1], no reward [left: -1, right: +1])
+    sel_rew_coefs = as.data.frame(summary(sel_rew_mod)$coef)
+    sel_rew_coefss = cbind(sID = subj, model = "selectedRewarded", predictor = rownames(sel_rew_coefs), back = n, data.frame(sel_rew_coefs, row.names = NULL))
+    
+    # ## Choice model (predictors: left_rew [reward: +1, no reward: -1, none: 0], right_rew [reward: +1, no reward: -1, none: 0])
+    # choice_formula = paste("selected_box ~ ", paste(paste0("back", n, choice_predictors), collapse = "+"))
+    # choice_mod = glm(as.formula(choice_formula),
+    #           family = "binomial",
+    #           data = subj_dat)
+    # choice_coefs = as.data.frame(summary(choice_mod)$coef)
+    # choice_coefss = cbind(sID = subj, model = "leftRight", predictor = rownames(choice_coefs), back = n, data.frame(choice_coefs, row.names = NULL))
+
+    ## Reward model (predictors: reward [left: -1, right: +1, none: 0], no reward [left: -1, right: +1, none: 0])
     reward_formula = paste("selected_box ~ ", paste(paste0("back", n, reward_predictors), collapse = "+"))
     reward_mod = glm(as.formula(reward_formula),
               family = "binomial",
               data = subj_dat)
     reward_coefs = as.data.frame(summary(reward_mod)$coef)
-    reward_coefss = cbind(sID = subj, predictor = rownames(reward_coefs), back = n, data.frame(reward_coefs, row.names = NULL))
+    reward_coefss = cbind(sID = subj, model = "rewardNoReward", predictor = rownames(reward_coefs), back = n, data.frame(reward_coefs, row.names = NULL))
     
-    nback_regr_dat = rbind(nback_regr_dat, choice_coefss, reward_coefss)
+    nback_regr_dat = rbind(nback_regr_dat, reward_coefss, sel_rew_coefss)  # , choice_coefss
   }
 }
-```
-```{r Beautify nback_regr_dat and plot relationship with age}
 # Beautify
 nback_regr_dat = merge(nback_regr_dat, ages, by.x = "sID", by.y = "ID", all.x = T)
 nback_regr_dat$predictor = gsub("back.", "", nback_regr_dat$predictor)
 nback_regr_dat$predictor = gsub("[0-99]", "", nback_regr_dat$predictor)
-
+nback_regr_dat$sig_Estimate = 1 / (1 + exp(-nback_regr_dat$Estimate / 2))  # transform so that I can see all
+# nback_regr_dat
+```
+```{r Plot relationship between regressors and age}
 # Plot
-gg_nback_regr_choice_agecont =
-  ggplot(subset(nback_regr_dat, predictor %in% c("left", "right") & back %in% seq(1, 12, 2)),
+gg_nback_regr_agecont =
+  ggplot(subset(nback_regr_dat, predictor != "(Intercept)" & back %in% seq(1, 12, 2)),
          aes(PreciseYrs, Estimate, color = predictor, fill = predictor, alpha = factor(12 - back))) +
   geom_smooth() +
   geom_point() +
-  labs(x = "Age (years)", y = "P(right) ~ choice_reward", color = "Choice", fill = "Choice", alpha = "# Trials back: 12-...")
-gg_nback_regr_reward_agecont = gg_nback_regr_choice_agecont
-gg_nback_regr_reward_agecont$data = subset(nback_regr_dat, predictor %in% c("reward", "noReward") & back %in% seq(1, 12, 2) & Estimate < 15)
+  labs(x = "Age (years)", y = "P(right) ~ choice_reward", color = "Choice", fill = "Choice", alpha = "# Trials back: 12-...") +
+  facet_grid(model ~ .)
+gg_nback_regr_agecont_sig = gg_nback_regr_agecont + aes(y = sig_Estimate)
 
-gg_nback_regr_choice_agecats =
-  ggplot(subset(nback_regr_dat, predictor %in% c("left", "right")), aes(back, Estimate, color = predictor, group = predictor)) +
-  stat_summary(fun.data = mean_se, geom = "bar") +
-  stat_summary(fun.data = mean_se, geom = "pointrange", color = "black") +
-  geom_point(position = "jitter", alpha = 0.15) +
+gg_nback_regr_agecats =
+  ggplot(subset(nback_regr_dat, predictor != "(Intercept)"), aes(back, Estimate, color = age_group, group = age_group)) +
+  # geom_point(position = "jitter", alpha = 0.15) +
+  stat_summary(fun.data = mean_se, geom = "pointrange") +
+  stat_summary(fun.data = mean_se, geom = "line") +
   labs(x = "# trials back", y = "beta weight", color = "Side") +
-  facet_grid(~ age_group)
-gg_nback_regr_reward_agecats = gg_nback_regr_choice_agecats
-gg_nback_regr_reward_agecats$data = subset(nback_regr_dat, predictor %in% c("reward", "noReward") & Estimate < 15)
+  facet_grid(~ predictor)
+gg_nback_regr_agecats_sig = gg_nback_regr_agecatss + aes(y = sig_Estimate)
 
 # Save plots
-ggsave(file.path(plot_dir, "gg_nback_regr_reward_agecats.png"), gg_nback_regr_reward_agecats)
-ggsave(file.path(plot_dir, "gg_nback_regr_choice_agecats.png"), gg_nback_regr_choice_agecats)
-ggsave(file.path(plot_dir, "gg_nback_regr_reward_agecont.png"), gg_nback_regr_reward_agecont)
-ggsave(file.path(plot_dir, "gg_nback_regr_choice_agecont.png"), gg_nback_regr_choice_agecont)
+ggsave(file.path(plot_dir, "gg_nback_regr_agecats.png"), gg_nback_regr_agecats)
+ggsave(file.path(plot_dir, "gg_nback_regr_agecont.png"), gg_nback_regr_agecont)
+ggsave(file.path(plot_dir, "gg_nback_regr_agecats_sig.png"), gg_nback_regr_agecats_sig)
+ggsave(file.path(plot_dir, "gg_nback_regr_agecont_sig.png"), gg_nback_regr_agecont_sig)
 ```
 ```{r Fit exponential model to regression weights}
 # Visualize one example
-dat = subset(nback_regr_dat, sID == 17 & predictor == "left")
-exp_mod = nls(Estimate ~ k * exp(-lambda * back), data = dat, start = list(k = .1, lambda = .1))
+dat = subset(nback_regr_dat, sID == 17 & predictor == "reward")
+# exp_mod = nls(Estimate ~ k * exp(-lambda * back), data = dat, start = list(k = .1, lambda = .1))
+exp_mod = nls(Estimate ~ k * exp(-back), data = dat, start = list(k = .1))
 plot(dat$back, dat$Estimate)
 lines(dat$back, predict(exp_mod, list(x = dat$back)))
 
 # Run on all participants
 exp_coefs = data.frame()
 for (subj in unique(nback_regr_dat$sID)) {
-  # print(subj)
   for (pred in unique(nback_regr_dat$predictor[nback_regr_dat$predictor != "(Intercept)"])) {
-    # print(pred)
     subj_dat = subset(nback_regr_dat, sID == subj & predictor == pred)
     exp_mod =
-      try(nls(Estimate ~ k * exp(-lambda * back), data = subj_dat, start = list(k = .1, lambda = .1)), silent = T)
+      try(nls(Estimate ~ k * exp(-back), data = subj_dat, start = list(k = .1)), silent = T)
     if (class(exp_mod) != "try-error") {
       subj_coefs = summary(exp_mod)$coef
-      subj_coefs = cbind(sID = subj, regr_predictor = pred, exp_predictor = rownames(subj_coefs), as.data.frame(subj_coefs, row.names = F))
+      # subj_coefs = cbind(sID = subj, regr_predictor = pred, exp_predictor = rownames(subj_coefs), as.data.frame(subj_coefs, row.names = F))
+      subj_coefs = cbind(sID = subj, regr_predictor = pred, exp_predictor = rownames(subj_coefs), as.data.frame(subj_coefs, row.names = '1'))
       exp_coefs = rbind(exp_coefs, subj_coefs)
     }
   }
 }
-exp_coefs
+exp_coefs = merge(exp_coefs, ages, by.x = "sID", by.y = "ID", all.x = T)
+exp_coefs$sig_Estimate = NA
+exp_coefs$sig_Estimate[exp_coefs$exp_predictor == "k"] = 1 / (1 + exp(-exp_coefs$Estimate[exp_coefs$exp_predictor == "k"] / 5))
+exp_coefs$sig_Estimate[exp_coefs$exp_predictor == "lambda"] = 1 / (1 + exp(-exp_coefs$Estimate[exp_coefs$exp_predictor == "lambda"] / .5))
 ```
 ```{r Plot parameters of the exponential model}
-exp_coefs = merge(exp_coefs, ages, by.x = "sID", by.y = "ID", all.x = T)
 gg_exp_coefs_age = ggplot(exp_coefs, aes(PreciseYrs, Estimate, color = regr_predictor)) +
   geom_point() +
   geom_smooth() +
   labs(y = "Regr beta ~ k * exp(-lambda * back)") +
   facet_wrap(~ exp_predictor, scale = "free")
+gg_exp_coefs_age_sig = gg_exp_coefs_age + aes(y = sig_Estimate)
 
 gg_exp_coefs_agecat =
   ggplot(subset(exp_coefs), aes(age_group, Estimate, color = regr_predictor, group = regr_predictor)) +
-  # geom_point(position = "jitter") +
+  geom_point(position = "jitter", alpha = 0.2) +
   stat_summary(fun.data = mean_se) +
   labs(y = "Regr beta ~ k * exp(-lambda * back)") +
   stat_summary(fun.data = mean_se, geom = "line") +
   facet_wrap(~ exp_predictor, scale = "free")
+gg_exp_coefs_agecat_sig = gg_exp_coefs_agecat + aes(y = sig_Estimate)
 
+ggsave(file.path(plot_dir, "gg_exp_coefs_age_sig.png"), gg_exp_coefs_age_sig)
+ggsave(file.path(plot_dir, "gg_exp_coefs_agecat_sig.png"), gg_exp_coefs_agecat_sig)
 ggsave(file.path(plot_dir, "gg_exp_coefs_age.png"), gg_exp_coefs_age)
 ggsave(file.path(plot_dir, "gg_exp_coefs_agecat.png"), gg_exp_coefs_agecat)
 ```
