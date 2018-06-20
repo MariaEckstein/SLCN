@@ -11,8 +11,10 @@ output: html_notebook
 # Why did my regression with 4 parameters not work? P(right) ~ right_reward + left_reward + right_noreward + left_noreward
 
 # TD:
-# fit exponential -> y = k exp(-lambda t)
-# fix gg_age_rewhist.png -> there is something wrong with it
+# exponential -> transform plot axes with 1 / (1 + exp(-k/5))
+# plot exponential lines on top of each other
+# fix the old 11 10 01 00 plot!
+# add number of previous incorrect as a predictor in my models
 
 
 gg_save = T
@@ -181,13 +183,13 @@ nback_regr_dat$predictor = gsub("[0-99]", "", nback_regr_dat$predictor)
 
 # Plot
 gg_nback_regr_choice_agecont =
-  ggplot(subset(nback_regr_dat, predictor %in% c("left", "right") & back %in% seq(2, 12, 2)),
+  ggplot(subset(nback_regr_dat, predictor %in% c("left", "right") & back %in% seq(1, 12, 2)),
          aes(PreciseYrs, Estimate, color = predictor, fill = predictor, alpha = factor(12 - back))) +
   geom_smooth() +
   geom_point() +
   labs(x = "Age (years)", y = "P(right) ~ choice_reward", color = "Choice", fill = "Choice", alpha = "# Trials back: 12-...")
 gg_nback_regr_reward_agecont = gg_nback_regr_choice_agecont
-gg_nback_regr_reward_agecont$data = subset(nback_regr_dat, predictor %in% c("reward", "noReward") & back %in% seq(2, 12, 2) & Estimate < 15)
+gg_nback_regr_reward_agecont$data = subset(nback_regr_dat, predictor %in% c("reward", "noReward") & back %in% seq(1, 12, 2) & Estimate < 15)
 
 gg_nback_regr_choice_agecats =
   ggplot(subset(nback_regr_dat, predictor %in% c("left", "right")), aes(back, Estimate, color = predictor, group = predictor)) +
@@ -204,6 +206,54 @@ ggsave(file.path(plot_dir, "gg_nback_regr_reward_agecats.png"), gg_nback_regr_re
 ggsave(file.path(plot_dir, "gg_nback_regr_choice_agecats.png"), gg_nback_regr_choice_agecats)
 ggsave(file.path(plot_dir, "gg_nback_regr_reward_agecont.png"), gg_nback_regr_reward_agecont)
 ggsave(file.path(plot_dir, "gg_nback_regr_choice_agecont.png"), gg_nback_regr_choice_agecont)
+```
+```{r Fit exponential model to regression weights}
+# Visualize one example
+dat = subset(nback_regr_dat, sID == 17 & predictor == "left")
+exp_mod = nls(Estimate ~ k * exp(-lambda * back), data = dat, start = list(k = .1, lambda = .1))
+plot(dat$back, dat$Estimate)
+lines(dat$back, predict(exp_mod, list(x = dat$back)))
+
+# Run on all participants
+exp_coefs = data.frame()
+for (subj in unique(nback_regr_dat$sID)) {
+  # print(subj)
+  for (pred in unique(nback_regr_dat$predictor[nback_regr_dat$predictor != "(Intercept)"])) {
+    # print(pred)
+    subj_dat = subset(nback_regr_dat, sID == subj & predictor == pred)
+    exp_mod =
+      try(nls(Estimate ~ k * exp(-lambda * back), data = subj_dat, start = list(k = .1, lambda = .1)), silent = T)
+    if (class(exp_mod) != "try-error") {
+      subj_coefs = summary(exp_mod)$coef
+      subj_coefs = cbind(sID = subj, regr_predictor = pred, exp_predictor = rownames(subj_coefs), as.data.frame(subj_coefs, row.names = F))
+      exp_coefs = rbind(exp_coefs, subj_coefs)
+    }
+  }
+}
+exp_coefs
+
+exp_coefs = merge(exp_coefs, ages, by.x = "sID", by.y = "ID", all.x = T)
+gg_exp_coefs_age = ggplot(exp_coefs, aes(PreciseYrs, Estimate, color = regr_predictor)) +
+  geom_point() +
+  geom_smooth() +
+  labs(y = "Regr beta ~ k * exp(-lambda * back)") +
+  facet_wrap(~ exp_predictor, scale = "free")
+
+# gg_exp_coefs_agecat =
+  ggplot(subset(exp_coefs), aes(age_group, Estimate, color = regr_predictor, group = regr_predictor)) +
+  # geom_point(position = "jitter") +
+  stat_summary(fun.data = mean_se) +
+  labs(y = "Regr beta ~ k * exp(-lambda * back)") +
+  stat_summary(fun.data = mean_se, geom = "line") +
+  facet_wrap(~ exp_predictor, scale = "free")
+
+ggsave(file.path(plot_dir, "gg_exp_coefs_age.png"), gg_exp_coefs_age)
+ggsave(file.path(plot_dir, "gg_exp_coefs_agecat.png"), gg_exp_coefs_agecat)
+
+x = seq(.01, 5, .01)
+y = exp(-1 * x)
+plot(x, y)
+
 ```
 ```{r Relationship with age and puberty: Other measures}
 # Overall ACC
@@ -251,7 +301,7 @@ gg_PDS_wsls = gg_age_wsls + aes(x = PDS)
 # Effect of reward history
 all_files
 rewhist_dat = ddply(all_files, .(sID, outcome_12_back), summarize,
-                    stay = sum(same_choice, na.rm = T))
+                    stay = mean(same_choice, na.rm = T))
 rewhist_dat = merge(rewhist_dat, ages, by.x = "sID", by.y = "ID", all.x = T)
 gg_age_rewhist =
   ggplot(subset(rewhist_dat, !is.na(outcome_12_back)), aes(PreciseYrs, stay, color = outcome_12_back)) +

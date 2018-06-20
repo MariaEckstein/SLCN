@@ -73,7 +73,7 @@ read_in_files = function() {
   
   all_files$outcome_12_back = paste(all_files$outcome_1_back, all_files$outcome_2_back)
   all_files$outcome_12_back = factor(all_files$outcome_12_back, levels = c("1 1", "1 0", "0 1", "0 0"))
-  all_files$same_choice = all_files$choice_1_back == all_files$choice_2_back
+  all_files$same_choice = all_files$choice_left == all_files$choice_1_back  # same choice in this trial as in the last?
   all_files$choice_12_back = ifelse(all_files$choice_1_back, "left", "right")
   all_files$choice_12_back[!all_files$same_choice | is.na(all_files$same_choice)] = NA
   all_files$reward_port = factor(all_files$correct_box, levels = c(0, 1), labels = c("Left", "Right"))
