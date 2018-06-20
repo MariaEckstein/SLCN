@@ -16,16 +16,18 @@ from fit_parameters import FitParameters
 # Fix context and self.context!
 
 # Model fitting parameters
-n_agents = 100
-agent_start_id = 200
-interactive_game = False
 run_on_cluster = False
+n_agents = 100
+agent_start_id = 400
+interactive_game = False
 
 fit_par_names = ['alpha', 'beta']
-do_fit_model = True
-do_simulate_agents = False
+learning_style = 'hierarchical'
+fit_model = True
+simulate_agents = False
 use_existing_data = True
 use_humans = True
+set_specific_parameters = False
 
 if run_on_cluster:
     base_path = '/home/bunge/maria/Desktop/Aliens'
@@ -34,7 +36,7 @@ if run_on_cluster:
 else:
     base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
     human_data_path = base_path + '/Data/version3.1/'
-    n_iter = 5 * 5
+    n_iter = 100 * 100
 agent_data_path = base_path + '/AlienGenRec/'
 
 
@@ -69,7 +71,7 @@ comp_stuff = {'phases': ['season', 'alien-same-season', 'item', 'alien'],
 agent_stuff = {'name': 'alien',
                'n_TS': 3,
                'beta_scaler': 3,
-               'learning_style': 'hierarchical',
+               'learning_style': learning_style,
                'mix_probs': False}
 
 parameters = {'par_names':
@@ -123,9 +125,15 @@ for file_name in file_names:
         print("Loading data {0}".format(file_name))
         agent_data = pd.read_csv(file_name)
 
-    elif do_simulate_agents:
+    elif simulate_agents:
         gen_pars = np.array([lim[0] + np.random.rand() * (lim[1] - lim[0]) for lim in parameters['par_soft_limits']])
         gen_pars[np.invert(parameters['fit_pars'])] = 0
+        if set_specific_parameters:
+            for i, par in enumerate(gen_pars):
+                change_par = input('Accept {0} of {1}? If not, type a new number.'.
+                                   format(parameters['par_names'][i], np.round(par, 2)))
+                if change_par:
+                    gen_pars[i] = float(change_par)
         print('Simulating {0} agent {1} with parameters {2}'.format(
             agent_stuff['learning_style'], agent_id, np.round(gen_pars, 3)))
         agent_data = fit_params.simulate_agent(all_pars=gen_pars)
@@ -136,7 +144,7 @@ for file_name in file_names:
     agent_data['sID'] = agent_id  # redundant but crashes otherwise...
 
     # STEP 2: Fit parameters
-    if do_fit_model:
+    if fit_model:
 
         # Clean data
         if use_humans:
@@ -173,7 +181,7 @@ for file_name in file_names:
     agent_data.to_csv(created_file_name)
 
     # STEP 3: Simulate agents with recovered parameters
-    if use_humans and do_simulate_agents:
+    if use_humans and simulate_agents:
         for sim_agent_id in range(n_agents):
             print('Simulating {0} agent {1} with parameters recovered from participant {3} {2}'.format(
                 agent_stuff['learning_style'], sim_agent_id, np.round(rec_pars, 3), agent_id))

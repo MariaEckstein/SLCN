@@ -1,10 +1,9 @@
 import numpy as np
-import pandas as pd
+# import pandas as pd
+import seaborn as sns
 from scipy.optimize import minimize
 from scipy.optimize import brute
-from scipy.optimize import basinhopping
-from BasinhoppinTakeStep import MyTakeStep
-from BasinhoppinBounds import MyBounds
+# from scipy.optimize import basinhopping
 from alien_task import Task
 from competition_phase import CompetitionPhase
 from alien_agents import Agent
@@ -132,7 +131,7 @@ class FitParameters(object):
         AIC = - 2 * agent.LL + self.n_fit_par
 
         if goal == 'calculate_NLL':
-            print(-agent.LL, vary_pars)
+            # print(-agent.LL, vary_pars)
             return -agent.LL
         elif goal == 'calculate_fit':
             return [-agent.LL, BIC, AIC]
@@ -146,20 +145,20 @@ class FitParameters(object):
             default_pars = self.parameters['default_pars']
 
         # Calculate the minimum value by brute force
-        n_eval_per_par = int(round(n_iter ** (1 / np.sum(self.parameters['fit_pars']))))
+        n_free_params = float(np.sum(self.parameters['fit_pars']))
+        n_eval_per_par = int(round(n_iter ** (1 / n_free_params)))
         minimization = brute(func=self.calculate_NLL,
                              ranges=([self.parameters['par_hard_limits'][i] for i in np.argwhere(self.parameters['fit_pars'])]),
-                             args=(agent_data, default_pars),  # , 'nelder-mead'
+                             args=(agent_data, default_pars),
                              Ns=n_eval_per_par,
                              full_output=True,
                              finish=None,
                              disp=True)
 
-        import seaborn as sns
         sns.heatmap(np.round(minimization[3], 0))
         sns.plt.show()
 
-        brute_fit_par = minimization[0]  # np.array([0.1, 0.1]),  #
+        brute_fit_par = minimization[0]
         print("Finished brute with values {0}, NLL {1}."
               .format(np.round(brute_fit_par, 3), np.round(minimization[1], 3)))
 
