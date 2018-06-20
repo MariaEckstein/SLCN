@@ -15,14 +15,14 @@ class Agent(object):
         if 'flat' in self.learning_style:
             self.mix_probs = False
         self.select_deterministic = 'flat' in self.learning_style  # Hack to select the right TS each time for the flat agent
-        self.id = agent_stuff['id']
+        # self.id = agent_stuff['id']
         [self.alpha, self.alpha_high,
          self.beta, self.beta_high,
          self.epsilon,
          self.forget,
          self.create_TS_biased_prefer_new,
          self.create_TS_biased_copy_old] = all_pars
-        self.beta = 6 * self.beta  # all parameters are on the same scale for fitting [0; 1]
+        self.beta = agent_stuff['beta_scaler'] * self.beta  # all parameters are on the same scale for fitting [0; 1]
         if self.alpha_high < 1e-5:
             self.alpha_high = self.alpha
         if self.beta_high < 1e-5:

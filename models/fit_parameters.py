@@ -24,19 +24,11 @@ class FitParameters(object):
         assert self.agent_stuff['name'] in ['alien', 'PS_']
         self.n_fit_par = sum(parameters['fit_pars'])
 
-    # def get_agent_data(self, way, data_path='', all_Q_columns=False, all_pars=()):
-    #     assert(way in ['simulate', 'real_data', 'interactive'])
-    #     if way in ['simulate', 'interactive']:
-    #         return self.simulate_agent(all_pars, all_Q_columns, interactive=way == 'interactive')
-    #     elif way == 'real_data':
-    #         return pd.read_csv(data_path)
-
-    def simulate_agent(self, all_pars, all_Q_columns, interactive=False):
+    def simulate_agent(self, all_pars, all_Q_columns=False, interactive=False):
 
         task = Task(self.task_stuff)
         agent = Agent(self.agent_stuff, all_pars, self.task_stuff)
-        record_data = RecordData(agent_id=agent.id,
-                                 mode='create_from_scratch',
+        record_data = RecordData(mode='create_from_scratch',
                                  task=task)
         if interactive:
             sim_int = SimulateInteractive(agent, self.agent_stuff['mix_probs'])
@@ -106,7 +98,7 @@ class FitParameters(object):
 
     def calculate_NLL(self, vary_pars, agent_data, default_pars="default", goal='calculate_NLL', suff='_rec'):
 
-        # Combine params_inf (current guess for fitted parameters) and default_pars (default parameters)
+        # Put vary_pars into default_pars
         if default_pars == "default":
             default_pars = self.parameters['default_pars']
         default_pars[np.argwhere(self.parameters['fit_pars'])] = vary_pars
@@ -114,8 +106,7 @@ class FitParameters(object):
         # Create agent with these parameters
         agent = Agent(self.agent_stuff, default_pars, self.task_stuff)
         if goal == 'add_decisions_and_fit':
-            record_data = RecordData(agent_id=agent.id,
-                                     mode='add_to_existing_data',
+            record_data = RecordData(mode='add_to_existing_data',
                                      agent_data=agent_data)
 
         # Let the agent do the task
@@ -141,7 +132,7 @@ class FitParameters(object):
         AIC = - 2 * agent.LL + self.n_fit_par
 
         if goal == 'calculate_NLL':
-            # print(-agent.LL, vary_pars)
+            print(-agent.LL, vary_pars)
             return -agent.LL
         elif goal == 'calculate_fit':
             return [-agent.LL, BIC, AIC]
@@ -155,37 +146,35 @@ class FitParameters(object):
             default_pars = self.parameters['default_pars']
 
         # Calculate the minimum value by brute force
+        n_eval_per_par = int(round(n_iter ** (1 / np.sum(self.parameters['fit_pars']))))
         minimization = brute(func=self.calculate_NLL,
                              ranges=([self.parameters['par_hard_limits'][i] for i in np.argwhere(self.parameters['fit_pars'])]),
-                             args=(agent_data, default_pars),
-                             Ns=n_iter,  # n_fit_par-te Wurzel aus (n_iter * 1000) -> gleich viel effort wie unten
+                             args=(agent_data, default_pars),  # , 'nelder-mead'
+                             Ns=n_eval_per_par,
                              full_output=True,
                              finish=None,
                              disp=True)
-        start_par = minimization[0]  # np.array([0.1, 0.1]),  #
-        print("Finished brute with values {0}!".format(str(np.round(start_par, 3))))
 
-        takestep = MyTakeStep(limits=(0, 1), stepsize=0.5)
-        bounds = MyBounds(limits=(0, 1))
-        minimization = basinhopping(func=self.calculate_NLL,
-                                    x0=start_par,
-                                    niter=n_iter,  # The number of basin hopping iterations
-                                    T=50.0,  # For best results T should be comparable to the separation (in function value) between local minima. it seems like NLLs are easily off by 100, telling from gg_gen_rec
-                                    # stepsize=0.5,  # initial step size for use in the random displacement. Ideally it should be comparable to the typical separation between local minima of the function being optimized. gg_gen_rec implies that alpha is often off by 0.25; beta by -5
-                                    take_step=takestep,  # never take a step outside of the limits
-                                    accept_test=bounds,  # Define a test which will be used to judge whether or not to accept the step. This will be used in addition to the Metropolis test based on “temperature” T.
-                                    minimizer_kwargs={'method': 'Nelder-Mead',  # options: Nelder-Mead, Powell, CG, BFGS
-                                                      'args': (agent_data, default_pars),
-                                                      'options': {'xatol': .01,  # 'gtol': .001, #
-                                                                  'fatol': .01,
-                                                                  'maxfev': 300}},  # 'maxiter': 100}},  #
-                                    disp=True)
-        fit_pars_lim = minimization.x
+        import seaborn as sns
+        sns.heatmap(np.round(minimization[3], 0))
+        sns.plt.show()
+
+        brute_fit_par = minimization[0]  # np.array([0.1, 0.1]),  #
+        print("Finished brute with values {0}, NLL {1}."
+              .format(np.round(brute_fit_par, 3), np.round(minimization[1], 3)))
+
+        minimization = minimize(fun=self.calculate_NLL,
+                                x0=brute_fit_par,
+                                args=(agent_data, default_pars),
+                                method='Nelder-Mead',
+                                options={'xatol': .01,
+                                         'fatol': 1e-5,
+                                         'maxfev': 1e5})
+        NM_fit_par = minimization.x
+        print("Finished Nelder-Mead with values {0}, NLL {1}."
+              .format(np.round(NM_fit_par, 3), np.round(minimization.fun, 3)))
 
         # Combine fit parameters and fixed parameters and return all
         fit_par_idx = np.argwhere(self.parameters['fit_pars'])
-        default_pars[fit_par_idx] = fit_pars_lim
+        default_pars[fit_par_idx] = NM_fit_par
         return default_pars
-
-    # def write_agent_data(self, agent_data, save_path, file_name=''):
-    #     agent_data.to_csv(save_path + file_name + "_" + str(agent_data['sID'][0]) + ".csv")
