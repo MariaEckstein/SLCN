@@ -3,7 +3,9 @@ import numpy as np
 import seaborn as sns
 from scipy.optimize import minimize
 from scipy.optimize import brute
-# from scipy.optimize import basinhopping
+from scipy.optimize import basinhopping
+from alien_take_step import AlienTakeStep
+from alien_bounds import AlienBounds
 from alien_task import Task
 from competition_phase import CompetitionPhase
 from alien_agents import Agent
@@ -131,7 +133,7 @@ class FitParameters(object):
         AIC = - 2 * agent.LL + self.n_fit_par
 
         if goal == 'calculate_NLL':
-            # print(-agent.LL, vary_pars)
+            print(-agent.LL, vary_pars)
             return -agent.LL
         elif goal == 'calculate_fit':
             return [-agent.LL, BIC, AIC]
@@ -147,33 +149,42 @@ class FitParameters(object):
         # Calculate the minimum value by brute force
         n_free_params = float(np.sum(self.parameters['fit_pars']))
         n_eval_per_par = int(round(n_iter ** (1 / n_free_params)))
-        minimization = brute(func=self.calculate_NLL,
+        brute_results = brute(func=self.calculate_NLL,
                              ranges=([self.parameters['par_hard_limits'][i] for i in np.argwhere(self.parameters['fit_pars'])]),
                              args=(agent_data, default_pars),
                              Ns=n_eval_per_par,
-                             full_output=True,
+                             full_output=True,  # False,  #
                              finish=None,
                              disp=True)
+        brute_fit_par = brute_results[0]  # brute_results  #
+        print("Finished brute with values {0}, NLL {1}."
+              .format(np.round(brute_fit_par, 3), np.round(brute_results[1], 3)))
 
-        sns.heatmap(np.round(minimization[3], 0))
+        # Plot heatmap
+        sns.heatmap(np.round(brute_results[3], 0))
         sns.plt.show()
 
-        brute_fit_par = minimization[0]
-        print("Finished brute with values {0}, NLL {1}."
-              .format(np.round(brute_fit_par, 3), np.round(minimization[1], 3)))
+        takestep = AlienTakeStep(stepsize=0.5)
+        bounds = AlienBounds(xmax=np.ones(np.sum(self.parameters['fit_pars'])), xmin=np.zeros(np.sum(self.parameters['fit_pars'])))
+        hoppin_results = basinhopping(func=self.calculate_NLL,
+                                    x0=brute_fit_par,
+                                    niter=n_iter,
+                                    T=5.0,
+                                    minimizer_kwargs={'method': 'Nelder-Mead',
+                                                      'args': (agent_data, default_pars),
+                                                      'options': {'xatol': .01,
+                                                                  'fatol': 1e-5,
+                                                                  'maxfev': 1e5}},
+                                    take_step=takestep,
+                                    accept_test=bounds,
+                                    callback=None,
+                                    disp=True)
+        hoppin_fit_par, hoppin_NLL = [hoppin_results.x, hoppin_results.fun]
 
-        minimization = minimize(fun=self.calculate_NLL,
-                                x0=brute_fit_par,
-                                args=(agent_data, default_pars),
-                                method='Nelder-Mead',
-                                options={'xatol': .01,
-                                         'fatol': 1e-5,
-                                         'maxfev': 1e5})
-        NM_fit_par = minimization.x
-        print("Finished Nelder-Mead with values {0}, NLL {1}."
-              .format(np.round(NM_fit_par, 3), np.round(minimization.fun, 3)))
+        print("Finished basin hopping with values {0}, NLL {1}."
+              .format(np.round(hoppin_fit_par, 3), np.round(hoppin_NLL, 3)))
 
         # Combine fit parameters and fixed parameters and return all
         fit_par_idx = np.argwhere(self.parameters['fit_pars'])
-        default_pars[fit_par_idx] = NM_fit_par
+        default_pars[fit_par_idx] = hoppin_fit_par
         return default_pars

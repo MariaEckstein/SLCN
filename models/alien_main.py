@@ -36,7 +36,7 @@ if run_on_cluster:
 else:
     base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
     human_data_path = base_path + '/Data/version3.1/'
-    n_iter = 100 * 100
+    n_iter = 50 * 50
 agent_data_path = base_path + '/AlienGenRec/'
 
 
