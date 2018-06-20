@@ -1,11 +1,12 @@
 import numpy as np
-# import pandas as pd
+import pandas as pd
 import seaborn as sns
 from scipy.optimize import minimize
 from scipy.optimize import brute
 from scipy.optimize import basinhopping
 from alien_take_step import AlienTakeStep
 from alien_bounds import AlienBounds
+from collect_minima import CollectMinima
 from alien_task import Task
 from competition_phase import CompetitionPhase
 from alien_agents import Agent
@@ -142,44 +143,46 @@ class FitParameters(object):
             record_data.add_fit(-agent.LL, BIC, AIC, suff=suff)
             return record_data.get()
 
-    def get_optimal_pars(self, agent_data, n_iter, default_pars="default"):
+    def get_optimal_pars(self, agent_data, n_iter, default_pars="default", prepare_plots=False):
         if default_pars == "default":
             default_pars = self.parameters['default_pars']
 
         # Calculate the minimum value by brute force
-        n_free_params = float(np.sum(self.parameters['fit_pars']))
-        n_eval_per_par = int(round(n_iter ** (1 / n_free_params)))
-        brute_results = brute(func=self.calculate_NLL,
-                             ranges=([self.parameters['par_hard_limits'][i] for i in np.argwhere(self.parameters['fit_pars'])]),
-                             args=(agent_data, default_pars),
-                             Ns=n_eval_per_par,
-                             full_output=True,  # False,  #
-                             finish=None,
-                             disp=True)
-        brute_fit_par = brute_results[0]  # brute_results  #
-        print("Finished brute with values {0}, NLL {1}."
-              .format(np.round(brute_fit_par, 3), np.round(brute_results[1], 3)))
+        if prepare_plots:
+            brute_results = brute(func=self.calculate_NLL,
+                                 ranges=([self.parameters['par_hard_limits'][i] for i in np.argwhere(self.parameters['fit_pars'])]),
+                                 args=(agent_data, default_pars),
+                                 Ns=40,
+                                 full_output=True,
+                                 finish=None,
+                                 disp=True)
+            brute_fit_par = brute_results[0]  # brute_results  #
+            print("Finished brute with values {0}, NLL {1}."
+                  .format(np.round(brute_fit_par, 3), np.round(brute_results[1], 3)))
 
-        # Plot heatmap
-        sns.heatmap(np.round(brute_results[3], 0))
-        sns.plt.show()
+            # Plot heatmap
+            sns.heatmap(np.round(brute_results[3], 0))
+            sns.plt.show()
 
-        takestep = AlienTakeStep(stepsize=0.5)
-        bounds = AlienBounds(xmax=np.ones(np.sum(self.parameters['fit_pars'])), xmin=np.zeros(np.sum(self.parameters['fit_pars'])))
+        n_free_pars = np.sum(self.parameters['fit_pars'])
+        bounds = AlienBounds(xmax=np.ones(n_free_pars), xmin=np.zeros(n_free_pars))
+        takestep = AlienTakeStep(stepsize=0.3, alpha_bounds=self.parameters['par_hard_limits'][0])  # so that the first step does not go outside [0, 1]
+        allminima = CollectMinima()
         hoppin_results = basinhopping(func=self.calculate_NLL,
-                                    x0=brute_fit_par,
-                                    niter=n_iter,
-                                    T=5.0,
-                                    minimizer_kwargs={'method': 'Nelder-Mead',
-                                                      'args': (agent_data, default_pars),
-                                                      'options': {'xatol': .01,
-                                                                  'fatol': 1e-5,
-                                                                  'maxfev': 1e5}},
-                                    take_step=takestep,
-                                    accept_test=bounds,
-                                    callback=None,
-                                    disp=True)
+                                      x0=.5 * np.ones(n_free_pars),  # brute_fit_par,
+                                      niter=20,
+                                      T=5.0,
+                                      minimizer_kwargs={'method': 'Nelder-Mead',
+                                                        'args': (agent_data, default_pars),
+                                                        'options': {'xatol': .1,
+                                                                    'fatol': .1,
+                                                                    'maxfev': 10}},
+                                      take_step=takestep,
+                                      accept_test=bounds,
+                                      callback=allminima,
+                                      disp=True)
         hoppin_fit_par, hoppin_NLL = [hoppin_results.x, hoppin_results.fun]
+        all_minima = allminima.get()
 
         print("Finished basin hopping with values {0}, NLL {1}."
               .format(np.round(hoppin_fit_par, 3), np.round(hoppin_NLL, 3)))

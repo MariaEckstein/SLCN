@@ -32,7 +32,7 @@ set_specific_parameters = False
 if run_on_cluster:
     base_path = '/home/bunge/maria/Desktop/Aliens'
     human_data_path = base_path + '/humanData/'
-    n_iter = 200 * 200  # How often in total should calculate_NLL be called in brute?
+    n_iter = 200 * 200  # How often in total should calculate_NLL be called in the minimizer?
 else:
     base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
     human_data_path = base_path + '/Data/version3.1/'
