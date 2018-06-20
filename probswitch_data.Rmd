@@ -7,11 +7,7 @@ output: html_notebook
 
 ```{r Set up parameters}
 
-# Questions:
-# Why did my regression with 4 parameters not work? P(right) ~ right_reward + left_reward + right_noreward + left_noreward
-
 # TD:
-# plot exponential lines on top of each other
 
 
 gg_save = T
@@ -274,7 +270,7 @@ all_files_regr
 ```{r Run regression action ~ action_nback * reward_nback and save in nback_regr_dat}
 # Run regression models for each subject, for each n in n-back
 sel_rew_predictors = c("selected", "reward")
-# choice_predictors = c("left_rew", "right_rew")
+choice_predictors = c("left_rew", "right_rew")
 reward_predictors = c("reward", "noReward")
 
 nback_regr_dat = data.frame()
@@ -283,7 +279,7 @@ for (subj in unique(all_files_regr$sID)) {
     subj_dat = subset(all_files_regr, sID == subj, !is.na(selected_box))
     
     ## Add nback columns
-    for (cond in c(reward_predictors, sel_rew_predictors)) {  # choice_predictors, 
+    for (cond in c(choice_predictors, reward_predictors, sel_rew_predictors)) {
       col_name = paste0("back", n, cond)
       subj_dat[,col_name] = c(rep(NA, n), subj_dat[1:(nrow(subj_dat)-n), cond])
     }
@@ -296,13 +292,13 @@ for (subj in unique(all_files_regr$sID)) {
     sel_rew_coefs = as.data.frame(summary(sel_rew_mod)$coef)
     sel_rew_coefss = cbind(sID = subj, model = "selectedRewarded", predictor = rownames(sel_rew_coefs), back = n, data.frame(sel_rew_coefs, row.names = NULL))
     
-    # ## Choice model (predictors: left_rew [reward: +1, no reward: -1, none: 0], right_rew [reward: +1, no reward: -1, none: 0])
-    # choice_formula = paste("selected_box ~ ", paste(paste0("back", n, choice_predictors), collapse = "+"))
-    # choice_mod = glm(as.formula(choice_formula),
-    #           family = "binomial",
-    #           data = subj_dat)
-    # choice_coefs = as.data.frame(summary(choice_mod)$coef)
-    # choice_coefss = cbind(sID = subj, model = "leftRight", predictor = rownames(choice_coefs), back = n, data.frame(choice_coefs, row.names = NULL))
+    ## Choice model (predictors: left_rew [reward: +1, no reward: -1, none: 0], right_rew [reward: +1, no reward: -1, none: 0])
+    choice_formula = paste("selected_box ~ ", paste(paste0("back", n, choice_predictors), collapse = "+"))
+    choice_mod = glm(as.formula(choice_formula),
+              family = "binomial",
+              data = subj_dat)
+    choice_coefs = as.data.frame(summary(choice_mod)$coef)
+    choice_coefss = cbind(sID = subj, model = "leftRight", predictor = rownames(choice_coefs), back = n, data.frame(choice_coefs, row.names = NULL))
 
     ## Reward model (predictors: reward [left: -1, right: +1, none: 0], no reward [left: -1, right: +1, none: 0])
     reward_formula = paste("selected_box ~ ", paste(paste0("back", n, reward_predictors), collapse = "+"))
@@ -312,7 +308,7 @@ for (subj in unique(all_files_regr$sID)) {
     reward_coefs = as.data.frame(summary(reward_mod)$coef)
     reward_coefss = cbind(sID = subj, model = "rewardNoReward", predictor = rownames(reward_coefs), back = n, data.frame(reward_coefs, row.names = NULL))
     
-    nback_regr_dat = rbind(nback_regr_dat, reward_coefss, sel_rew_coefss)  # , choice_coefss
+    nback_regr_dat = rbind(nback_regr_dat, choice_coefss, reward_coefss, sel_rew_coefss)
   }
 }
 # Beautify
@@ -340,7 +336,7 @@ gg_nback_regr_agecats =
   stat_summary(fun.data = mean_se, geom = "line") +
   labs(x = "# trials back", y = "beta weight", color = "Side") +
   facet_grid(~ predictor)
-gg_nback_regr_agecats_sig = gg_nback_regr_agecatss + aes(y = sig_Estimate)
+gg_nback_regr_agecats_sig = gg_nback_regr_agecats + aes(y = sig_Estimate)
 
 # Save plots
 ggsave(file.path(plot_dir, "gg_nback_regr_agecats.png"), gg_nback_regr_agecats)
