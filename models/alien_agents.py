@@ -22,7 +22,8 @@ class Agent(object):
          self.forget,
          self.create_TS_biased_prefer_new,
          self.create_TS_biased_copy_old] = all_pars
-        self.beta = agent_stuff['beta_scaler'] * self.beta  # all parameters are on the same scale for fitting [0; 1]
+        self.beta = agent_stuff['beta_scaler'] * self.beta
+        self.beta_high = agent_stuff['beta_high_scaler'] * self.beta_high
         if self.alpha_high < 1e-5:
             self.alpha_high = self.alpha
         if self.beta_high < 1e-5:

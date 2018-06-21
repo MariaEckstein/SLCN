@@ -1,12 +1,10 @@
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from scipy.optimize import minimize
 from scipy.optimize import brute
 from scipy.optimize import basinhopping
-from alien_take_step import AlienTakeStep
-from alien_bounds import AlienBounds
-from collect_minima import CollectMinima
+from basinhopping_specifics import AlienTakeStep, AlienBounds
+from minimizer_heatmap import PlotMinimizerHeatmap, CollectPaths, CollectMinima
 from alien_task import Task
 from competition_phase import CompetitionPhase
 from alien_agents import Agent
@@ -98,7 +96,7 @@ class FitParameters(object):
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()
 
-    def calculate_NLL(self, vary_pars, agent_data, default_pars="default", goal='calculate_NLL', suff='_rec'):
+    def calculate_NLL(self, vary_pars, agent_data, default_pars="default", collect_paths=None, goal='calculate_NLL', suff='_rec'):
 
         # Put vary_pars into default_pars
         if default_pars == "default":
@@ -134,7 +132,8 @@ class FitParameters(object):
         AIC = - 2 * agent.LL + self.n_fit_par
 
         if goal == 'calculate_NLL':
-            print(-agent.LL, vary_pars)
+            # print(-agent.LL, vary_pars)
+            collect_paths.add_point(np.array(vary_pars))
             return -agent.LL
         elif goal == 'calculate_fit':
             return [-agent.LL, BIC, AIC]
@@ -143,46 +142,60 @@ class FitParameters(object):
             record_data.add_fit(-agent.LL, BIC, AIC, suff=suff)
             return record_data.get()
 
-    def get_optimal_pars(self, agent_data, n_iter, default_pars="default", prepare_plots=False):
+    def get_optimal_pars(self, agent_data, minimizer_stuff, default_pars="default", prepare_plots=False):
         if default_pars == "default":
             default_pars = self.parameters['default_pars']
 
-        # Calculate the minimum value by brute force
         if prepare_plots:
+            file_name = minimizer_stuff['plot_save_path'] + '/ID' + str(agent_data.loc[0, 'sID'])
+            collect_paths = CollectPaths(colnames=self.parameters['fit_par_names'])
             brute_results = brute(func=self.calculate_NLL,
                                  ranges=([self.parameters['par_hard_limits'][i] for i in np.argwhere(self.parameters['fit_pars'])]),
-                                 args=(agent_data, default_pars),
-                                 Ns=40,
+                                 args=(agent_data, default_pars, collect_paths),
+                                 Ns=minimizer_stuff['brute_Ns'],
                                  full_output=True,
                                  finish=None,
                                  disp=True)
-            brute_fit_par = brute_results[0]  # brute_results  #
-            print("Finished brute with values {0}, NLL {1}."
-                  .format(np.round(brute_fit_par, 3), np.round(brute_results[1], 3)))
-
-            # Plot heatmap
-            sns.heatmap(np.round(brute_results[3], 0))
-            sns.plt.show()
+            print('Finished brute!')
+            if minimizer_stuff['create_plot']:
+                plot_heatmap = PlotMinimizerHeatmap(None, None, None, None)
+                plot_heatmap.plot_3d(brute_results, self.parameters['fit_par_names'], file_name)
+            heatmap_data = brute_results[3][2]
+            hoppin_minima = CollectMinima(colnames=self.parameters['fit_par_names'])
+            hoppin_paths = CollectPaths(colnames=self.parameters['fit_par_names'])  # empty dataframe to start from scratch for basinhoppin!
+        else:
+            hoppin_minima = None
+            hoppin_paths = None
 
         n_free_pars = np.sum(self.parameters['fit_pars'])
         bounds = AlienBounds(xmax=np.ones(n_free_pars), xmin=np.zeros(n_free_pars))
-        takestep = AlienTakeStep(stepsize=0.3, alpha_bounds=self.parameters['par_hard_limits'][0])  # so that the first step does not go outside [0, 1]
-        allminima = CollectMinima()
+        takestep = AlienTakeStep(stepsize=minimizer_stuff['hoppin_stepsize'],
+                                 alpha_bounds=self.parameters['par_hard_limits'][0])
         hoppin_results = basinhopping(func=self.calculate_NLL,
-                                      x0=.5 * np.ones(n_free_pars),  # brute_fit_par,
-                                      niter=20,
-                                      T=5.0,
+                                      x0=.5 * np.ones(n_free_pars),
+                                      niter=minimizer_stuff['NM_niter'],
+                                      T=minimizer_stuff['hoppin_T'],
                                       minimizer_kwargs={'method': 'Nelder-Mead',
-                                                        'args': (agent_data, default_pars),
-                                                        'options': {'xatol': .1,
-                                                                    'fatol': .1,
-                                                                    'maxfev': 10}},
+                                                        'args': (agent_data, default_pars, hoppin_paths),
+                                                        'options': {'xatol': minimizer_stuff['NM_xatol'],
+                                                                    'fatol': minimizer_stuff['NM_fatol'],
+                                                                    'maxfev': minimizer_stuff['NM_maxfev']}},
                                       take_step=takestep,
                                       accept_test=bounds,
-                                      callback=allminima,
+                                      callback=hoppin_minima,
                                       disp=True)
         hoppin_fit_par, hoppin_NLL = [hoppin_results.x, hoppin_results.fun]
-        all_minima = allminima.get()
+
+        if prepare_plots:
+            fin_res = np.append(hoppin_fit_par, hoppin_NLL) * np.ones((1, 4))
+            final_result = pd.DataFrame(fin_res, columns=self.parameters['fit_par_names'] + ['NLL'])
+            pd.DataFrame(hoppin_paths.get()).to_csv(file_name + '_paths.csv')
+            pd.DataFrame(heatmap_data).to_csv(file_name + '_heatmap.csv')
+            pd.DataFrame(hoppin_minima.get()).to_csv(file_name + '_hoppin.csv')
+            pd.DataFrame(final_result).to_csv(file_name + '_hopping_final_result.csv')
+            if minimizer_stuff['create_plot']:
+                plot_heatmap = PlotMinimizerHeatmap(heatmap_data, hoppin_minima.get(), hoppin_paths.get(), final_result)
+                plot_heatmap.plot(file_name)
 
         print("Finished basin hopping with values {0}, NLL {1}."
               .format(np.round(hoppin_fit_par, 3), np.round(hoppin_NLL, 3)))
