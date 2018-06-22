@@ -16,23 +16,25 @@ from minimizer_heatmap import PlotMinimizerHeatmap
 # Save Q and p for competition phase?
 # Fix context and self.context!
 
-# Model fitting parameters
-run_on_cluster = False
-n_agents = 100
-agent_start_id = 400
-interactive_game = False
-plot_heatmap_from_csvs = False
-main_part = True
-
+# Model parameters
 fit_par_names = ['alpha', 'beta', 'beta_high']
 learning_style = 'hierarchical'
-mix_probs = False
+mix_probs = True
+
+# Which analyses should the script perform?
+run_on_cluster = False
+interactive_game = False
+plot_heatmaps = False
+main_part = True
 fit_model = True
 simulate_agents = False
 use_existing_data = True
 use_humans = True
 set_specific_parameters = False
+n_agents = 100
+agent_start_id = 400
 
+# Don't touch
 if run_on_cluster:
     base_path = '/home/bunge/maria/Desktop/Aliens'
     human_data_path = base_path + '/humanData/'
@@ -41,16 +43,17 @@ else:
     human_data_path = base_path + '/Data/version3.1/'
 agent_data_path = base_path + '/AlienGenRec/'
 
-minimizer_stuff = {'prepare_plots': True,
+# How should the function be minimized?
+minimizer_stuff = {'save_plot_data': True,
                    'create_plot': not run_on_cluster,
                    'plot_save_path': agent_data_path,
-                   'brute_Ns': 8,
+                   'brute_Ns': 50,
                    'hoppin_T': 10.0,
                    'hoppin_stepsize': 0.5,
-                   'NM_niter': 3,
-                   'NM_xatol': .5,
-                   'NM_fatol': .5,
-                   'NM_maxfev': 10}
+                   'NM_niter': 100,
+                   'NM_xatol': .01,
+                   'NM_fatol': 1e-5,
+                   'NM_maxfev': 500}
 
 # Task parameters
 n_actions = 3
@@ -78,14 +81,17 @@ task_stuff = {'phases': ['1InitialLearning', '2CloudySeason', 'Refresher2', '3Pi
               'n_actions': n_actions,
               'n_contexts': 3,
               'TS': TSs}
+
 comp_stuff = {'phases': ['season', 'alien-same-season', 'item', 'alien'],
               'n_blocks': {'season': 3, 'alien-same-season': 3, 'item': 3, 'alien': 3}}
+
 agent_stuff = {'name': 'alien',
                'n_TS': 3,
                'beta_scaler': 2,
                'beta_high_scaler': 10,
                'learning_style': learning_style,
                'mix_probs': mix_probs}
+
 parameters = {'fit_par_names': fit_par_names,
               'par_names':
               ['alpha', 'alpha_high', 'beta', 'beta_high', 'epsilon', 'forget', 'create_TS_biased_prefer_new', 'create_TS_biased_copy_old'],
@@ -180,8 +186,7 @@ if main_part:
                 print("True parameters: {0}".format(np.round(gen_pars.values.astype(np.double), 3)))
 
             # Find parameters that minimize NLL
-            rec_pars = fit_params.get_optimal_pars(agent_data=agent_data, minimizer_stuff=minimizer_stuff,
-                                                   prepare_plots=True)
+            rec_pars = fit_params.get_optimal_pars(agent_data=agent_data, minimizer_stuff=minimizer_stuff)
             print("Fitted parameters: {0}".format(np.round(rec_pars, 3)))
 
             # Calculate NLL,... of minimizing parameters
@@ -207,13 +212,11 @@ if main_part:
                 agent_data.to_csv(created_file_name)
 
 # Plot heatmaps from saved data
-if plot_heatmap_from_csvs:
-    for id in range(134, 140):
+if plot_heatmaps:
+    for id in range(153, 155):
         file_name = minimizer_stuff['plot_save_path'] + '/ID' + str(id)
-        plot_heatmap = PlotMinimizerHeatmap(heatmap_data=pd.read_csv(file_name + '_heatmap.csv', header=0, index_col=0),
-                                            hoppin_minima=pd.read_csv(file_name + '_hoppin.csv', header=0, index_col=0),
-                                            hoppin_paths=pd.read_csv(file_name + '_paths.csv', header=0, index_col=0))
-        plot_heatmap.plot(file_name)
+        plot_heatmap = PlotMinimizerHeatmap(file_name)
+        plot_heatmap.plot_3d(parameters['fit_par_names'])
 
 # Play the game interactively to test agents
 if interactive_game:

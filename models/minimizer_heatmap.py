@@ -3,6 +3,7 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 from itertools import combinations
+import pickle
 
 
 class CollectPaths(object):
@@ -32,38 +33,24 @@ class CollectMinima(object):
 
 
 class PlotMinimizerHeatmap(object):
-    def __init__(self, heatmap_data, hoppin_minima, hoppin_paths, final_result):
-        self.heatmap_data = heatmap_data
-        self.hoppin_minima = hoppin_minima
-        self.hoppin_paths = hoppin_paths
-        self.final_result = final_result
+    def __init__(self, file_path):  # , heatmap_data, hoppin_minima, hoppin_paths, final_result
+        self.file_path = file_path
 
-    def plot(self, path):
+    def pickle_brute_results(self, brute_results):
+        with open(self.file_path + 'brute_results.pickle', 'wb') as handle:
+            pickle.dump(brute_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        # Prepare figure
-        fig = plt.figure()
-        ax = fig.add_subplot(111, aspect='equal')
+    def unpickle_brute_results(self):
+        with open(self.file_path + 'brute_results.pickle', 'rb') as handle:
+            return pickle.load(handle)
 
-        # Plot heatmap
-        sns.heatmap(self.heatmap_data)
+    def pickle_hoppin_results(self, hoppin_results):
+        with open(self.file_path + 'hoppin_results.pickle', 'wb') as handle:
+            pickle.dump(hoppin_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        # Add paths
-        x = self.hoppin_paths['beta'] * self.heatmap_data.shape[0]
-        y = self.hoppin_paths['alpha'] * self.heatmap_data.shape[0]
-        ax.scatter(x, y, marker='.', s=10, color='yellow')
-
-        # Add minima
-        x = self.hoppin_minima['beta'] * self.heatmap_data.shape[0]
-        y = self.hoppin_minima['alpha'] * self.heatmap_data.shape[0]
-        ax.scatter(x, y, marker='*', s=10, color='red')
-
-        # Add final result
-        x = self.final_result['alpha']
-        y = self.final_result['beta']
-        ax.scatter(x, y, marker='*', s=50, color='blue')
-
-        # Save figure as png
-        plt.savefig(path + 'heatmap.png')
+    def unpickle_hoppin_results(self):
+        with open(self.file_path + 'hoppin_results.pickle', 'rb') as handle:
+            return pickle.load(handle)
 
     @staticmethod
     def get_tril_positions(n):
@@ -71,7 +58,15 @@ class PlotMinimizerHeatmap(object):
         tril_pos = np.tril((np.arange(n ** 2) + 1).reshape(n, -1)).T.ravel()
         return tril_pos[tril_pos != 0]
 
-    def plot_3d(self, brute_results, fit_par_names, path=None):
+    def plot_3d(self, fit_par_names):
+        # Get data
+        brute_results = self.unpickle_brute_results()
+        hoppin_results = self.unpickle_hoppin_results()
+        hoppin_paths = hoppin_results['paths']
+        hoppin_minima = hoppin_results['minima']
+        hoppin_final_result = hoppin_results['final_result']
+
+        # Get plot positions
         n = len(fit_par_names) - 1
         combos = list(combinations(fit_par_names, 2))
         positions = self.get_tril_positions(n)
@@ -96,7 +91,20 @@ class PlotMinimizerHeatmap(object):
             min_xgrid = np.amin(X, axis=axes)
             min_ygrid = np.amin(Y, axis=axes)
 
+            # Create heatmap
             ax.pcolormesh(min_xgrid, min_ygrid, min_jout)
+
+            # Add paths
+            ax.scatter(hoppin_paths[xname], hoppin_paths[yname],
+                       marker='.', s=10, color='yellow')
+
+            # Add minima
+            ax.scatter(hoppin_minima[xname], hoppin_minima[yname],
+                       marker='*', s=10, color='red')
+
+            # Add final result
+            ax.scatter(hoppin_final_result[yname], hoppin_final_result[xname],
+                       marker='*', s=50, color='blue')
 
             # Add colorbar to each plot
             # plt.colorbar()
@@ -108,5 +116,4 @@ class PlotMinimizerHeatmap(object):
                 plt.ylabel(yname)
 
         plt.tight_layout()
-        # plt.show()
-        plt.savefig(path + 'heatmap.png')
+        plt.savefig(self.file_path + 'heatmap.png')

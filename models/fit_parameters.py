@@ -58,40 +58,40 @@ class FitParameters(object):
                 record_data.add_decisions(agent, total_trials, suff='', all_Q_columns=all_Q_columns)
                 total_trials += 1
 
-        task.set_phase('3PickAliens')
-        comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
-        for trial in range(sum(comp.n_trials)):
-            comp.prepare_trial(trial)
-            stimuli = comp.present_stimulus(trial)
-            selected = agent.competition_selection(stimuli, comp.current_phase)
-            if interactive:
-                print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
-                trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
-            record_data.add_behavior_and_decisions_comp(stimuli, selected, agent.Q_stimuli, agent.p_stimuli,
-                                                        total_trials, task.phase, comp.current_phase)
-            total_trials += 1
-
-        for phase in ['Refresher3', '5RainbowSeason']:
-            task.set_phase(phase)
-            agent.task_phase = phase
-            n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
-            for trial in range(n_trials):
-                if interactive:
-                    stimulus = sim_int.trial(trial)
-                    [task.context, task.alien] = stimulus
-                    sim_int.print_values_pre()
-                    action = int(input('Action (0, 1, 2):'))
-                else:
-                    task.prepare_trial(trial)
-                    stimulus = task.present_stimulus(trial)
-                    action = agent.select_action(stimulus)
-                [reward, correct] = task.produce_reward(action)
-                agent.learn(stimulus, action, reward)
-                if interactive:
-                    sim_int.print_values_post(action, reward, correct)
-                record_data.add_behavior(task, stimulus, action, reward, correct, total_trials, phase)
-                record_data.add_decisions(agent, total_trials, suff='', all_Q_columns=all_Q_columns)
-                total_trials += 1
+        # task.set_phase('3PickAliens')
+        # comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
+        # for trial in range(sum(comp.n_trials)):
+        #     comp.prepare_trial(trial)
+        #     stimuli = comp.present_stimulus(trial)
+        #     selected = agent.competition_selection(stimuli, comp.current_phase)
+        #     if interactive:
+        #         print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
+        #         trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
+        #     record_data.add_behavior_and_decisions_comp(stimuli, selected, agent.Q_stimuli, agent.p_stimuli,
+        #                                                 total_trials, task.phase, comp.current_phase)
+        #     total_trials += 1
+        #
+        # for phase in ['Refresher3', '5RainbowSeason']:
+        #     task.set_phase(phase)
+        #     agent.task_phase = phase
+        #     n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
+        #     for trial in range(n_trials):
+        #         if interactive:
+        #             stimulus = sim_int.trial(trial)
+        #             [task.context, task.alien] = stimulus
+        #             sim_int.print_values_pre()
+        #             action = int(input('Action (0, 1, 2):'))
+        #         else:
+        #             task.prepare_trial(trial)
+        #             stimulus = task.present_stimulus(trial)
+        #             action = agent.select_action(stimulus)
+        #         [reward, correct] = task.produce_reward(action)
+        #         agent.learn(stimulus, action, reward)
+        #         if interactive:
+        #             sim_int.print_values_post(action, reward, correct)
+        #         record_data.add_behavior(task, stimulus, action, reward, correct, total_trials, phase)
+        #         record_data.add_decisions(agent, total_trials, suff='', all_Q_columns=all_Q_columns)
+        #         total_trials += 1
 
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()
@@ -142,27 +142,25 @@ class FitParameters(object):
             record_data.add_fit(-agent.LL, BIC, AIC, suff=suff)
             return record_data.get()
 
-    def get_optimal_pars(self, agent_data, minimizer_stuff, default_pars="default", prepare_plots=False):
+    def get_optimal_pars(self, agent_data, minimizer_stuff, default_pars="default"):
         if default_pars == "default":
             default_pars = self.parameters['default_pars']
 
-        if prepare_plots:
+        if minimizer_stuff['save_plot_data']:
             file_name = minimizer_stuff['plot_save_path'] + '/ID' + str(agent_data.loc[0, 'sID'])
+            plot_heatmap = PlotMinimizerHeatmap(file_name)
             collect_paths = CollectPaths(colnames=self.parameters['fit_par_names'])
             brute_results = brute(func=self.calculate_NLL,
-                                 ranges=([self.parameters['par_hard_limits'][i] for i in np.argwhere(self.parameters['fit_pars'])]),
-                                 args=(agent_data, default_pars, collect_paths),
-                                 Ns=minimizer_stuff['brute_Ns'],
-                                 full_output=True,
-                                 finish=None,
-                                 disp=True)
+                                  ranges=([self.parameters['par_hard_limits'][i] for i in np.argwhere(self.parameters['fit_pars'])]),
+                                  args=(agent_data, default_pars, collect_paths),
+                                  Ns=minimizer_stuff['brute_Ns'],
+                                  full_output=True,
+                                  finish=None,
+                                  disp=True)
             print('Finished brute!')
-            if minimizer_stuff['create_plot']:
-                plot_heatmap = PlotMinimizerHeatmap(None, None, None, None)
-                plot_heatmap.plot_3d(brute_results, self.parameters['fit_par_names'], file_name)
-            heatmap_data = brute_results[3][2]
+            plot_heatmap.pickle_brute_results(brute_results)
             hoppin_minima = CollectMinima(colnames=self.parameters['fit_par_names'])
-            hoppin_paths = CollectPaths(colnames=self.parameters['fit_par_names'])  # empty dataframe to start from scratch for basinhoppin!
+            hoppin_paths = CollectPaths(colnames=self.parameters['fit_par_names'])  # reinitialize
         else:
             hoppin_minima = None
             hoppin_paths = None
@@ -186,16 +184,13 @@ class FitParameters(object):
                                       disp=True)
         hoppin_fit_par, hoppin_NLL = [hoppin_results.x, hoppin_results.fun]
 
-        if prepare_plots:
+        if minimizer_stuff['save_plot_data']:
             fin_res = np.append(hoppin_fit_par, hoppin_NLL) * np.ones((1, 4))
             final_result = pd.DataFrame(fin_res, columns=self.parameters['fit_par_names'] + ['NLL'])
-            pd.DataFrame(hoppin_paths.get()).to_csv(file_name + '_paths.csv')
-            pd.DataFrame(heatmap_data).to_csv(file_name + '_heatmap.csv')
-            pd.DataFrame(hoppin_minima.get()).to_csv(file_name + '_hoppin.csv')
-            pd.DataFrame(final_result).to_csv(file_name + '_hopping_final_result.csv')
-            if minimizer_stuff['create_plot']:
-                plot_heatmap = PlotMinimizerHeatmap(heatmap_data, hoppin_minima.get(), hoppin_paths.get(), final_result)
-                plot_heatmap.plot(file_name)
+            hoppin_results = {'final_result': final_result,
+                              'paths': hoppin_paths.get(),
+                              'minima': hoppin_minima.get()}
+            plot_heatmap.pickle_hoppin_results(hoppin_results)
 
         print("Finished basin hopping with values {0}, NLL {1}."
               .format(np.round(hoppin_fit_par, 3), np.round(hoppin_NLL, 3)))

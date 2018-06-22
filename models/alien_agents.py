@@ -15,7 +15,6 @@ class Agent(object):
         if 'flat' in self.learning_style:
             self.mix_probs = False
         self.select_deterministic = 'flat' in self.learning_style  # Hack to select the right TS each time for the flat agent
-        # self.id = agent_stuff['id']
         [self.alpha, self.alpha_high,
          self.beta, self.beta_high,
          self.epsilon,
@@ -28,7 +27,6 @@ class Agent(object):
             self.alpha_high = self.alpha
         if self.beta_high < 1e-5:
             self.beta_high = self.beta
-        # print(self.alpha, self.beta)
         self.forget_high = self.forget
         self.task_phase = np.nan
         # assert self.alpha >= 0  # Make sure that alpha is a number and is > 0
