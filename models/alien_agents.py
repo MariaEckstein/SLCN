@@ -194,10 +194,12 @@ class Agent(object):
         if phase == 'season':
             context = stimulus
             if self.learning_style == 'hierarchical':
+
                 # Calculate "stimulus values": Q(c) = \sum_{TS_i} \pi(TS_i|c) Q(TS_i|c)
                 Q_TSi_given_c = self.Q_high[context, :self.n_TS]
                 return self.marginalize(Q_TSi_given_c, self.beta_high)
             else:
+
                 # Context value = average value across aliens: Q(c) = \mean_{s_j} \sum_{a_i} Q(a_i|s_j,c) \pi(a_i|s_j,c)
                 return np.mean([self.marginalize(self.Q_low[context, alien, :], self.beta) for alien in range(self.n_aliens)])
 

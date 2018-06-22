@@ -18,21 +18,23 @@ from minimizer_heatmap import PlotMinimizerHeatmap
 
 # Model parameters
 fit_par_names = ['alpha', 'beta', 'beta_high']
-learning_style = 'hierarchical'
+learning_style = 's-flat'
 mix_probs = True
 
 # Which analyses should the script perform?
 run_on_cluster = False
-interactive_game = False
-plot_heatmaps = False
 main_part = True
-fit_model = True
-simulate_agents = False
-use_existing_data = True
-use_humans = True
-set_specific_parameters = False
-n_agents = 100
-agent_start_id = 400
+plot_heatmaps = True
+interactive_game = False
+
+if main_part:
+    fit_model = True
+    simulate_agents = False
+    use_existing_data = True
+    use_humans = True
+    set_specific_parameters = False
+    n_agents = 100
+    agent_start_id = 400
 
 # Don't touch
 if run_on_cluster:
@@ -47,13 +49,14 @@ agent_data_path = base_path + '/AlienGenRec/'
 minimizer_stuff = {'save_plot_data': True,
                    'create_plot': not run_on_cluster,
                    'plot_save_path': agent_data_path,
-                   'brute_Ns': 50,
+                   'verbose': True,
+                   'brute_Ns': 4,
                    'hoppin_T': 10.0,
                    'hoppin_stepsize': 0.5,
-                   'NM_niter': 100,
-                   'NM_xatol': .01,
-                   'NM_fatol': 1e-5,
-                   'NM_maxfev': 500}
+                   'NM_niter': 3,
+                   'NM_xatol': .1,
+                   'NM_fatol': .1,
+                   'NM_maxfev': 10}
 
 # Task parameters
 n_actions = 3
@@ -103,29 +106,29 @@ parameters = {'fit_par_names': fit_par_names,
               np.array([.1, 0.,    .1,       0.,       0.,        0.,       0.,       0.])}
 
 # Adjust things to user selection
-if use_existing_data:
-    if use_humans:
-        save_path = human_data_path
-        file_name_pattern = 'aliens'
+if main_part:
+    if use_existing_data:
+        if use_humans:
+            save_path = human_data_path
+            file_name_pattern = 'aliens'
+        else:
+            save_path = agent_data_path
+            file_name_pattern = 'sim_'
+        file_names = glob.glob(human_data_path + file_name_pattern + '*csv')
     else:
         save_path = agent_data_path
         file_name_pattern = 'sim_'
-    file_names = glob.glob(human_data_path + file_name_pattern + '*csv')
-else:
-    save_path = agent_data_path
-    file_name_pattern = 'sim_'
-    file_names = range(agent_start_id, agent_start_id + n_agents)
+        file_names = range(agent_start_id, agent_start_id + n_agents)
 
-parameters['fit_pars'] = np.array([par in parameters['fit_par_names'] for par in parameters['par_names']])
-fit_par_col_name = '_'.join([agent_stuff['learning_style'], '_'.join(parameters['fit_par_names'])])
-agent_stuff['fit_par'] = fit_par_col_name
+    parameters['fit_pars'] = np.array([par in parameters['fit_par_names'] for par in parameters['par_names']])
+    fit_par_col_name = '_'.join([agent_stuff['learning_style'], '_'.join(parameters['fit_par_names'])])
+    agent_stuff['fit_par'] = fit_par_col_name
 
-# Create folder to save output files
-if not os.path.isdir(save_path + '/fit_par/'):
-    os.makedirs(save_path + '/fit_par/')
+    # Create folder to save output files
+    if not os.path.isdir(save_path + '/fit_par/'):
+        os.makedirs(save_path + '/fit_par/')
 
-# Create / fit each agent / person
-if main_part:
+    # Create / fit each agent / person
     for file_name in file_names:
 
         # Get agent id

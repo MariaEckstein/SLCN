@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import seaborn as sns
 import pandas as pd
 import numpy as np
 from itertools import combinations
@@ -75,7 +74,7 @@ class PlotMinimizerHeatmap(object):
             # Specify subplot
             ax = plt.subplot(n, n, pos)
 
-            # Find index for these variables
+            # Find index for the two paratemers
             xi = fit_par_names.index(xname)
             yi = fit_par_names.index(yname)
 
@@ -83,7 +82,7 @@ class PlotMinimizerHeatmap(object):
             X = brute_results[2][xi]
             Y = brute_results[2][yi]
 
-            # Find other axis to collapse
+            # Find other axes to collapse
             axes = tuple([ii for ii in range(brute_results[3].ndim) if ii not in (xi, yi)])
 
             # Collapse to minimum Jout
@@ -94,20 +93,13 @@ class PlotMinimizerHeatmap(object):
             # Create heatmap
             ax.pcolormesh(min_xgrid, min_ygrid, min_jout)
 
-            # Add paths
+            # Add basin hopping paths, minima, and final result
             ax.scatter(hoppin_paths[xname], hoppin_paths[yname],
                        marker='.', s=10, color='yellow')
-
-            # Add minima
             ax.scatter(hoppin_minima[xname], hoppin_minima[yname],
                        marker='*', s=10, color='red')
-
-            # Add final result
             ax.scatter(hoppin_final_result[yname], hoppin_final_result[xname],
                        marker='*', s=50, color='blue')
-
-            # Add colorbar to each plot
-            # plt.colorbar()
 
             # Add labels to edge only
             if pos >= n ** 2 - n:

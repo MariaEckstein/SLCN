@@ -24,23 +24,23 @@ class FitParameters(object):
         assert self.agent_stuff['name'] in ['alien', 'PS_']
         self.n_fit_par = sum(parameters['fit_pars'])
 
-    def simulate_agent(self, all_pars, all_Q_columns=False, interactive=False):
+    def simulate_agent(self, all_pars, interactive=False):
 
+        # Initialize task, agent, record, and interactive game
         task = Task(self.task_stuff)
         agent = Agent(self.agent_stuff, all_pars, self.task_stuff)
-        record_data = RecordData(mode='create_from_scratch',
-                                 task=task)
+        record_data = RecordData(mode='create_from_scratch', task=task)
         if interactive:
             sim_int = SimulateInteractive(agent, self.agent_stuff['mix_probs'])
 
+        # Play the game, phase by phase, trial by trial
         total_trials = 0
         for phase in ['1InitialLearning', '2CloudySeason', 'Refresher2']:
             task.set_phase(phase)
             agent.task_phase = phase
             n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
+            agent.prev_context = 99
             for trial in range(n_trials):
-                if trial == 0 and phase == '2CloudySeason':
-                    agent.prev_context = 99
                 if interactive:
                     stimulus = sim_int.trial(trial)
                     [task.context, task.alien] = stimulus
@@ -55,7 +55,7 @@ class FitParameters(object):
                 if interactive:
                     sim_int.print_values_post(action, reward, correct)
                 record_data.add_behavior(task, stimulus, action, reward, correct, total_trials, phase)
-                record_data.add_decisions(agent, total_trials, suff='', all_Q_columns=all_Q_columns)
+                record_data.add_decisions(agent, total_trials, suff='')
                 total_trials += 1
 
         # task.set_phase('3PickAliens')
@@ -96,15 +96,16 @@ class FitParameters(object):
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()
 
-    def calculate_NLL(self, vary_pars, agent_data, default_pars="default", collect_paths=None, goal='calculate_NLL', suff='_rec'):
+    def calculate_NLL(self, vary_pars, agent_data, all_pars="default", collect_paths=None, verbose=False,
+                      goal='calculate_NLL', suff='_rec'):
 
-        # Put vary_pars into default_pars
-        if default_pars == "default":
-            default_pars = self.parameters['default_pars']
-        default_pars[np.argwhere(self.parameters['fit_pars'])] = vary_pars
+        # Get agent parameters
+        if all_pars == "default":
+            all_pars = self.parameters['default_pars']
+        all_pars[np.argwhere(self.parameters['fit_pars'])] = vary_pars
 
-        # Create agent with these parameters
-        agent = Agent(self.agent_stuff, default_pars, self.task_stuff)
+        # Initialize agent and record
+        agent = Agent(self.agent_stuff, all_pars, self.task_stuff)
         if goal == 'add_decisions_and_fit':
             record_data = RecordData(mode='add_to_existing_data',
                                      agent_data=agent_data)
@@ -128,11 +129,13 @@ class FitParameters(object):
             if goal == 'add_decisions_and_fit':
                 record_data.add_decisions(agent, trial, suff=suff)
 
+        # Calculate fit of this set of parameters
         BIC = - 2 * agent.LL + self.n_fit_par * np.log(n_trials)
         AIC = - 2 * agent.LL + self.n_fit_par
 
         if goal == 'calculate_NLL':
-            # print(-agent.LL, vary_pars)
+            if verbose:
+                print(-agent.LL, vary_pars)
             collect_paths.add_point(np.array(vary_pars))
             return -agent.LL
         elif goal == 'calculate_fit':
@@ -142,17 +145,17 @@ class FitParameters(object):
             record_data.add_fit(-agent.LL, BIC, AIC, suff=suff)
             return record_data.get()
 
-    def get_optimal_pars(self, agent_data, minimizer_stuff, default_pars="default"):
-        if default_pars == "default":
-            default_pars = self.parameters['default_pars']
+    def get_optimal_pars(self, agent_data, minimizer_stuff, all_pars="default"):
+        if all_pars == "default":
+            all_pars = self.parameters['default_pars']
 
         if minimizer_stuff['save_plot_data']:
             file_name = minimizer_stuff['plot_save_path'] + '/ID' + str(agent_data.loc[0, 'sID'])
             plot_heatmap = PlotMinimizerHeatmap(file_name)
-            collect_paths = CollectPaths(colnames=self.parameters['fit_par_names'])
+            hoppin_paths = CollectPaths(colnames=self.parameters['fit_par_names'])
             brute_results = brute(func=self.calculate_NLL,
                                   ranges=([self.parameters['par_hard_limits'][i] for i in np.argwhere(self.parameters['fit_pars'])]),
-                                  args=(agent_data, default_pars, collect_paths),
+                                  args=(agent_data, all_pars, hoppin_paths, minimizer_stuff['verbose']),
                                   Ns=minimizer_stuff['brute_Ns'],
                                   full_output=True,
                                   finish=None,
@@ -174,7 +177,7 @@ class FitParameters(object):
                                       niter=minimizer_stuff['NM_niter'],
                                       T=minimizer_stuff['hoppin_T'],
                                       minimizer_kwargs={'method': 'Nelder-Mead',
-                                                        'args': (agent_data, default_pars, hoppin_paths),
+                                                        'args': (agent_data, all_pars, hoppin_paths, minimizer_stuff['verbose']),
                                                         'options': {'xatol': minimizer_stuff['NM_xatol'],
                                                                     'fatol': minimizer_stuff['NM_fatol'],
                                                                     'maxfev': minimizer_stuff['NM_maxfev']}},
@@ -197,5 +200,5 @@ class FitParameters(object):
 
         # Combine fit parameters and fixed parameters and return all
         fit_par_idx = np.argwhere(self.parameters['fit_pars'])
-        default_pars[fit_par_idx] = hoppin_fit_par
-        return default_pars
+        all_pars[fit_par_idx] = hoppin_fit_par
+        return all_pars
