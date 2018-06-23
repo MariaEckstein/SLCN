@@ -14,13 +14,13 @@ class AlienBounds(object):
 
 
 class AlienTakeStep(object):
-    def __init__(self, stepsize=0.5, alpha_bounds=np.array([0, 1])):
+    def __init__(self, stepsize=0.5, bounds=np.array([0, 1])):
         self.stepsize = stepsize
-        self.alpha_bounds = alpha_bounds
+        self.bounds = bounds
 
     def __call__(self, x):
         s = self.stepsize
-        new_x0 = x[0] + np.random.uniform(-s, s)
-        x[0] = max(min(new_x0, self.alpha_bounds[1] - 1e-5), self.alpha_bounds[0] + 1e-5)
-
-        return x
+        new_x = x + np.random.uniform(-s, s, x.shape)
+        new_x[np.array(new_x) < self.bounds[0]] = self.bounds[0] + 1e-3
+        new_x[np.array(new_x) > self.bounds[1]] = self.bounds[1] - 1e-3
+        return new_x

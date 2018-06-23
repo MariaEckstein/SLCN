@@ -96,12 +96,11 @@ class FitParameters(object):
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()
 
-    def calculate_NLL(self, vary_pars, agent_data, all_pars="default", collect_paths=None, verbose=False,
+    def calculate_NLL(self, vary_pars, agent_data, collect_paths=None, verbose=False,
                       goal='calculate_NLL', suff='_rec'):
 
         # Get agent parameters
-        if all_pars == "default":
-            all_pars = self.parameters['default_pars']
+        all_pars = self.parameters['default_pars']
         all_pars[np.argwhere(self.parameters['fit_pars'])] = vary_pars
 
         # Initialize agent and record
@@ -145,9 +144,7 @@ class FitParameters(object):
             record_data.add_fit(-agent.LL, BIC, AIC, suff=suff)
             return record_data.get()
 
-    def get_optimal_pars(self, agent_data, minimizer_stuff, all_pars="default"):
-        if all_pars == "default":
-            all_pars = self.parameters['default_pars']
+    def get_optimal_pars(self, agent_data, minimizer_stuff):
 
         if minimizer_stuff['save_plot_data']:
             file_name = minimizer_stuff['plot_save_path'] + '/ID' + str(agent_data.loc[0, 'sID'])
@@ -155,7 +152,7 @@ class FitParameters(object):
             hoppin_paths = CollectPaths(colnames=self.parameters['fit_par_names'])
             brute_results = brute(func=self.calculate_NLL,
                                   ranges=([self.parameters['par_hard_limits'][i] for i in np.argwhere(self.parameters['fit_pars'])]),
-                                  args=(agent_data, all_pars, hoppin_paths, minimizer_stuff['verbose']),
+                                  args=(agent_data, hoppin_paths, minimizer_stuff['verbose']),
                                   Ns=minimizer_stuff['brute_Ns'],
                                   full_output=True,
                                   finish=None,
@@ -171,13 +168,13 @@ class FitParameters(object):
         n_free_pars = np.sum(self.parameters['fit_pars'])
         bounds = AlienBounds(xmax=np.ones(n_free_pars), xmin=np.zeros(n_free_pars))
         takestep = AlienTakeStep(stepsize=minimizer_stuff['hoppin_stepsize'],
-                                 alpha_bounds=self.parameters['par_hard_limits'][0])
+                                 bounds=self.parameters['par_hard_limits'][0])
         hoppin_results = basinhopping(func=self.calculate_NLL,
                                       x0=.5 * np.ones(n_free_pars),
                                       niter=minimizer_stuff['NM_niter'],
                                       T=minimizer_stuff['hoppin_T'],
                                       minimizer_kwargs={'method': 'Nelder-Mead',
-                                                        'args': (agent_data, all_pars, hoppin_paths, minimizer_stuff['verbose']),
+                                                        'args': (agent_data, hoppin_paths, minimizer_stuff['verbose']),
                                                         'options': {'xatol': minimizer_stuff['NM_xatol'],
                                                                     'fatol': minimizer_stuff['NM_fatol'],
                                                                     'maxfev': minimizer_stuff['NM_maxfev']}},
@@ -190,15 +187,15 @@ class FitParameters(object):
         if minimizer_stuff['save_plot_data']:
             fin_res = np.append(hoppin_fit_par, hoppin_NLL) * np.ones((1, 4))
             final_result = pd.DataFrame(fin_res, columns=self.parameters['fit_par_names'] + ['NLL'])
-            hoppin_results = {'final_result': final_result,
-                              'paths': hoppin_paths.get(),
-                              'minima': hoppin_minima.get()}
-            plot_heatmap.pickle_hoppin_results(hoppin_results)
+            final_result.to_csv(plot_heatmap.file_path + 'hoppin_result.csv')
+            hoppin_paths.get().to_csv(plot_heatmap.file_path + 'hoppin_paths.csv')
+            hoppin_minima.get().to_csv(plot_heatmap.file_path + 'hoppin_minima.csv')
 
         print("Finished basin hopping with values {0}, NLL {1}."
               .format(np.round(hoppin_fit_par, 3), np.round(hoppin_NLL, 3)))
 
         # Combine fit parameters and fixed parameters and return all
         fit_par_idx = np.argwhere(self.parameters['fit_pars'])
-        all_pars[fit_par_idx] = hoppin_fit_par
-        return all_pars
+        minimized_pars = self.parameters['default_pars']
+        minimized_pars[fit_par_idx] = hoppin_fit_par
+        return minimized_pars
