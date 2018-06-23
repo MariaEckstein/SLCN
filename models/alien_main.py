@@ -1,6 +1,7 @@
-def run(file_name=None, run_on_cluster=False, main_part=True, plot_heatmaps=False, interactive_game=False):
+def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, interactive_game=False,
+        fit_model=True, simulate_agents=False, use_humans=False):
+
     import numpy as np
-    import glob
     import os
     import pandas as pd
     from fit_parameters import FitParameters
@@ -23,13 +24,12 @@ def run(file_name=None, run_on_cluster=False, main_part=True, plot_heatmaps=Fals
 
     # Adjust exact modeling
     if main_part:
-        fit_model = True
-        simulate_agents = True
-        use_existing_data = False
-        use_humans = False
         set_specific_parameters = False
         n_agents = 100
-        agent_start_id = 700
+        if isinstance(file_name, int):
+            use_existing_data = False
+        else:
+            use_existing_data = True
 
     # Don't touch
     if run_on_cluster:
@@ -221,7 +221,7 @@ def run(file_name=None, run_on_cluster=False, main_part=True, plot_heatmaps=Fals
 
     # Play the game interactively to test agents
     if interactive_game:
-        agent_stuff['id'] = agent_start_id
+        agent_stuff['id'] = 0
 
         # Adjust parameters
         for feature_name in ['learning_style', 'mix_probs']:
