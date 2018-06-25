@@ -42,7 +42,7 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
     plot_save_path = agent_data_path + '/heatmaps/'
 
     # How should the function be minimized?
-    minimizer_stuff = {'save_plot_data': True,
+    minimizer_stuff = {'save_plot_data': False,
                        'create_plot': not run_on_cluster,
                        'plot_save_path': plot_save_path,
                        'verbose': True,
@@ -105,13 +105,13 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
     if main_part:
         if use_existing_data:
             if use_humans:
-                save_path = human_data_path
+                save_path = human_data_path + '/fit_pars/'
                 file_name_pattern = 'aliens'
             else:
-                save_path = agent_data_path
+                save_path = agent_data_path + '/fit_pars/'
                 file_name_pattern = 'sim_'
         else:
-            save_path = agent_data_path
+            save_path = agent_data_path + '/fit_pars/'
             file_name_pattern = 'sim_'
 
         parameters['fit_pars'] = np.array([par in parameters['fit_par_names'] for par in parameters['par_names']])
@@ -119,8 +119,8 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
         agent_stuff['fit_par'] = fit_par_col_name
 
         # Create folder to save output files
-        if not os.path.isdir(save_path + '/fit_par/'):
-            os.makedirs(save_path + '/fit_par/')
+        if not os.path.isdir(save_path):
+            os.makedirs(save_path)
 
         # Create / fit each agent / person
         # Get agent id
@@ -192,7 +192,7 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
                                                   suff='_rec')
 
         # Write agent_data as csv
-        created_file_name = save_path + '/fit_par/' + file_name_pattern + str(agent_id) + ".csv"
+        created_file_name = save_path + file_name_pattern + str(agent_id) + ".csv"
         print("Saving fitted data to {0}".format(created_file_name))
         agent_data.to_csv(created_file_name)
 
@@ -203,7 +203,7 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
                     agent_stuff['learning_style'], sim_agent_id, np.round(rec_pars, 3), agent_id))
                 agent_data = fit_params.simulate_agent(all_pars=rec_pars)
 
-                created_file_name = save_path + '/fit_par/' + file_name_pattern + str(agent_id) + '_' + str(sim_agent_id) + ".csv"
+                created_file_name = save_path + file_name_pattern + str(agent_id) + '_' + str(sim_agent_id) + ".csv"
                 print("Saving data to {0}".format(created_file_name))
                 agent_data.to_csv(created_file_name)
 
@@ -214,7 +214,7 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
         if not os.path.isdir(plot_save_path):
             os.makedirs(plot_save_path)
 
-        for id in range(400, 450):
+        for id in range(731, 800):
             file_name = minimizer_stuff['plot_save_path'] + '/ID' + str(id)
             plot_heatmap = PlotMinimizerHeatmap(file_name)
             plot_heatmap.plot_3d(parameters['fit_par_names'])

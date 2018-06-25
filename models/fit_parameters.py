@@ -135,7 +135,8 @@ class FitParameters(object):
         if goal == 'calculate_NLL':
             if verbose:
                 print(-agent.LL, vary_pars)
-            collect_paths.add_point(np.array(vary_pars))
+            if collect_paths:
+                collect_paths.add_point(np.array(vary_pars))
             return -agent.LL
         elif goal == 'calculate_fit':
             return [-agent.LL, BIC, AIC]
