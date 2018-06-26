@@ -1,5 +1,7 @@
-def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, interactive_game=False,
-        fit_model=True, simulate_agents=False, use_humans=False):
+def run(file_name='C:/Users/maria/MEGAsync/Berkeley/TaskSets/AlienGenRec/sim_400.csv',
+        run_on_cluster=False, main_part=True, fit_model=True, fit_par_names=('alpha', 'beta'),
+        simulate_agents_post_fit=False, use_humans=False,
+        plot_heatmaps=False, interactive_game=True):
 
     import numpy as np
     import os
@@ -17,18 +19,15 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
     # Save Q and p for competition phase?
     # Fix context and self.context!
 
-    # Model parameters
-    fit_par_names = ['alpha', 'beta', 'beta_high']
-    learning_style = 'hierarchical'
-    mix_probs = True
-
     # Adjust exact modeling
     if main_part:
         set_specific_parameters = False
         n_agents = 100
         if isinstance(file_name, int):
+            simulate_agents = True
             use_existing_data = False
         else:
+            simulate_agents = False
             use_existing_data = True
 
     # Don't touch
@@ -87,19 +86,17 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
     agent_stuff = {'name': 'alien',
                    'n_TS': 3,
                    'beta_scaler': 2,
-                   'beta_high_scaler': 4,
-                   'learning_style': learning_style,
-                   'mix_probs': mix_probs}
+                   'beta_high_scaler': 4}
 
     parameters = {'fit_par_names': fit_par_names,
                   'par_names':
-                  ['alpha', 'alpha_high', 'beta', 'beta_high', 'epsilon', 'forget', 'create_TS_biased_prefer_new', 'create_TS_biased_copy_old'],
+                  ['alpha', 'alpha_high', 'beta', 'beta_high', 'epsilon', 'forget', 'TS_bias'],
                   'par_hard_limits':  # no values fitted outside; beta will be multiplied by 6 inside of alien_agents.py!
-                  ((0., 1.), (0., 1.), (0., 1.), (0., 1.), (0., 1.),  (0., 1.), (0., 1.), (0., 1.)),
+                  ((0., 1.), (0., 1.), (0., 1.), (0., 1.), (0., 1.),  (0., 1.), (0., 1.)),
                   'par_soft_limits':  # no simulations outside
-                  ((0., .5), (0., .5), (0., 1.), (0., 1.), (0., .25), (0., .1), (0., 1.), (0., 1.)),
+                  ((0., .5), (0., .5), (0., 1.), (0., 1.), (0., .25), (0., .1), (0., 1.)),
                   'default_pars':  # when a parameter is fixed
-                  np.array([.1, 0.,     .1,       0.,       0.,        0.,       0.,       0.])}
+                  np.array([.1, 0.,     .1,       100.,     0.,        0.,       1.5])}
 
     # Adjust things to user selection
     if main_part:
@@ -115,7 +112,7 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
             file_name_pattern = 'sim_'
 
         parameters['fit_pars'] = np.array([par in parameters['fit_par_names'] for par in parameters['par_names']])
-        fit_par_col_name = '_'.join([agent_stuff['learning_style'], '_'.join(parameters['fit_par_names'])])
+        fit_par_col_name = '_'.join(parameters['fit_par_names'])
         agent_stuff['fit_par'] = fit_par_col_name
 
         # Create folder to save output files
@@ -133,8 +130,7 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
         agent_stuff['id'] = agent_id
 
         # Specify model
-        fit_params = FitParameters(parameters=parameters, task_stuff=task_stuff,
-                                   comp_stuff=comp_stuff, agent_stuff=agent_stuff)
+        fit_params = FitParameters(parameters, task_stuff, comp_stuff, agent_stuff)
 
         # STEP 1: Get data
         if use_existing_data:
@@ -150,8 +146,7 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
                                        format(parameters['par_names'][i], np.round(par, 2)))
                     if change_par:
                         gen_pars[i] = float(change_par)
-            print('Simulating {0} agent {1} with parameters {2}'.format(
-                agent_stuff['learning_style'], agent_id, np.round(gen_pars, 3)))
+            print('Simulating agent {0} with parameters {1}'.format(agent_id, np.round(gen_pars, 3)))
             agent_data = fit_params.simulate_agent(all_pars=gen_pars)
 
             created_file_name = save_path + file_name_pattern + str(agent_id) + ".csv"
@@ -197,10 +192,10 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
         agent_data.to_csv(created_file_name)
 
         # STEP 3: Simulate agents with recovered parameters
-        if use_humans and simulate_agents:
+        if use_humans and simulate_agents_post_fit:
             for sim_agent_id in range(n_agents):
-                print('Simulating {0} agent {1} with parameters recovered from participant {3} {2}'.format(
-                    agent_stuff['learning_style'], sim_agent_id, np.round(rec_pars, 3), agent_id))
+                print('Simulating agent {0} with parameters recovered from participant {2} {1}'.format(
+                    sim_agent_id, np.round(rec_pars, 3), agent_id))
                 agent_data = fit_params.simulate_agent(all_pars=rec_pars)
 
                 created_file_name = save_path + file_name_pattern + str(agent_id) + '_' + str(sim_agent_id) + ".csv"
@@ -224,20 +219,13 @@ def run(file_name, run_on_cluster=False, main_part=True, plot_heatmaps=False, in
         agent_stuff['id'] = 0
 
         # Adjust parameters
-        for feature_name in ['learning_style', 'mix_probs']:
-            feat = input('{0} (Hit enter for "{1}"):'.format(feature_name, agent_stuff[feature_name]))
-            if feat:
-                agent_stuff[feature_name] = feat
+        gen_pars = parameters['default_pars']
         for par_name in parameters['par_names']:
             par = input('{0} (Hit enter for {1}):'.format(par_name, gen_pars[np.array(parameters['par_names']) == par_name]))
             if par:
                 gen_pars[np.array(parameters['par_names']) == par_name] = par
+        parameters['fit_pars'] = np.array([gen_par != 0 for gen_par in gen_pars])
 
-        print('\tAGENT CHARACTERISTICS:\n'
-              'Learning style: {0}\nMix probs: {1}\nParameters: {2}'.format(
-              str(agent_stuff['learning_style']), str(agent_stuff['mix_probs']), str(np.round(gen_pars, 2))))
-        fit_params = FitParameters(parameters=parameters,
-                                   task_stuff=task_stuff,
-                                   comp_stuff=comp_stuff,
-                                   agent_stuff=agent_stuff)
+        print('\tAGENT CHARACTERISTICS:\nParameters: {0}'.format(np.round(gen_pars, 2)))
+        fit_params = FitParameters(parameters, task_stuff, comp_stuff, agent_stuff)
         agent_data = fit_params.simulate_agent(all_pars=gen_pars, interactive=True)

@@ -20,21 +20,14 @@ class RecordData(object):
             self.subj_file['fit_pars'] = str(parameters['fit_pars'])
         self.subj_file['n_actions'] = agent.n_actions
         self.subj_file['n_TS'] = agent.n_TS
-        self.subj_file['learning_style'] = agent.learning_style
-        self.subj_file['mix_probs'] = agent.mix_probs
         self.subj_file['alpha' + suff] = agent.alpha
         self.subj_file['alpha_high' + suff] = agent.alpha_high
         self.subj_file['beta' + suff] = agent.beta
         self.subj_file['beta_high' + suff] = agent.beta_high
         self.subj_file['epsilon' + suff] = agent.epsilon
-        # self.subj_file['perseverance' + suff] = agent.perseverance
         self.subj_file['forget' + suff] = agent.forget
         self.subj_file['forget_high' + suff] = agent.forget_high
-        # self.subj_file['suppress_prev_TS' + suff] = agent.suppress_prev_TS
-        self.subj_file['create_TS_biased_prefer_new' + suff] = agent.create_TS_biased_prefer_new
-        self.subj_file['create_TS_biased_copy_old' + suff] = agent.create_TS_biased_copy_old
-        # self.subj_file['create_TS_biased' + suff] = agent.create_TS_biased
-        # self.subj_file['mix' + suff] = agent.mix
+        self.subj_file['TS_bias' + suff] = agent.TS_bias
 
     def add_behavior(self, task, stimulus, action, reward, correct, trial, phase, suff=''):
         self.subj_file.loc[trial, 'context' + suff] = stimulus[0]
@@ -61,16 +54,15 @@ class RecordData(object):
 
     def add_decisions(self, agent, trial, suff='', all_Q_columns=False):
         current_context = int(self.subj_file.loc[trial, 'context'])
-        current_TS = int(agent.TS)
         current_alien = int(self.subj_file.loc[trial, 'sad_alien'])
         current_item_chosen = int(float(self.subj_file.loc[trial, 'item_chosen']))
         self.subj_file.loc[trial, 'LL' + suff] = agent.LL
-        self.subj_file.loc[trial, 'TS' + suff] = current_TS
+        # self.subj_file.loc[trial, 'TS' + suff] = current_TS
         # Q_high and Q_low for the current trial's TS and chosen item, respectively
-        self.subj_file.loc[trial, 'Q_TS' + suff] = agent.Q_high[current_context, current_TS]
-        self.subj_file.loc[trial, 'Q_action' + suff] = agent.Q_low[current_TS, current_alien, current_item_chosen]
+        # self.subj_file.loc[trial, 'Q_TS' + suff] = agent.Q_high[current_context, current_TS]
+        # self.subj_file.loc[trial, 'Q_action' + suff] = agent.Q_low[current_TS, current_alien, current_item_chosen]
         # p_high and p_low for the current trial's TS and chosen item, respectively
-        self.subj_file.loc[trial, 'p_TS' + suff] = agent.p_TS[current_TS]
+        # self.subj_file.loc[trial, 'p_TS' + suff] = agent.p_TS[current_TS]
         self.subj_file.loc[trial, 'p_action' + suff] = agent.p_actions[current_item_chosen]
         # Add all values
         if all_Q_columns:

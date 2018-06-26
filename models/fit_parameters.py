@@ -31,7 +31,7 @@ class FitParameters(object):
         agent = Agent(self.agent_stuff, all_pars, self.task_stuff)
         record_data = RecordData(mode='create_from_scratch', task=task)
         if interactive:
-            sim_int = SimulateInteractive(agent, self.agent_stuff['mix_probs'])
+            sim_int = SimulateInteractive(agent)
 
         # Play the game, phase by phase, trial by trial
         total_trials = 0
@@ -58,40 +58,40 @@ class FitParameters(object):
                 record_data.add_decisions(agent, total_trials, suff='')
                 total_trials += 1
 
-        # task.set_phase('3PickAliens')
-        # comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
-        # for trial in range(sum(comp.n_trials)):
-        #     comp.prepare_trial(trial)
-        #     stimuli = comp.present_stimulus(trial)
-        #     selected = agent.competition_selection(stimuli, comp.current_phase)
-        #     if interactive:
-        #         print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
-        #         trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
-        #     record_data.add_behavior_and_decisions_comp(stimuli, selected, agent.Q_stimuli, agent.p_stimuli,
-        #                                                 total_trials, task.phase, comp.current_phase)
-        #     total_trials += 1
-        #
-        # for phase in ['Refresher3', '5RainbowSeason']:
-        #     task.set_phase(phase)
-        #     agent.task_phase = phase
-        #     n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
-        #     for trial in range(n_trials):
-        #         if interactive:
-        #             stimulus = sim_int.trial(trial)
-        #             [task.context, task.alien] = stimulus
-        #             sim_int.print_values_pre()
-        #             action = int(input('Action (0, 1, 2):'))
-        #         else:
-        #             task.prepare_trial(trial)
-        #             stimulus = task.present_stimulus(trial)
-        #             action = agent.select_action(stimulus)
-        #         [reward, correct] = task.produce_reward(action)
-        #         agent.learn(stimulus, action, reward)
-        #         if interactive:
-        #             sim_int.print_values_post(action, reward, correct)
-        #         record_data.add_behavior(task, stimulus, action, reward, correct, total_trials, phase)
-        #         record_data.add_decisions(agent, total_trials, suff='', all_Q_columns=all_Q_columns)
-        #         total_trials += 1
+        task.set_phase('3PickAliens')
+        comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
+        for trial in range(sum(comp.n_trials)):
+            comp.prepare_trial(trial)
+            stimuli = comp.present_stimulus(trial)
+            selected = agent.competition_selection(stimuli, comp.current_phase)
+            if interactive:
+                print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
+                trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
+            record_data.add_behavior_and_decisions_comp(stimuli, selected, agent.Q_stimuli, agent.p_stimuli,
+                                                        total_trials, task.phase, comp.current_phase)
+            total_trials += 1
+
+        for phase in ['Refresher3', '5RainbowSeason']:
+            task.set_phase(phase)
+            agent.task_phase = phase
+            n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
+            for trial in range(n_trials):
+                if interactive:
+                    stimulus = sim_int.trial(trial)
+                    [task.context, task.alien] = stimulus
+                    sim_int.print_values_pre()
+                    action = int(input('Action (0, 1, 2):'))
+                else:
+                    task.prepare_trial(trial)
+                    stimulus = task.present_stimulus(trial)
+                    action = agent.select_action(stimulus)
+                [reward, correct] = task.produce_reward(action)
+                agent.learn(stimulus, action, reward)
+                if interactive:
+                    sim_int.print_values_post(action, reward, correct)
+                record_data.add_behavior(task, stimulus, action, reward, correct, total_trials, phase)
+                record_data.add_decisions(agent, total_trials, suff='', all_Q_columns=False)
+                total_trials += 1
 
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()
