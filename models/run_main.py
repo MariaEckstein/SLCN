@@ -4,15 +4,15 @@ import glob
 # Set parameters
 settings = {'run_on_cluster': False,
             'data_set': 'Aliens',
-            'fit_par_names': ['alpha', 'beta', 'TS_bias'],
-            'learning_style': 's-flat',
+            'fit_par_names': ['alpha', 'beta', 'forget'],
+            'learning_style': 'hierarchical',
             'set_specific_parameters': False,
             'use_humans': False}
 
-agent_ids = range(700, 701)
+agent_ids = range(300, 302)
 
 # Do things
-interactive_game(settings)
+# interactive_game(settings)
 
 for agent_id in agent_ids:
     simulate(agent_id=agent_id, sets=settings)

@@ -51,9 +51,9 @@ class Agent(object):
         self.TS_bias *= agent_stuff['TS_bias_scaler']
 
         # Get the right high-level alpha and beta
-        if self.alpha_high < 1e-5:
+        if self.alpha_high == 99:
             self.alpha_high = self.alpha
-        if self.beta_high < 1e-5:
+        if self.beta_high == 99:
             self.beta_high = self.beta
 
     def select_action(self, stimulus):

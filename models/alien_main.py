@@ -23,7 +23,7 @@ def simulate(agent_id, sets):
     paths = get_paths(sets)
 
     # Get info about RL model parameters and minimizer
-    parameters = get_parameter_stuff(sets['fit_par_names'], sets['learning_style'])
+    parameters = get_parameter_stuff(sets['fit_par_names'])
 
     # Get info about agent and task
     agent_stuff = get_agent_stuff(sets['data_set'], sets['fit_par_names'])
@@ -35,7 +35,7 @@ def simulate(agent_id, sets):
     fit_params = FitParameters(parameters, task_stuff, comp_stuff, agent_stuff)
 
     # Simulate agent based on random parameters
-    gen_pars = get_random_par(parameters, sets['set_specific_parameters'])
+    gen_pars = get_random_par(parameters, sets['set_specific_parameters'], sets['learning_style'])
     print('Simulating agent {0} with parameters {1}'.format(agent_stuff['id'], np.round(gen_pars, 3)))
     agent_data = fit_params.simulate_agent(all_pars=gen_pars)
 
@@ -51,7 +51,7 @@ def fit(file_name, sets):
     paths = get_paths(sets)
 
     # Get info about RL model parameters and minimizer
-    parameters = get_parameter_stuff(sets['fit_par_names'], sets['learning_style'])
+    parameters = get_parameter_stuff(sets['fit_par_names'])
     minimizer_stuff = get_minimizer_stuff(sets['run_on_cluster'], paths['plot_data_path'])
 
     # Get info about agent and task
@@ -119,7 +119,7 @@ def fit(file_name, sets):
 def plot_heatmaps(agent_id, sets):
 
     paths = get_paths(sets)
-    parameters = get_parameter_stuff(sets['fit_par_names'], sets['learning_style'])
+    parameters = get_parameter_stuff(sets['fit_par_names'])
 
     data_path = paths['plot_data_path'] + '/ID' + str(agent_id)
     plot_heatmap = PlotMinimizerHeatmap(data_path)
@@ -135,8 +135,8 @@ def interactive_game(sets):
     comp_stuff = get_comp_stuff(sets['data_set'])
 
     # Get RL model parameters
-    parameters = get_parameter_stuff(sets['fit_par_names'], sets['learning_style'])
-    gen_pars = get_random_par(parameters=parameters, set_specific_parameters=True)
+    parameters = get_parameter_stuff(sets['fit_par_names'])
+    gen_pars = get_random_par(parameters, True, sets['learning_style'])
 
     print('\tAGENT CHARACTERISTICS:\nParameters: {0}'.format(np.round(gen_pars, 2)))
     fit_params = FitParameters(parameters, task_stuff, comp_stuff, agent_stuff)
@@ -245,19 +245,12 @@ def get_agent_stuff(data_set, fit_par_names):
             'TS_bias_scaler': 6}
 
 
-def get_parameter_stuff(fit_par_names, learning_style):
+def get_parameter_stuff(fit_par_names):
 
     par_names = ['alpha', 'alpha_high', 'beta', 'beta_high', 'epsilon', 'forget', 'TS_bias']
-    default_pars = np.array([.1,  0.,       .5,       0.,       0.,        0.,       .3])
+    default_pars = np.array([.1,  99,       .5,       99,       0.,        0.,       .3])
     par_hard_limits = ((0., 1.), (0., 1.), (0., 1.), (0., 1.), (0., 1.),  (0., 1.), (0., 1.))
     par_soft_limits = ((0., .5), (0., .5), (0., 1.), (0., 1.), (0., .25), (0., .1), (0., 1.))
-
-    # Adjust beta_high and TS_bias if learning style is flat
-    beta_high_TS_bias = np.argwhere([par in ['beta_high', 'TS_bias'] for par in par_names])
-    if learning_style == 's-flat':
-        default_pars[beta_high_TS_bias] = [100., 100.]
-    elif learning_style == 'flat':
-        default_pars[beta_high_TS_bias] = [0., 1.]
 
     return {'par_hard_limits': par_hard_limits,  # no fitting outside
             'par_soft_limits': par_soft_limits,  # no simulations outside
@@ -302,12 +295,19 @@ def get_minimizer_stuff(run_on_cluster, plot_data_path):
                 'NM_maxfev': 10}
 
 
-def get_random_par(parameters, set_specific_parameters):
+def get_random_par(parameters, set_specific_parameters, learning_style):
 
     # Get random parameters within soft limits, with default pars for those that should not be fit
     gen_pars = np.array([lim[0] + np.random.rand() * (lim[1] - lim[0]) for lim in parameters['par_soft_limits']])
     fixed_par_idx = np.invert(parameters['fit_pars'])
     gen_pars[fixed_par_idx] = parameters['default_pars'][fixed_par_idx]
+
+    # Adjust beta_high and TS_bias if learning style is flat
+    beta_high_TS_bias = np.argwhere([par in ['beta_high', 'TS_bias'] for par in parameters['par_names']])
+    if learning_style == 'flat':
+        gen_pars[beta_high_TS_bias] = [100., 100.]
+    elif learning_style == 's-flat':
+        gen_pars[beta_high_TS_bias] = [0., 1.]
 
     # Alternatively, let user set parameters
     if set_specific_parameters:
