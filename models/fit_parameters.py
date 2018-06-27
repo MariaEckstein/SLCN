@@ -21,7 +21,6 @@ class FitParameters(object):
         self.task_stuff = task_stuff
         self.comp_stuff = comp_stuff
         self.agent_stuff = agent_stuff
-        assert self.agent_stuff['name'] in ['alien', 'PS_']
         self.n_fit_par = sum(parameters['fit_pars'])
 
     def simulate_agent(self, all_pars, interactive=False):
@@ -58,40 +57,40 @@ class FitParameters(object):
                 record_data.add_decisions(agent, total_trials, suff='')
                 total_trials += 1
 
-        task.set_phase('3PickAliens')
-        comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
-        for trial in range(sum(comp.n_trials)):
-            comp.prepare_trial(trial)
-            stimuli = comp.present_stimulus(trial)
-            selected = agent.competition_selection(stimuli, comp.current_phase)
-            if interactive:
-                print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
-                trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
-            record_data.add_behavior_and_decisions_comp(stimuli, selected, agent.Q_stimuli, agent.p_stimuli,
-                                                        total_trials, task.phase, comp.current_phase)
-            total_trials += 1
-
-        for phase in ['Refresher3', '5RainbowSeason']:
-            task.set_phase(phase)
-            agent.task_phase = phase
-            n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
-            for trial in range(n_trials):
-                if interactive:
-                    stimulus = sim_int.trial(trial)
-                    [task.context, task.alien] = stimulus
-                    sim_int.print_values_pre()
-                    action = int(input('Action (0, 1, 2):'))
-                else:
-                    task.prepare_trial(trial)
-                    stimulus = task.present_stimulus(trial)
-                    action = agent.select_action(stimulus)
-                [reward, correct] = task.produce_reward(action)
-                agent.learn(stimulus, action, reward)
-                if interactive:
-                    sim_int.print_values_post(action, reward, correct)
-                record_data.add_behavior(task, stimulus, action, reward, correct, total_trials, phase)
-                record_data.add_decisions(agent, total_trials, suff='', all_Q_columns=False)
-                total_trials += 1
+        # task.set_phase('3PickAliens')
+        # comp = CompetitionPhase(self.comp_stuff, self.task_stuff)
+        # for trial in range(sum(comp.n_trials)):
+        #     comp.prepare_trial(trial)
+        #     stimuli = comp.present_stimulus(trial)
+        #     selected = agent.competition_selection(stimuli, comp.current_phase)
+        #     if interactive:
+        #         print('\tTRIAL {0} ({1}),\nstimuli {2}, values: {3}, probs.: {4}'.format(
+        #         trial, comp.current_phase, stimuli, str(np.round(agent.Q_stimuli, 2)), str(np.round(agent.p_stimuli, 2))))
+        #     record_data.add_behavior_and_decisions_comp(stimuli, selected, agent.Q_stimuli, agent.p_stimuli,
+        #                                                 total_trials, task.phase, comp.current_phase)
+        #     total_trials += 1
+        #
+        # for phase in ['Refresher3', '5RainbowSeason']:
+        #     task.set_phase(phase)
+        #     agent.task_phase = phase
+        #     n_trials = int(task.n_trials_per_phase[np.array(task.phases) == task.phase])
+        #     for trial in range(n_trials):
+        #         if interactive:
+        #             stimulus = sim_int.trial(trial)
+        #             [task.context, task.alien] = stimulus
+        #             sim_int.print_values_pre()
+        #             action = int(input('Action (0, 1, 2):'))
+        #         else:
+        #             task.prepare_trial(trial)
+        #             stimulus = task.present_stimulus(trial)
+        #             action = agent.select_action(stimulus)
+        #         [reward, correct] = task.produce_reward(action)
+        #         agent.learn(stimulus, action, reward)
+        #         if interactive:
+        #             sim_int.print_values_post(action, reward, correct)
+        #         record_data.add_behavior(task, stimulus, action, reward, correct, total_trials, phase)
+        #         record_data.add_decisions(agent, total_trials, suff='', all_Q_columns=False)
+        #         total_trials += 1
 
         record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
         return record_data.get()
@@ -112,7 +111,7 @@ class FitParameters(object):
         # Let the agent do the task
         n_trials = len(agent_data)
         for trial in range(n_trials):
-            if 'alien' in self.agent_stuff['name']:
+            if 'Alien' in self.agent_stuff['name']:
                 agent.task_phase = '1InitialLearning'
                 context = int(agent_data['context'][trial])
                 sad_alien = int(agent_data['sad_alien'][trial])
@@ -148,7 +147,7 @@ class FitParameters(object):
     def get_optimal_pars(self, agent_data, minimizer_stuff):
 
         if minimizer_stuff['save_plot_data']:
-            file_name = minimizer_stuff['plot_save_path'] + '/ID' + str(agent_data.loc[0, 'sID'])
+            file_name = minimizer_stuff['plot_data_path'] + '/ID' + str(agent_data.loc[0, 'sID'])
             plot_heatmap = PlotMinimizerHeatmap(file_name)
             hoppin_paths = CollectPaths(colnames=self.parameters['fit_par_names'])
             brute_results = brute(func=self.calculate_NLL,
@@ -188,9 +187,9 @@ class FitParameters(object):
         if minimizer_stuff['save_plot_data']:
             fin_res = np.append(hoppin_fit_par, hoppin_NLL) * np.ones((1, 4))
             final_result = pd.DataFrame(fin_res, columns=self.parameters['fit_par_names'] + ['NLL'])
-            final_result.to_csv(plot_heatmap.file_path + 'hoppin_result.csv')
-            hoppin_paths.get().to_csv(plot_heatmap.file_path + 'hoppin_paths.csv')
-            hoppin_minima.get().to_csv(plot_heatmap.file_path + 'hoppin_minima.csv')
+            final_result.to_csv(plot_heatmap.data_path + 'hoppin_result.csv')
+            hoppin_paths.get().to_csv(plot_heatmap.data_path + 'hoppin_paths.csv')
+            hoppin_minima.get().to_csv(plot_heatmap.data_path + 'hoppin_minima.csv')
 
         print("Finished basin hopping with values {0}, NLL {1}."
               .format(np.round(hoppin_fit_par, 3), np.round(hoppin_NLL, 3)))

@@ -1,8 +1,24 @@
-from alien_main import run
+from alien_main import simulate, fit, plot_heatmaps, interactive_game
+import glob
 
-for file_name in range(700, 800):
-    run(file_name=file_name,  #'C:/Users/maria/MEGAsync/Berkeley/TaskSets/AlienGenRec/sim_400.csv',  #
-        run_on_cluster=False,
-        main_part=False, fit_model=True, fit_par_names=['alpha', 'beta'],
-        simulate_agents_post_fit=False, use_humans=False,
-        plot_heatmaps=False, interactive_game=True)
+# Set parameters
+settings = {'run_on_cluster': False,
+            'data_set': 'Aliens',
+            'fit_par_names': ['alpha', 'beta', 'TS_bias'],
+            'learning_style': 's-flat',
+            'set_specific_parameters': False,
+            'use_humans': False}
+
+agent_ids = range(700, 701)
+
+# Do things
+interactive_game(settings)
+
+for agent_id in agent_ids:
+    simulate(agent_id=agent_id, sets=settings)
+
+for file_name in glob.glob('C:/Users/maria/MEGAsync/Berkeley/TaskSets/GenRec/' + '*.csv'):
+    fit(file_name=file_name, sets=settings)
+
+for agent_id in agent_ids:
+    plot_heatmaps(sets=settings, agent_id=agent_id)

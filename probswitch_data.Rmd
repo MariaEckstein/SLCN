@@ -6,10 +6,6 @@ output: html_notebook
 # Set switches
 
 ```{r Set up parameters}
-
-# TD:
-
-
 gg_save = T
 data = "human"  # Can be "human", "fitted_human", or "fitted_sim"
 library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo")
@@ -339,10 +335,10 @@ gg_nback_regr_agecats =
 gg_nback_regr_agecats_sig = gg_nback_regr_agecats + aes(y = sig_Estimate)
 
 # Save plots
-ggsave(file.path(plot_dir, "gg_nback_regr_agecats.png"), gg_nback_regr_agecats)
-ggsave(file.path(plot_dir, "gg_nback_regr_agecont.png"), gg_nback_regr_agecont)
-ggsave(file.path(plot_dir, "gg_nback_regr_agecats_sig.png"), gg_nback_regr_agecats_sig)
-ggsave(file.path(plot_dir, "gg_nback_regr_agecont_sig.png"), gg_nback_regr_agecont_sig)
+ggsave(file.path(plot_dir, "gg_nback_regr_agecats.png"), gg_nback_regr_agecats, width=8, height=3)
+ggsave(file.path(plot_dir, "gg_nback_regr_agecats_sig.png"), gg_nback_regr_agecats_sig, width=8, height=3)
+ggsave(file.path(plot_dir, "gg_nback_regr_agecont.png"), gg_nback_regr_agecont, width=7, height=12)
+ggsave(file.path(plot_dir, "gg_nback_regr_agecont_sig.png"), gg_nback_regr_agecont_sig, width=7, height=12)
 ```
 ```{r Fit exponential model to regression weights}
 # Visualize one example

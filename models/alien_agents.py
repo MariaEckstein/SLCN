@@ -6,14 +6,13 @@ class Agent(object):
 
     def __init__(self, agent_stuff, all_pars, task_stuff=np.nan):
 
-        # Get parameters
+        # Get info about task
         self.n_actions, self.n_contexts, self.n_aliens, self.n_TS = task_stuff['n_actions'], task_stuff['n_contexts'], task_stuff['n_aliens'], agent_stuff['n_TS']
-        self.task_phase = np.nan
+
+        # Get RL parameters
         [self.alpha, self.alpha_high,
          self.beta, self.beta_high,
-         self.epsilon,
-         self.forget,
-         self.TS_bias] = all_pars
+         self.epsilon, self.forget, self.TS_bias] = all_pars
         self.forget_high = self.forget
         self.adjust_parameters(agent_stuff)
 
@@ -25,7 +24,7 @@ class Agent(object):
                                self.n_actions])
         self.initial_Q = 5. / 3.
 
-        # Initialize action probs, current TS and action, LL
+        # Initialize RL features and log likelihood (LL)
         self.p_TS = np.ones(self.n_TS) / self.n_TS  # P(TS|context)
         self.p_actions = np.ones(self.n_actions) / self.n_actions  # P(action|TS)
         self.Q_actions = np.nan
@@ -34,6 +33,7 @@ class Agent(object):
         self.LL = 0
 
         # Initialize agent's "memory"
+        self.task_phase = np.nan
         self.action = []
         self.context_ext = 99
         self.context_int = np.nan
@@ -45,9 +45,12 @@ class Agent(object):
 
     def adjust_parameters(self, agent_stuff):
 
-        # Get the beta's on the right scale
-        self.beta = agent_stuff['beta_scaler'] * self.beta
-        self.beta_high = agent_stuff['beta_high_scaler'] * self.beta_high
+        # Get betas and TS_bias on the right scale
+        self.beta *= agent_stuff['beta_scaler']
+        self.beta_high *= agent_stuff['beta_high_scaler']
+        self.TS_bias *= agent_stuff['TS_bias_scaler']
+
+        # Get the right high-level alpha and beta
         if self.alpha_high < 1e-5:
             self.alpha_high = self.alpha
         if self.beta_high < 1e-5:

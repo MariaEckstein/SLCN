@@ -53,8 +53,8 @@ class RecordData(object):
         self.subj_file.loc[trial, 'trial_type'] = 'pick-aliens'
 
     def add_decisions(self, agent, trial, suff='', all_Q_columns=False):
-        current_context = int(self.subj_file.loc[trial, 'context'])
-        current_alien = int(self.subj_file.loc[trial, 'sad_alien'])
+        # current_context = int(self.subj_file.loc[trial, 'context'])
+        # current_alien = int(self.subj_file.loc[trial, 'sad_alien'])
         current_item_chosen = int(float(self.subj_file.loc[trial, 'item_chosen']))
         self.subj_file.loc[trial, 'LL' + suff] = agent.LL
         # self.subj_file.loc[trial, 'TS' + suff] = current_TS
