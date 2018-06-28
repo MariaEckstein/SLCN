@@ -33,18 +33,19 @@ class CollectMinima(object):
 
 
 class PlotMinimizerHeatmap(object):
-    def __init__(self, save_data_path):
-        self.save_data_path = save_data_path
+    def __init__(self, heatmap_data_path, heatmap_plot_path=None):
+        self.heatmap_data_path = heatmap_data_path
+        self.heatmap_plot_path = heatmap_plot_path
 
     def get_save_path(self):
-        return self.save_data_path
+        return self.heatmap_data_path
 
     def pickle_brute_results(self, brute_results):
-        with open(self.save_data_path + 'brute_results.pickle', 'wb') as handle:
+        with open(self.heatmap_data_path + 'brute_results.pickle', 'wb') as handle:
             pickle.dump(brute_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def unpickle_brute_results(self):
-        with open(self.save_data_path + 'brute_results.pickle', 'rb') as handle:
+        with open(self.heatmap_data_path + 'brute_results.pickle', 'rb') as handle:
             return pickle.load(handle, encoding='latin1')
 
     @staticmethod
@@ -54,13 +55,13 @@ class PlotMinimizerHeatmap(object):
         tril_pos = np.tril((np.arange(n ** 2) + 1).reshape(n, -1)).T.ravel()
         return tril_pos[tril_pos != 0]
 
-    def plot_3d(self, fit_par_names, plot_path):
+    def plot_3d(self, fit_par_names):
 
         # Get data
         brute_results = self.unpickle_brute_results()
-        hoppin_paths = pd.read_csv(self.save_data_path + 'hoppin_paths.csv')
-        hoppin_minima = pd.read_csv(self.save_data_path + 'hoppin_minima.csv')
-        hoppin_final_result = pd.read_csv(self.save_data_path + 'hoppin_result.csv')
+        hoppin_paths = pd.read_csv(self.heatmap_data_path + 'hoppin_paths.csv')
+        hoppin_minima = pd.read_csv(self.heatmap_data_path + 'hoppin_minima.csv')
+        hoppin_final_result = pd.read_csv(self.heatmap_data_path + 'hoppin_result.csv')
 
         # Get plot positions
         n = len(fit_par_names) - 1
@@ -98,7 +99,7 @@ class PlotMinimizerHeatmap(object):
                 plt.ylabel(yname)
 
         plt.tight_layout()
-        plt.savefig(plot_path + 'heatmap.png')
+        plt.savefig(self.heatmap_plot_path + 'heatmap.png')
         plt.close()
 
         for (xname, yname), pos in zip(combos, positions):
@@ -121,5 +122,5 @@ class PlotMinimizerHeatmap(object):
                 plt.ylabel(yname)
 
         plt.tight_layout()
-        plt.savefig(plot_path + 'hoppin.png')
+        plt.savefig(self.heatmap_plot_path + 'hoppin.png')
         plt.close()

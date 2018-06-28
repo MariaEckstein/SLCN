@@ -43,9 +43,9 @@ class RLAgent(object):
         self.beta_high *= agent_stuff['beta_high_scaler']
 
         # Get the right high-level alpha and beta
-        if self.alpha_high < 1e-5:
+        if self.alpha_high == 99:
             self.alpha_high = self.alpha
-        if self.beta_high < 1e-5:
+        if self.beta_high == 99:
             self.beta_high = self.beta
 
     def select_action(self):
@@ -67,10 +67,10 @@ class RLAgent(object):
         # Update Q values based on RPEs
         update_high = self.alpha_high * self.p_TS * self.RPEs_high
         update_low = self.alpha * self.p_TS * self.RPEs_low
-        if not self.learning_style == 'flat':
-            self.Q_high += update_high
+        self.Q_high += update_high
         self.Q_low[:, action] += update_low
-        self.Q_low[:, 1-action] -= update_low
+        if 'counter' in self.learning_style:
+            self.Q_low[:, 1-action] -= update_low
 
         # Calculate trial log likelihood and add to sum
         self.LL += np.log(self.p_actions[action])
@@ -83,9 +83,13 @@ class RLAgent(object):
             denominator = 1. + sum([np.exp(beta * (Q[j] - Q[i])) for j in range(len(Q)) if j != i])
             p_actions[i] = 1. / denominator
 
-        # Add epsilon noise
-        p_actions = epsilon / len(self.p_actions) + (1 - epsilon) * p_actions
-        assert np.round(sum(p_actions), 3) == 1
+        # Add epsilon noise and get probabilities into [0, 1] (minimizer will sometimes go outside)
+        p_actions = epsilon / len(p_actions) + (1 - epsilon) * p_actions
+        p_actions[np.argwhere(p_actions < 0)] = 0
+        p_actions[np.argwhere(p_actions > 1)] = 1
+        assert np.round(sum(p_actions), 3) == 1, 'Error in get_p_from_Q: probabilities must sum to 1.'
+        assert np.all(p_actions >= 0), 'Error in get_p_from_Q: probabilities must be >= 0.'
+        assert np.all(p_actions <= 1), 'Error in get_p_from_Q: probabilities must be <= 1.'
         return p_actions
 
     def forget_Qs(self):

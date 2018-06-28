@@ -14,6 +14,8 @@ import pandas as pd
 from fit_parameters import FitParameters
 from minimizer_heatmap import PlotMinimizerHeatmap
 from main_helper_functions import *
+import os
+import re
 
 
 def interactive_game(sets):
@@ -25,7 +27,7 @@ def interactive_game(sets):
 
     # Get RL model parameters
     parameters = get_parameter_stuff(sets['data_set'], sets['fit_par_names'])
-    gen_pars = get_random_pars(parameters, True, sets['learning_style'])
+    gen_pars = get_random_pars(parameters, sets['set_specific_parameters'], sets['learning_style'])
 
     print('\tAGENT CHARACTERISTICS:\nParameters: {0}'.format(np.round(gen_pars, 2)))
     fit_params = FitParameters(parameters, task_stuff, comp_stuff, agent_stuff)
@@ -33,9 +35,6 @@ def interactive_game(sets):
 
 
 def simulate(sets, agent_id, save_path):
-
-    check_user_settings(sets)
-    paths = get_paths(sets)
 
     # Get info about RL model parameters and minimizer
     parameters = get_parameter_stuff(sets['data_set'], sets['fit_par_names'])
@@ -55,23 +54,20 @@ def simulate(sets, agent_id, save_path):
     agent_data = fit_params.simulate_agent(sets['data_set'], all_pars=gen_pars)
 
     # Save data to specified path
-    created_file_name = paths['agent_data_path'] + paths['file_name_pattern'] + str(agent_stuff['id']) + ".csv"
+    created_file_name = save_path + sets['data_set'] + sets['learning_style'] + str(agent_stuff['id']) + ".csv"
     print("Saving simulated data to {0}".format(created_file_name))
     agent_data.to_csv(created_file_name)
 
 
-def fit(file_name, sets):
-
-    check_user_settings(sets)
-    paths = get_paths(sets)
+def fit(sets, file_name, fitted_data_path, heatmap_data_path):
 
     # Get info about RL model parameters and minimizer
     parameters = get_parameter_stuff(sets['data_set'], sets['fit_par_names'])
-    minimizer_stuff = get_minimizer_stuff(sets['run_on_cluster'], paths['plot_data_path'])
+    minimizer_stuff = get_minimizer_stuff(sets['run_on_cluster'], heatmap_data_path)
 
     # Get info about agent and task
     agent_stuff = get_agent_stuff(sets['data_set'], sets['learning_style'], sets['fit_par_names'])
-    agent_stuff['id'] = int(file_name.split(paths['file_name_pattern'])[1].split('.csv')[0])
+    agent_stuff['id'] = int(re.findall('\d+', file_name)[0])
     task_stuff = get_task_stuff(sets['data_set'])
     comp_stuff = get_comp_stuff(sets['data_set'])
 
@@ -105,7 +101,8 @@ def fit(file_name, sets):
 
     # Find parameters that minimize NLL
     fit_params = FitParameters(parameters, task_stuff, comp_stuff, agent_stuff)
-    rec_pars = fit_params.get_optimal_pars(agent_data, minimizer_stuff)
+    rec_pars = fit_params.get_optimal_pars(agent_data, minimizer_stuff,
+                                           heatmap_data_path + sets['data_set'] + sets['learning_style'] + str(agent_stuff['id']))
     print("Fitted parameters: {0}".format(np.round(rec_pars, 3)))
 
     # Calculate NLL,... of minimizing parameters
@@ -115,28 +112,92 @@ def fit(file_name, sets):
                                           suff='_rec')
 
     # Write agent_data as csv
-    created_file_name = paths['fitting_save_path'] + paths['file_name_pattern'] + str(agent_stuff['id']) + ".csv"
+    created_file_name = fitted_data_path + sets['data_set'] + sets['learning_style'] + str(agent_stuff['id']) + ".csv"
     print("Saving fitted data to {0}".format(created_file_name))
     agent_data.to_csv(created_file_name)
 
-# def simulate_based_on_data(sets):
-#
-#     if sets['use_humans'] and sets['simulate_agents_post_fit']:
-#         for sim_agent_id in range(sets['n_agents']):
-#             print('Simulating agent {0} with parameters recovered from participant {2} {1}'.format(
-#                 sim_agent_id, np.round(rec_pars, 3), agent_stuff['id']))
-#             agent_data = fit_params.simulate_agent(all_pars=rec_pars)
-#
-#             created_file_name = paths['fitting_save_path'] + paths['file_name_pattern'] + str(agent_stuff['id']) + '_' + str(sim_agent_id) + ".csv"
-#             print("Saving data to {0}".format(created_file_name))
-#             agent_data.to_csv(created_file_name)
+def plot_heatmaps(sets, agent_id, heatmap_data_path, heatmap_plot_path):
 
-
-def plot_heatmaps(agent_id, sets):
-
-    paths = get_paths(sets)
+    identifier = sets['data_set'] + sets['learning_style'] + str(agent_id)
     parameters = get_parameter_stuff(sets['data_set'], sets['fit_par_names'])
+    plot_heatmap = PlotMinimizerHeatmap(heatmap_data_path + identifier, heatmap_plot_path + identifier)
+    plot_heatmap.plot_3d(parameters['fit_par_names'])
 
-    data_path = paths['plot_data_path'] + '/ID' + str(agent_id)
-    plot_heatmap = PlotMinimizerHeatmap(data_path)
-    plot_heatmap.plot_3d(parameters['fit_par_names'], paths['plot_save_path'] + str(agent_id))
+
+def simulate_based_on_data(sets, file_name, simulation_data_path):
+
+    data_set = sets['data_set']
+    parameters = get_parameter_stuff(data_set, sets['fit_par_names'])
+    agent_stuff = get_agent_stuff(data_set, sets['learning_style'], sets['fit_par_names'])
+    fit_params = FitParameters(parameters,
+                               get_task_stuff(data_set),
+                               get_comp_stuff(data_set),
+                               get_agent_stuff(data_set, sets['learning_style'], parameters['fit_par_names']))
+    rec_par_columns = [par + '_rec' for par in parameters['par_names']]
+    sim_pars = pd.read_csv(file_name).loc[0, rec_par_columns].tolist()
+    sim_pars[np.argwhere([par == 'beta' for par in parameters['par_names']])] /= agent_stuff['beta_scaler']
+    sim_pars[np.argwhere([par == 'beta_high' for par in parameters['par_names']])] /= agent_stuff['beta_high_scaler']
+    # sim_pars[np.argwhere([par == 'TS_bias' for par in parameters['par_names']])] /= agent_stuff['TS_bias_scaler']
+
+    agent_id = pd.read_csv(file_name).loc[0, 'sID']
+    for sim_agent_id in range(sets['n_agents']):
+        print('Simulating agent {0} with parameters recovered from participant {1} {2}'.format(
+            sim_agent_id, agent_id, np.round(sim_pars, 3)))
+        agent_data = fit_params.simulate_agent(data_set, sim_pars)
+
+        created_file_name = simulation_data_path + data_set + str(agent_id) + '_' + str(sim_agent_id) + ".csv"
+        print("Saving data to {0}".format(created_file_name))
+        agent_data.to_csv(created_file_name)
+
+
+def get_paths(use_humans, data_set, run_on_cluster):
+
+    # Cluster or laptop?
+    paths = dict()
+    if run_on_cluster:
+        paths['base_path'] = '/home/bunge/maria/Desktop/'
+    else:
+        paths['base_path'] = 'C:/Users/maria/MEGAsync/SLCN/'
+
+    # Check that path exists
+    assert os.path.isdir(paths['base_path']), 'No files are found because the specified path {0} does not exist!'.\
+        format(paths['base_path'])
+
+    # humans or agents?
+    if use_humans:
+        paths['agent_data_path'] = paths['base_path'] + data_set + 'humanData/'
+    else:
+        paths['agent_data_path'] = paths['base_path'] + data_set + 'GenRec/'
+
+    paths['fitted_data_path'] = paths['agent_data_path'] + '/fit_par/'
+    paths['heatmap_data_path'] = paths['agent_data_path'] + '/heatmap_data/'
+    paths['heatmap_plot_path'] = paths['heatmap_data_path'] + '/plots/'
+    paths['simulation_data_path'] = paths['fitted_data_path'] + '/simulations/'
+
+    # Create output folders
+    if not os.path.isdir(paths['agent_data_path']):
+        os.makedirs(paths['agent_data_path'])
+    if not os.path.isdir(paths['fitted_data_path']):
+        os.makedirs(paths['fitted_data_path'])
+    if not os.path.isdir(paths['heatmap_data_path']):
+        os.makedirs(paths['heatmap_data_path'])
+    if not os.path.isdir(paths['heatmap_plot_path']):
+        os.makedirs(paths['heatmap_plot_path'])
+    if not os.path.isdir(paths['simulation_data_path']):
+        os.makedirs(paths['simulation_data_path'])
+
+    return paths
+
+
+def check_user_settings(sets):
+
+    allowed_values = {'run_on_cluster': [True, False],
+                      'data_set': ['PS', 'Aliens'],
+                      'learning_style': ['s-flat', 'flat', 'simple_flat', 'counter_flat', 'hierarchical', 'Bayes'],
+                      'set_specific_parameters': [True, False],
+                      'use_humans': [True, False]}
+
+    # Check that every setting is in the allowed range
+    for parameter in allowed_values.keys():
+        assert sets[parameter] in allowed_values[parameter], 'Variable "{0}" must be one of {1}.' \
+            .format(parameter, allowed_values[parameter])

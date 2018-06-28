@@ -24,11 +24,14 @@ class RecordData(object):
             self.subj_file['beta_high' + suff] = agent.beta_high
         if hasattr(agent, 'epsilon'):
             self.subj_file['epsilon' + suff] = agent.epsilon
+        if hasattr(agent, 'forget'):
+            self.subj_file['forget' + suff] = agent.forget
 
-    def add_behavior(self, action, reward, correct, trial, suff=''):
+    def add_behavior(self, action, reward, correct, correct_box, trial, suff=''):
         self.subj_file.loc[trial, 'selected_box' + suff] = action
         self.subj_file.loc[trial, 'reward' + suff] = reward
         self.subj_file.loc[trial, 'correct' + suff] = correct
+        self.subj_file.loc[trial, 'correct_box' + suff] = correct_box
 
     def add_decisions(self, agent, trial, suff=''):
         self.subj_file.loc[trial, 'LL' + suff] = agent.LL

@@ -11,7 +11,7 @@ from minimizer_heatmap import PlotMinimizerHeatmap, CollectPaths, CollectMinima
 # from alien_record_data import RecordData
 from simulate_interactive import SimulateInteractive
 from ps_task import Task
-from ps_agents import BayesAgent as Agent
+from ps_agents import RLAgent as Agent
 from ps_record_data import RecordData
 
 
@@ -93,11 +93,10 @@ class FitParameters(object):
             record_data.add_fit(-agent.LL, BIC, AIC, suff=suff)
             return record_data.get()
 
-    def get_optimal_pars(self, agent_data, minimizer_stuff):
+    def get_optimal_pars(self, agent_data, minimizer_stuff, heatmap_data_path):
 
         if minimizer_stuff['save_plot_data']:
-            file_name = minimizer_stuff['plot_data_path'] + '/ID' + str(agent_data.loc[0, 'sID'])
-            plot_heatmap = PlotMinimizerHeatmap(file_name)
+            plot_heatmap = PlotMinimizerHeatmap(heatmap_data_path)
             hoppin_paths = CollectPaths(colnames=self.parameters['fit_par_names'])
             brute_results = brute(func=self.calculate_NLL,
                                   ranges=([self.parameters['par_hard_limits'][i] for i in np.argwhere(self.parameters['fit_pars'])]),
@@ -117,7 +116,7 @@ class FitParameters(object):
         n_free_pars = np.sum(self.parameters['fit_pars'])
         bounds = MyBounds(xmax=np.ones(n_free_pars), xmin=np.zeros(n_free_pars))
         takestep = MyTakeStep(stepsize=minimizer_stuff['hoppin_stepsize'],
-                                 bounds=self.parameters['par_hard_limits'][0])
+                              bounds=self.parameters['par_hard_limits'][0])
         hoppin_results = basinhopping(func=self.calculate_NLL,
                                       x0=.5 * np.ones(n_free_pars),
                                       niter=minimizer_stuff['NM_niter'],
@@ -169,7 +168,7 @@ class FitParameters(object):
                 sim_int.print_values_post(action, reward, correct)
 
             # Save trial data
-            record_data.add_behavior(action, reward, correct, trial)
+            record_data.add_behavior(action, reward, correct, task.correct_box, trial)
             record_data.add_decisions(agent, trial)
 
     @staticmethod

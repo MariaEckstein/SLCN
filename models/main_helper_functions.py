@@ -1,62 +1,4 @@
 import numpy as np
-import os
-
-
-def check_user_settings(settings_dictionary):
-
-    # Check if all user-specified settings are allowed; raise error if not
-    sets = settings_dictionary
-    allowed_values = {'run_on_cluster': [True, False],
-                      'data_set': ['PS', 'Aliens'],
-                      'learning_style': ['s-flat', 'flat', 'hierarchical', 'Bayes'],
-                      'use_humans': [True, False],
-                      'set_specific_parameters': [True, False]}
-    for parameter in allowed_values.keys():
-        assert sets[parameter] in allowed_values[parameter], 'Variable "{0}" must be one of {1}.' \
-            .format(parameter, allowed_values[parameter])
-
-
-def get_paths(sets):
-
-    # Get paths on cluster
-    paths = dict()
-    if sets['run_on_cluster']:
-        paths['base_path'] = '/home/bunge/maria/Desktop/' + sets['data_set']
-        paths['human_data_path'] = paths['base_path'] + '/humanData/'
-
-    # Get paths on local computer
-    else:
-        if sets['data_set'] == 'Aliens':
-            paths['base_path'] = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
-            paths['human_data_path'] = paths['base_path'] + '/Data/version3.1/'
-        else:
-            paths['base_path'] = 'C:/Users/maria/MEGAsync/SLCN'
-            paths['human_data_path'] = paths['base_path'] + 'data/PSResults'
-
-    # Define output folders
-    paths['agent_data_path'] = paths['base_path'] + '/' + sets['data_set'] + 'GenRec/'
-
-    if sets['use_humans']:
-        paths['plot_data_path'] = paths['human_data_path'] + '/heatmap_data/'
-        paths['fitting_save_path'] = paths['human_data_path'] + '/fit_pars_Bayes/'
-        paths['file_name_pattern'] = sets['data_set'] + '_'
-    else:
-        paths['plot_data_path'] = paths['agent_data_path'] + '/heatmap_data/'
-        paths['fitting_save_path'] = paths['agent_data_path'] + '/fit_pars/'
-        paths['file_name_pattern'] = 'sim_'
-    paths['plot_save_path'] = paths['plot_data_path'] + '/plots/'
-
-    # Create output folders
-    if not os.path.isdir(paths['agent_data_path']):
-        os.makedirs(paths['agent_data_path'])
-    if not os.path.isdir(paths['plot_data_path']):
-        os.makedirs(paths['plot_data_path'])
-    if not os.path.isdir(paths['plot_save_path']):
-        os.makedirs(paths['plot_save_path'])
-    if not os.path.isdir(paths['fitting_save_path']):
-        os.makedirs(paths['fitting_save_path'])
-
-    return paths
 
 
 def get_agent_stuff(data_set, learning_style, fit_par_names):
@@ -70,7 +12,7 @@ def get_agent_stuff(data_set, learning_style, fit_par_names):
         n_TS = 2
         beta_scaler = 10
         beta_high_scaler = 10
-        TS_bias_scaler = np.nan
+        TS_bias_scaler = 0
 
     return {'name': data_set,
             'learning_style': learning_style,
@@ -150,11 +92,11 @@ def get_parameter_stuff(data_set, fit_par_names):
             'fit_pars': np.array([par in fit_par_names for par in par_names])}
 
 
-def get_minimizer_stuff(run_on_cluster, plot_data_path):
+def get_minimizer_stuff(run_on_cluster, heatmap_data_path):
 
     if run_on_cluster:
         return {'save_plot_data': False,
-                'plot_data_path': plot_data_path,
+                'heatmap_data_path': heatmap_data_path,
                 'verbose': False,
                 'brute_Ns': 50,
                 'hoppin_T': 10.0,
@@ -166,15 +108,15 @@ def get_minimizer_stuff(run_on_cluster, plot_data_path):
 
     else:
         return {'save_plot_data': False,
-                'plot_data_path': plot_data_path,
+                'heatmap_data_path': heatmap_data_path,
                 'verbose': False,
-                'brute_Ns': 10,
+                'brute_Ns': 3,
                 'hoppin_T': 10.0,
                 'hoppin_stepsize': 0.5,
-                'NM_niter': 10,
+                'NM_niter': 2,
                 'NM_xatol': .01,
                 'NM_fatol': 1e-5,
-                'NM_maxfev': 1000}
+                'NM_maxfev': 100}
 
 
 def get_random_pars(parameters, set_specific_parameters, learning_style):
@@ -184,12 +126,15 @@ def get_random_pars(parameters, set_specific_parameters, learning_style):
     fixed_par_idx = np.invert(parameters['fit_pars'])
     gen_pars[fixed_par_idx] = parameters['default_pars'][fixed_par_idx]
 
-    # Adjust beta_high and TS_bias if learning style is flat
-    beta_high_TS_bias = np.argwhere([par in ['beta_high', 'TS_bias'] for par in parameters['par_names']])
-    if learning_style == 'flat':
-        gen_pars[beta_high_TS_bias] = [100., 100.]
-    elif learning_style == 's-flat':
-        gen_pars[beta_high_TS_bias] = [0., 1.]
+    # Adjust parameters to create flat agent
+    if 'flat' in learning_style:  # 'flat', 'simple_flat', 'counter_flat'
+        gen_pars[np.argwhere([par == 'beta_high' for par in parameters['par_names']])] = 100.
+        gen_pars[np.argwhere([par == 'alpha_high' for par in parameters['par_names']])] = 0.
+        gen_pars[np.argwhere([par == 'TS_bias' for par in parameters['par_names']])] = 100.
+    if learning_style == 's-flat':
+        gen_pars[np.argwhere([par == 'beta_high' for par in parameters['par_names']])] = 0.
+        gen_pars[np.argwhere([par == 'alpha_high' for par in parameters['par_names']])] = 0.
+        gen_pars[np.argwhere([par == 'TS_bias' for par in parameters['par_names']])] = 1.
 
     # Alternatively, let user set parameters
     if set_specific_parameters:
