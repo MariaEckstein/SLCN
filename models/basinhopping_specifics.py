@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class AlienBounds(object):
+class MyBounds(object):
     def __init__(self, xmax, xmin):
         self.xmax = xmax
         self.xmin = xmin
@@ -13,7 +13,7 @@ class AlienBounds(object):
         return tmax and tmin
 
 
-class AlienTakeStep(object):
+class MyTakeStep(object):
     def __init__(self, stepsize=0.5, bounds=np.array([0, 1])):
         self.stepsize = stepsize
         self.bounds = bounds

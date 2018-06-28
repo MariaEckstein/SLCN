@@ -10,6 +10,7 @@ class Agent(object):
         self.n_actions, self.n_contexts, self.n_aliens, self.n_TS = task_stuff['n_actions'], task_stuff['n_contexts'], task_stuff['n_aliens'], agent_stuff['n_TS']
 
         # Get RL parameters
+        self.learning_style = agent_stuff['learning_style']
         [self.alpha, self.alpha_high,
          self.beta, self.beta_high,
          self.epsilon, self.forget, self.TS_bias] = all_pars
@@ -115,7 +116,8 @@ class Agent(object):
 
             # Update Q values based on RPEs
             self.Q_low[:, stimulus[1], action] += self.alpha * self.p_TS * self.RPEs_low
-            self.Q_high[self.context_int, :] += self.alpha_high * self.p_TS * self.RPEs_high
+            if not 'flat' in self.learning_style:
+                self.Q_high[self.context_int, :] += self.alpha_high * self.p_TS * self.RPEs_high
 
         # Calculate trial log likelihood and add to sum
         self.LL += np.log(self.p_actions[action])

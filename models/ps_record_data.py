@@ -4,44 +4,39 @@ import pandas as pd
 
 class RecordData(object):
 
-    def __init__(self, agent_id, mode='add_to_existing_data', agent_data=(), task=()):
+    def __init__(self, mode='add_to_existing_data', agent_data=(), task=()):
         if mode == 'create_from_scratch':
-            colnames = ['selected_box', 'reward', 'p_switch', 'correct_box', 'sID', 'RT']
+            colnames = ['selected_box', 'reward', 'sID', 'RT']
             self.subj_file = pd.DataFrame(data=np.zeros([task.n_trials, len(colnames)]),
                                           columns=colnames)
-            self.subj_file['sID'] = agent_id
             self.subj_file['RT'] = np.nan
         else:
             self.subj_file = agent_data
 
     def add_parameters(self, agent, parameters, suff=''):
-        if parameters:
-            self.subj_file['fit_pars'] = str(parameters.fit_pars)
-        self.subj_file['method'] = agent.method
         self.subj_file['learning_style'] = agent.learning_style
-        self.subj_file['alpha' + suff] = agent.alpha
-        self.subj_file['beta' + suff] = agent.beta
-        self.subj_file['epsilon' + suff] = agent.epsilon
-        self.subj_file['w_reward' + suff] = agent.w_reward
-        self.subj_file['w_noreward' + suff] = agent.w_noreward
-        self.subj_file['w_explore' + suff] = agent.w_explore
+        if parameters:
+            self.subj_file['fit_pars'] = str(parameters['fit_pars'])
+        if hasattr(agent, 'alpha'):
+            self.subj_file['alpha' + suff] = agent.alpha
+            self.subj_file['alpha_high' + suff] = agent.alpha_high
+            self.subj_file['beta' + suff] = agent.beta
+            self.subj_file['beta_high' + suff] = agent.beta_high
+        if hasattr(agent, 'epsilon'):
+            self.subj_file['epsilon' + suff] = agent.epsilon
 
-    def add_behavior(self, task, stimulus, action, reward, trial, suff=''):
+    def add_behavior(self, action, reward, correct, trial, suff=''):
         self.subj_file.loc[trial, 'selected_box' + suff] = action
         self.subj_file.loc[trial, 'reward' + suff] = reward
-        self.subj_file.loc[trial, 'correct_box' + suff] = task.correct_box
+        self.subj_file.loc[trial, 'correct' + suff] = correct
 
     def add_decisions(self, agent, trial, suff=''):
         self.subj_file.loc[trial, 'LL' + suff] = agent.LL
         self.subj_file.loc[trial, 'p_action_l' + suff] = agent.p_actions[0]
         self.subj_file.loc[trial, 'p_action_r' + suff] = agent.p_actions[1]
-        if agent.learning_style == 'RL':
-            self.subj_file.loc[trial, 'values_l' + suff] = agent.q[0]
-            self.subj_file.loc[trial, 'values_r' + suff] = agent.q[1]
-        else:  # if agent.learning_style == 'Bayes' or 'estimate-switch'
-            self.subj_file.loc[trial, 'values_l' + suff] = agent.p_actions[0]
-            self.subj_file.loc[trial, 'values_r' + suff] = agent.p_actions[1]
-            self.subj_file.loc[trial, 'p_switch' + suff] = agent.p_switch
+        if hasattr(agent, 'Q_low'):
+            self.subj_file.loc[trial, 'q_action_l' + suff] = agent.Q_low[0, 0]  # TS0, action0
+            self.subj_file.loc[trial, 'q_action_l' + suff] = agent.Q_low[0, 1]  # TS0, action1
 
     def add_fit(self, NLL, BIC, AIC, suff=''):
         self.subj_file['NLL' + suff] = NLL

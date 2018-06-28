@@ -7,30 +7,31 @@ output: html_notebook
 
 ```{r Set up parameters}
 gg_save = T
-data = "human"  # Can be "human", "fitted_human", or "fitted_sim"
+data = "fitted_human"  # Can be "human", "fitted_human", or "fitted_sim"
 library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo")
 
 base_dir = "C:/Users/maria/MEGAsync/SLCNdata/PSResults"
 plot_dir = file.path(base_dir, "plots")
   
 if (data == "fitted_human") {
-  base_dir = file.path(base_dir, "humans")
-  ages = read.csv("C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo.csv")
+  base_dir = file.path(base_dir, "fit_pars")
 } else if (data == "fitted_sim") {
   base_dir = "C:/Users/maria/MEGAsync/SLCN/PSGenRec"
   genrec_dir = base_dir
-} else if (data == "human") {
-  ages = read.csv("C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo.csv")
-  ages$age_group = "Adults"
-  ages$age_group[ages$PreciseYrs < 18] = "Teens"
-  ages$age_group[ages$PreciseYrs < 13] = "Children"
-  ages$age_group = factor(ages$age_group, levels = c("Children", "Teens", "Adults"))
-  ages$PDS[ages$age_group == "Adults"] = 6
-  ages
 }
+
+ages = read.csv("C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo.csv")
+ages$age_group = "Adults"
+ages$age_group[ages$PreciseYrs < 18] = "Teens"
+ages$age_group[ages$PreciseYrs < 13] = "Children"
+ages$age_group = factor(ages$age_group, levels = c("Children", "Teens", "Adults"))
+ages$PDS[ages$age_group == "Adults"] = 6
+ages
+  
 unlink(plot_dir, recursive=TRUE)  # Delete old plots
 dir.create(plot_dir)
 ```
+
 # Read in and clean data
 
 ```{r Read in data}
@@ -123,20 +124,131 @@ summary(all_files)
 ```{r Get Parameter data}
 if (data != "human") {
   all_params = ddply(all_files,
-                        .(sID, age_group, learning_style, method, fit_pars), summarize,
+                        .(sID, age_group, learning_style, fit_pars), summarize,
                         alpha = mean(alpha_rec),
                         beta = mean(beta_rec),
                         epsilon = mean(epsilon_rec),
-                        perseverance = mean(perseverance_rec),
-                        decay = mean(decay_rec),
                         LL_rec = mean(LL_rec),
                         BIC = mean(BIC_rec),
                         AIC = mean(AIC_rec))
-  ddply(all_params, .(age_group, learning_style, method), summarize,
+  ddply(all_params, .(age_group, learning_style), summarize,
       BIC = mean(BIC))
-  
 }
 ```
+
+# Analyze model parameters, gen_rec, etc.
+
+```{r plot example values and example probs}
+if (!data == "human") {
+  
+  # Plot values for one example session
+  ex_dat = subset(all_files, sID < 100)
+  gg_example_values = ggplot(ex_dat) +
+    geom_line(aes(TrialID, values_l_rec), color="red") +
+    geom_line(aes(TrialID, values_r_rec), color="blue") +
+    # geom_vline(xintercept = which(ex_dat$switch_trial)) +
+    # geom_point(aes(TrialID, reward - 0.5)) +
+    geom_point(aes(TrialID, 0.5, color = choice_left, size = factor(reward))) +
+    geom_point(aes(TrialID, as.numeric(as.character(factor(switch_trial, labels = c(-5, 0.5))))), shape = 8, size = 3, color = "darkgreen") +
+    scale_size_manual(values = c(0.5, 1)) +
+    scale_color_manual(values = c("blue", "red")) +
+    coord_cartesian(x = c(1, 80), y = c(0, 1)) +
+    labs(x = "Trial", y = "Values (left: red; right: blue)") +
+    theme(legend.position = 'none') +
+    facet_wrap(~ sID, ncol = 2)
+  
+  # Plot action probs for one example session
+  gg_example_probs = gg_example_values +
+    geom_line(aes(TrialID, p_action_l_rec), color="red") +
+    geom_line(aes(TrialID, p_action_r_rec), color="blue")
+  
+  if (gg_save) {
+    ggsave(file.path(plot_dir, "gg_example_values.png"), gg_example_values, width = 12, height = 8)
+    ggsave(file.path(plot_dir, "gg_example_probs.png"), gg_example_probs, width = 12, height = 8)
+  }
+  
+  gg_switch_values = ggplot(all_files, aes(trialsinceswitch, values_l_rec, color = reward_port, group = reward_port)) +
+    stat_summary(fun.data = "mean_se", geom = "smooth") +
+    coord_cartesian(x = c(-3, 5))
+  
+  gg_trial_values = ggplot(all_files) +
+    stat_summary(aes(TrialID, values_l_rec), color = "red", fun.data = "mean_se", geom = "smooth") +
+    stat_summary(aes(TrialID, values_r_rec), color = "blue", fun.data = "mean_se", geom = "smooth") +
+    facet_grid(~ rewardversion)
+  
+  if (gg_save) {
+    ggsave(file.path(plot_dir, "/gg_trial_values.png"), gg_trial_values)
+    ggsave(file.path(plot_dir, "/gg_switch_values.png"), gg_switch_values)
+  }
+}
+```
+```{r Genrec Plots}
+if (data == "fitted_sim") {
+  # Plot generated against recovered parameter values
+  genrec = read.csv(file.path(genrec_dir, 'genrec.csv'))
+  genrec$X = NULL
+  gen_plot = subset(genrec, learning_style != "estimate-switch")
+  gg_genrec_a = ggplot(gen_plot, aes(alpha_gen, alpha_rec, color=fit_par, shape=fit_par)) +
+    geom_abline(slope=1, linetype="dotted") +
+    geom_point() +
+    scale_shape_manual(values=1:length(unique(gen_plot$fit_par))) +
+    facet_grid(learning_style ~ method)
+  gg_genrec_b = gg_genrec_a + aes(beta_gen, beta_rec)
+  gg_genrec_e = gg_genrec_a + aes(epsilon_gen, epsilon_rec)
+  gg_genrec_p = gg_genrec_a + aes(perseverance_gen, perseverance_rec)
+  gg_genrec_d = gg_genrec_a + aes(decay_gen, decay_rec)
+  gg_genrec_wr = gg_genrec_a + aes(w_reward_gen, w_reward_rec)
+  gg_genrec_we = gg_genrec_a + aes(w_explore_gen, w_explore_rec)
+  gg_genrec_wn = gg_genrec_a + aes(w_noreward_gen, w_noreward_gen)
+  
+  if (gg_save) {
+    ggsave(file.path(plot_dir, "/gg_genrec_a.png"), gg_genrec_a, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_b.png"), gg_genrec_b, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_e.png"), gg_genrec_e, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_p.png"), gg_genrec_p, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_d.png"), gg_genrec_d, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_wr.png"), gg_genrec_wr, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_we.png"), gg_genrec_we, width = 11, height = 8)
+    ggsave(file.path(plot_dir, "/gg_genrec_wn.png"), gg_genrec_wn, width = 11, height = 8)
+  }
+}
+```
+```{Plot parameters}
+if (data == "fitted_humans") {
+  
+  all_params = reshape(subset(all_params, select = c("sID", "age_group", "BIC", "learning_style")),
+          timevar = "learning_style", idvar = c("sID", "age_group"), direction = "wide")
+  
+  ggplot(all_params, aes(sID, BIC.flat - BIC.Bayes, color = sID)) +
+    geom_point(position = "jitter") +
+    geom_hline(yintercept = 0, linetype = "dotted")
+  
+  all_paramsl = melt(all_params, measure.vars = c("BIC", "AIC"), variable.name = "measure")
+
+  gg_fit = ggplot(subset(all_paramsl, measure == "BIC"), aes(learning_style, value, color = learning_style)) +
+    stat_summary(fun.data = "mean_se", geom = "pointrange") +
+    # geom_point(position = "jitter", alpha = 0.5) +
+    facet_grid(age_group ~ .) +
+    labs(x = "", y = "BIC")
+    theme(legend.position = "none")
+  
+  fitted_paramsl = melt(all_params, measure.vars = c("alpha", "beta", "epsilon", "perseverance", "decay"), variable.name = "parameter")
+  fitted_paramsl[fitted_paramsl$parameter == 'beta', 'value'] = fitted_paramsl[fitted_paramsl$parameter == 'beta', 'value'] / 10
+  gg_params = ggplot(fitted_paramsl, aes(parameter, value, color = age_group, fill = age_group)) +
+    stat_summary(fun.data = "mean_se", geom = "pointrange", position = position_dodge(width = 0.8)) +
+    # geom_point(position = "jitter", alpha = 0.3) +
+    labs(x = "", y = "Parameter value", color = "Age group", fill = "Age group") +
+    facet_grid(learning_style ~ .)
+  
+  if (gg_save) {
+    ggsave(file.path(plot_dir, "gg_fit2.png"), gg_fit)
+    ggsave(file.path(plot_dir, "gg_params.png"), gg_params)
+  }
+}
+```
+
+# Analyze behavior
+
 ```{r Get behavioral summary and win-stay loose-shift}
 # Behavior
 all_files_sum = ddply(subset(all_files, !is.na(choice_12_back)),
@@ -153,9 +265,6 @@ wsls = ddply(all_files, .(sID, reward, age_group), summarize,
              stay = mean(stay, na.rm = T))
 wsls$reward = factor(wsls$reward)
 ```
-
-# Analyze behavior
-
 ```{r Basic behavioral analyses}
 # Response times
 gg_RT = ggplot(all_files, aes(TrialID, RT, fill = age_group)) +
@@ -486,116 +595,6 @@ ggsave(file.path(plot_dir, "gg_age_n_blocks.png"), gg_age_n_blocks)
 ggsave(file.path(plot_dir, "gg_PDS_n_blocks.png"), gg_PDS_n_blocks)
 ggsave(file.path(plot_dir, "gg_age_overall_stay.png"), gg_age_overall_stay)
 ggsave(file.path(plot_dir, "gg_PDS_overall_stay.png"), gg_PDS_overall_stay)
-```
-
-# Analyze model parameters, gen_rec, etc.
-
-```{r plot example values and example probs}
-if (!data == "human") {
-  
-  # Plot values for one example session
-  ex_dat = subset(all_files, sID < 100)
-  gg_example_values = ggplot(ex_dat) +
-    geom_line(aes(TrialID, values_l_rec), color="red") +
-    geom_line(aes(TrialID, values_r_rec), color="blue") +
-    # geom_vline(xintercept = which(ex_dat$switch_trial)) +
-    # geom_point(aes(TrialID, reward - 0.5)) +
-    geom_point(aes(TrialID, 0.5, color = choice_left, size = factor(reward))) +
-    geom_point(aes(TrialID, as.numeric(as.character(factor(switch_trial, labels = c(-5, 0.5))))), shape = 8, size = 3, color = "darkgreen") +
-    scale_size_manual(values = c(0.5, 1)) +
-    scale_color_manual(values = c("blue", "red")) +
-    coord_cartesian(x = c(1, 80), y = c(0, 1)) +
-    labs(x = "Trial", y = "Values (left: red; right: blue)") +
-    theme(legend.position = 'none') +
-    facet_wrap(~ sID, ncol = 2)
-  
-  # Plot action probs for one example session
-  gg_example_probs = gg_example_probs
-    geom_line(aes(TrialID, p_action_l_rec), color="red") +
-    geom_line(aes(TrialID, p_action_r_rec), color="blue")
-  
-  if (gg_save) {
-    ggsave(file.path(plot_dir, "gg_example_values.png"), gg_example_values, width = 12, height = 8)
-    ggsave(file.path(plot_dir, "gg_example_probs.png"), gg_example_probs, width = 12, height = 8)
-  }
-  
-  gg_switch_values = ggplot(all_files, aes(trialsinceswitch, values_l_rec, color = reward_port, group = reward_port)) +
-    stat_summary(fun.data = "mean_se", geom = "smooth") +
-    coord_cartesian(x = c(-3, 5))
-  
-  gg_trial_values = ggplot(all_files) +
-    stat_summary(aes(TrialID, values_l_rec), color = "red", fun.data = "mean_se", geom = "smooth") +
-    stat_summary(aes(TrialID, values_r_rec), color = "blue", fun.data = "mean_se", geom = "smooth") +
-    facet_grid(~ rewardversion)
-  
-  if (gg_save) {
-    ggsave(file.path(plot_dir, "/gg_trial_values.png"), gg_trial_values)
-    ggsave(file.path(plot_dir, "/gg_switch_values.png"), gg_switch_values)
-  }
-}
-```
-```{r Genrec Plots}
-if (data == "fitted_sim") {
-  # Plot generated against recovered parameter values
-  genrec = read.csv(file.path(genrec_dir, 'genrec.csv'))
-  genrec$X = NULL
-  gen_plot = subset(genrec, learning_style != "estimate-switch")
-  gg_genrec_a = ggplot(gen_plot, aes(alpha_gen, alpha_rec, color=fit_par, shape=fit_par)) +
-    geom_abline(slope=1, linetype="dotted") +
-    geom_point() +
-    scale_shape_manual(values=1:length(unique(gen_plot$fit_par))) +
-    facet_grid(learning_style ~ method)
-  gg_genrec_b = gg_genrec_a + aes(beta_gen, beta_rec)
-  gg_genrec_e = gg_genrec_a + aes(epsilon_gen, epsilon_rec)
-  gg_genrec_p = gg_genrec_a + aes(perseverance_gen, perseverance_rec)
-  gg_genrec_d = gg_genrec_a + aes(decay_gen, decay_rec)
-  gg_genrec_wr = gg_genrec_a + aes(w_reward_gen, w_reward_rec)
-  gg_genrec_we = gg_genrec_a + aes(w_explore_gen, w_explore_rec)
-  gg_genrec_wn = gg_genrec_a + aes(w_noreward_gen, w_noreward_gen)
-  
-  if (gg_save) {
-    ggsave(file.path(plot_dir, "/gg_genrec_a.png"), gg_genrec_a, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_b.png"), gg_genrec_b, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_e.png"), gg_genrec_e, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_p.png"), gg_genrec_p, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_d.png"), gg_genrec_d, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_wr.png"), gg_genrec_wr, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_we.png"), gg_genrec_we, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_wn.png"), gg_genrec_wn, width = 11, height = 8)
-  }
-}
-```
-```{Plot parameters}
-if (data == "fitted_humans") {
-  all_paramsw1 = reshape(subset(all_params, select = c("sID", "age_group", "BIC", "learning_style", "method")),
-          timevar = "learning_style", idvar = c("sID", "age_group", "method"), direction = "wide")
-  all_paramsw2 = reshape(all_paramsw1,
-          timevar = "method", idvar = c("sID", "age_group"), direction = "wide")
-  ggplot(all_paramsw2, aes(sID, `BIC.Bayes.epsilon-greedy` - BIC.Bayes.softmax, color = sID)) +
-    geom_point(position = "jitter") +
-    geom_hline(yintercept = 0, linetype = "dotted")
-  
-  all_paramsl = melt(all_params, measure.vars = c("BIC", "AIC"), variable.name = "measure")
-  gg_fit = ggplot(subset(all_paramsl, measure == "BIC"), aes(learning_style, value, color = learning_style)) +
-    stat_summary(fun.data = "mean_se", geom = "pointrange") +
-    # geom_point(position = "jitter", alpha = 0.5) +
-    facet_grid(age_group ~ method) +
-    labs(x = "", y = "BIC")
-    theme(legend.position = "none")
-  
-  fitted_paramsl = melt(all_params, measure.vars = c("alpha", "beta", "epsilon", "perseverance", "decay"), variable.name = "parameter")
-  fitted_paramsl[fitted_paramsl$parameter == 'beta', 'value'] = fitted_paramsl[fitted_paramsl$parameter == 'beta', 'value'] / 10
-  gg_params = ggplot(fitted_paramsl, aes(parameter, value, color = age_group, fill = age_group)) +
-    stat_summary(fun.data = "mean_se", geom = "pointrange", position = position_dodge(width = 0.8)) +
-    # geom_point(position = "jitter", alpha = 0.3) +
-    labs(x = "", y = "Parameter value", color = "Age group", fill = "Age group") +
-    facet_grid(learning_style ~ method)
-  
-  if (gg_save) {
-    ggsave(file.path(plot_dir, "gg_fit2.png"), gg_fit)
-    ggsave(file.path(plot_dir, "gg_params.png"), gg_params)
-  }
-}
 ```
 ```{r Start button}
 ```

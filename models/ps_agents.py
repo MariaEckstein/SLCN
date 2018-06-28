@@ -9,16 +9,21 @@ class RLAgent(object):
         self.n_actions, self.n_TS = task_stuff['n_actions'], agent_stuff['n_TS']
 
         # Get RL parameters
+        self.learning_style = agent_stuff['learning_style']
         [self.alpha, self.alpha_high,
          self.beta, self.beta_high,
-         self.epsilon, self.forget, self.TS_bias] = all_pars
+         self.epsilon, self.forget] = all_pars
+        if self.alpha_high == 99:
+            self.alpha_high = self.alpha
+        if self.beta_high == 99:
+            self.beta_high = self.beta
         self.forget_high = self.forget
         self.adjust_parameters(agent_stuff)
 
         # Set up value tables for TS values (Q_high) and action values (Q_low) for each TS
-        self.Q_high = np.zeros(self.n_TS)
-        self.Q_low = np.zeros([self.n_TS, self.n_actions])
         self.initial_Q = 1. / self.n_actions
+        self.Q_high = np.array([1., 0.])
+        self.Q_low = self.initial_Q * np.ones([self.n_TS, self.n_actions])
 
         # Initialize RL features and log likelihood (LL)
         self.p_TS = np.ones(self.n_TS) / self.n_TS  # P(TS|context)
@@ -33,10 +38,9 @@ class RLAgent(object):
 
     def adjust_parameters(self, agent_stuff):
 
-        # Get betas and TS_bias on the right scale
+        # Get betas on the right scale
         self.beta *= agent_stuff['beta_scaler']
         self.beta_high *= agent_stuff['beta_high_scaler']
-        self.TS_bias *= agent_stuff['TS_bias_scaler']
 
         # Get the right high-level alpha and beta
         if self.alpha_high < 1e-5:
@@ -44,7 +48,7 @@ class RLAgent(object):
         if self.beta_high < 1e-5:
             self.beta_high = self.beta
 
-    def select_action(self, stimulus):
+    def select_action(self):
 
         # Calculate probabilities for each TS from Q_high, and select action according to associated Q_low
         self.p_TS = self.get_p_from_Q(Q=self.Q_high, beta=self.beta_high, epsilon=0)
@@ -54,15 +58,19 @@ class RLAgent(object):
         self.forget_Qs()  # Why is this happening here and not in learn?
         return self.action
 
-    def learn(self, stimulus, action, reward):
+    def learn(self, action, reward):
 
         # Calculate RPEs
         self.RPEs_high = reward - self.Q_high
         self.RPEs_low = reward - self.Q_low[:, action]
 
         # Update Q values based on RPEs
-        self.Q_low[:, action] += self.alpha * self.p_TS * self.RPEs_low
-        self.Q_high += self.alpha_high * self.p_TS * self.RPEs_high
+        update_high = self.alpha_high * self.p_TS * self.RPEs_high
+        update_low = self.alpha * self.p_TS * self.RPEs_low
+        if not self.learning_style == 'flat':
+            self.Q_high += update_high
+        self.Q_low[:, action] += update_low
+        self.Q_low[:, 1-action] -= update_low
 
         # Calculate trial log likelihood and add to sum
         self.LL += np.log(self.p_actions[action])
@@ -83,3 +91,41 @@ class RLAgent(object):
     def forget_Qs(self):
         self.Q_low -= self.forget * (self.Q_low - self.initial_Q)
         self.Q_high -= self.forget_high * (self.Q_high - self.initial_Q)
+
+
+class BayesAgent(object):
+    def __init__(self, agent_stuff, all_pars, task_stuff):
+
+        self.learning_style = agent_stuff['learning_style']
+        self.n_actions = task_stuff['n_actions']
+        [_, _, _, _, self.epsilon, _] = all_pars
+        self.p_switch = task_stuff['p_reward'] / np.mean(task_stuff['av_run_length'])  # true average switch probability
+        self.p_reward = task_stuff['p_reward']  # true reward probability
+        self.p_actions = np.ones(self.n_actions) / self.n_actions  # initialize prior uniformly over all actions
+        self.LL = 0
+
+    def select_action(self):
+        action = np.random.choice(range(self.n_actions), p=self.p_actions)
+        self.LL += np.log(self.p_actions[action])
+        return action
+
+    def learn(self, action, reward):
+
+        # Get likelihood P(r|box)
+        if reward:
+            lik_boxes = np.zeros(self.n_actions) + 0.001  # P(r==1|box==wrong) = 0
+            lik_boxes[action] = self.p_reward  # P(r==1|box==magical) = p_reward
+        else:
+            lik_boxes = np.ones(self.n_actions) - 0.001  # P(r==0|box==wrong) = 1
+            lik_boxes[action] = 1 - self.p_reward  # P(r==0|box==magical) = 1 - p_reward
+
+        # Get posterior P(box==magical|r==r) = P(r==r|box==magical) * P(box==magical) / P(r==r)
+        posterior = lik_boxes * self.p_actions / np.sum(lik_boxes * self.p_actions)  # normalize such that sum == 1
+
+        # Get probability that the same box will be magical on the next trial
+        next_trial_if_no_switch = (1 - self.p_switch) * posterior
+        next_trial_if_switch = self.p_switch * np.flipud(posterior)
+        self.p_actions = next_trial_if_no_switch + next_trial_if_switch
+
+        # Add epsilon noise
+        # self.p_actions = self.epsilon / len(self.p_actions) + (1 - self.epsilon) * self.p_actions

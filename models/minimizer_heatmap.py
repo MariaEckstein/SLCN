@@ -33,29 +33,34 @@ class CollectMinima(object):
 
 
 class PlotMinimizerHeatmap(object):
-    def __init__(self, data_path):
-        self.data_path = data_path
+    def __init__(self, save_data_path):
+        self.save_data_path = save_data_path
+
+    def get_save_path(self):
+        return self.save_data_path
 
     def pickle_brute_results(self, brute_results):
-        with open(self.data_path + 'brute_results.pickle', 'wb') as handle:
+        with open(self.save_data_path + 'brute_results.pickle', 'wb') as handle:
             pickle.dump(brute_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def unpickle_brute_results(self):
-        with open(self.data_path + 'brute_results.pickle', 'rb') as handle:
+        with open(self.save_data_path + 'brute_results.pickle', 'rb') as handle:
             return pickle.load(handle, encoding='latin1')
 
     @staticmethod
     def get_tril_positions(n):
+
         """Lower square triangular position"""
         tril_pos = np.tril((np.arange(n ** 2) + 1).reshape(n, -1)).T.ravel()
         return tril_pos[tril_pos != 0]
 
     def plot_3d(self, fit_par_names, plot_path):
+
         # Get data
         brute_results = self.unpickle_brute_results()
-        hoppin_paths = pd.read_csv(self.data_path + 'hoppin_paths.csv')
-        hoppin_minima = pd.read_csv(self.data_path + 'hoppin_minima.csv')
-        hoppin_final_result = pd.read_csv(self.data_path + 'hoppin_result.csv')
+        hoppin_paths = pd.read_csv(self.save_data_path + 'hoppin_paths.csv')
+        hoppin_minima = pd.read_csv(self.save_data_path + 'hoppin_minima.csv')
+        hoppin_final_result = pd.read_csv(self.save_data_path + 'hoppin_result.csv')
 
         # Get plot positions
         n = len(fit_par_names) - 1
@@ -63,6 +68,7 @@ class PlotMinimizerHeatmap(object):
         positions = self.get_tril_positions(n)
 
         for (xname, yname), pos in zip(combos, positions):
+
             # Specify subplot
             ax = plt.subplot(n, n, pos)
 
@@ -84,7 +90,6 @@ class PlotMinimizerHeatmap(object):
 
             # Create heatmap
             ax.pcolormesh(min_xgrid, min_ygrid, min_jout)
-            # sns.heatmap(min_jout)
 
             # Add labels to edge only
             if pos >= n ** 2 - n:
@@ -97,6 +102,7 @@ class PlotMinimizerHeatmap(object):
         plt.close()
 
         for (xname, yname), pos in zip(combos, positions):
+
             # Specify subplot
             ax = plt.subplot(n, n, pos)
 
@@ -104,9 +110,9 @@ class PlotMinimizerHeatmap(object):
             ax.scatter(hoppin_paths[xname], hoppin_paths[yname],
                        marker='.', s=10, color='yellow')
             ax.scatter(hoppin_minima[xname], hoppin_minima[yname],
-                       marker='*', s=10, color='red')
+                       marker='*', s=30, color='red')
             ax.scatter(hoppin_final_result[xname], hoppin_final_result[yname],
-                       marker='*', s=50, color='blue')
+                       marker='*', s=20, color='blue')
 
             # Add labels to edge only
             if pos >= n ** 2 - n:

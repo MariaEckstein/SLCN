@@ -29,7 +29,7 @@ class RecordData(object):
         self.subj_file['forget_high' + suff] = agent.forget_high
         self.subj_file['TS_bias' + suff] = agent.TS_bias
 
-    def add_behavior(self, task, stimulus, action, reward, correct, trial, phase, suff=''):
+    def add_behavior(self, stimulus, action, reward, correct, trial, phase, suff=''):
         self.subj_file.loc[trial, 'context' + suff] = stimulus[0]
         self.subj_file.loc[trial, 'sad_alien' + suff] = stimulus[1]
         self.subj_file.loc[trial, 'item_chosen' + suff] = action
@@ -53,16 +53,8 @@ class RecordData(object):
         self.subj_file.loc[trial, 'trial_type'] = 'pick-aliens'
 
     def add_decisions(self, agent, trial, suff='', all_Q_columns=False):
-        # current_context = int(self.subj_file.loc[trial, 'context'])
-        # current_alien = int(self.subj_file.loc[trial, 'sad_alien'])
         current_item_chosen = int(float(self.subj_file.loc[trial, 'item_chosen']))
         self.subj_file.loc[trial, 'LL' + suff] = agent.LL
-        # self.subj_file.loc[trial, 'TS' + suff] = current_TS
-        # Q_high and Q_low for the current trial's TS and chosen item, respectively
-        # self.subj_file.loc[trial, 'Q_TS' + suff] = agent.Q_high[current_context, current_TS]
-        # self.subj_file.loc[trial, 'Q_action' + suff] = agent.Q_low[current_TS, current_alien, current_item_chosen]
-        # p_high and p_low for the current trial's TS and chosen item, respectively
-        # self.subj_file.loc[trial, 'p_TS' + suff] = agent.p_TS[current_TS]
         self.subj_file.loc[trial, 'p_action' + suff] = agent.p_actions[current_item_chosen]
         # Add all values
         if all_Q_columns:
