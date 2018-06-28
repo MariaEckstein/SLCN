@@ -7,42 +7,40 @@ output: html_notebook
 
 ```{r Set up parameters}
 gg_save = T
-data = "fitted_human"  # Can be "human", "fitted_human", or "fitted_sim"
+data = "fitted_human"  # Can be "human", "fitted_human"
+parameter_names = c("alpha", "alpha_high", "beta", "beta_high", "epsilon", "TS_bias", "forget")
 library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo")
 
-base_dir = "C:/Users/maria/MEGAsync/SLCNdata/PSResults"
-plot_dir = file.path(base_dir, "plots")
   
-if (data == "fitted_human") {
-  base_dir = file.path(base_dir, "fit_pars")
-} else if (data == "fitted_sim") {
-  base_dir = "C:/Users/maria/MEGAsync/SLCN/PSGenRec"
-  genrec_dir = base_dir
+if (data == "human") {
+  data_dir = "C:/Users/maria/MEGAsync/SLCN/PSHumanData"
+} else if (data == "fitted_human") {
+  data_dir = "C:/Users/maria/MEGAsync/SLCN/PSGenRec"
 }
+plot_dir = file.path(data_dir, "plots")
 
+if (!dir.exists(plot_dir)) {
+  dir.create(plot_dir)
+}
+```
+
+# Read in and clean data
+
+```{r Read in ages}
 ages = read.csv("C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo.csv")
 ages$age_group = "Adults"
 ages$age_group[ages$PreciseYrs < 18] = "Teens"
 ages$age_group[ages$PreciseYrs < 13] = "Children"
 ages$age_group = factor(ages$age_group, levels = c("Children", "Teens", "Adults"))
 ages$PDS[ages$age_group == "Adults"] = 6
+colnames(ages)[colnames(ages) == "ID"] = "sID"
 ages
-  
-unlink(plot_dir, recursive=TRUE)  # Delete old plots
-dir.create(plot_dir)
 ```
-
-# Read in and clean data
-
 ```{r Read in data}
-all_params = data.frame()
 all_files = data.frame()
 
-if (data %in% c("human", "fitted_human")) {
-  data_dir = base_dir
-}
-filenames = list.files(data_dir, pattern = ifelse(data == "human", "*.mat", "*PS_[0-9]*.csv"))
-filename = filenames[1] # debugging
+filenames = list.files(data_dir, pattern = ifelse(data == "human", "*.mat", "*[0-9]*.csv"))
+filename = filenames[1]  # debugging
 
 for(filename in filenames) {
   if (data == "human") {
@@ -104,7 +102,8 @@ for(filename in filenames) {
   
   all_files = as.data.frame(rbind(all_files, subj_file))
 }
-
+```
+```{r Remaining fixes for all_filess}
 all_files$outcome_12_back = paste(all_files$outcome_1_back, all_files$outcome_2_back)
 all_files$outcome_12_back = factor(all_files$outcome_12_back, levels = c("1 1", "1 0", "0 1", "0 0"))
 all_files$same_choice_01_back = all_files$choice_left == all_files$choice_1_back  # same choice in this trial as in the last?
@@ -112,139 +111,18 @@ all_files$same_choice_12_back = all_files$choice_1_back == all_files$choice_2_ba
 all_files$choice_12_back = ifelse(all_files$choice_1_back, "left", "right")
 all_files$choice_12_back[!all_files$same_choice_12_back | is.na(all_files$same_choice_12_back)] = NA
 all_files$reward_port = factor(all_files$correct_box, levels = c(0, 1), labels = c("Left", "Right"))
-all_files = subset(all_files, sID > 16)
-if (data == "fitted_humans") {
-  all_files$learning_style = factor(all_files$learning_style)
-  all_files$method = factor(all_files$method)
+
+for (colname in c("learning_style", "model_name", parameter_names)) {
+  if (!colname %in% colnames(all_files)) {
+    all_files[,colname] = 0
+  }
 }
-all_files = merge(all_files, ages, by.x = "sID", by.y = "ID", all.x = T)
+all_files$learning_style = factor(all_files$learning_style)
+
+old_nrows = nrow(all_files)
+all_files = merge(all_files, ages, all.x = T)
+assertthat::assert_that(nrow(all_files) == old_nrows)
 summary(all_files)
-```
-  
-```{r Get Parameter data}
-if (data != "human") {
-  all_params = ddply(all_files,
-                        .(sID, age_group, learning_style, fit_pars), summarize,
-                        alpha = mean(alpha_rec),
-                        beta = mean(beta_rec),
-                        epsilon = mean(epsilon_rec),
-                        LL_rec = mean(LL_rec),
-                        BIC = mean(BIC_rec),
-                        AIC = mean(AIC_rec))
-  ddply(all_params, .(age_group, learning_style), summarize,
-      BIC = mean(BIC))
-}
-```
-
-# Analyze model parameters, gen_rec, etc.
-
-```{r plot example values and example probs}
-if (!data == "human") {
-  
-  # Plot values for one example session
-  ex_dat = subset(all_files, sID < 100)
-  gg_example_values = ggplot(ex_dat) +
-    geom_line(aes(TrialID, values_l_rec), color="red") +
-    geom_line(aes(TrialID, values_r_rec), color="blue") +
-    # geom_vline(xintercept = which(ex_dat$switch_trial)) +
-    # geom_point(aes(TrialID, reward - 0.5)) +
-    geom_point(aes(TrialID, 0.5, color = choice_left, size = factor(reward))) +
-    geom_point(aes(TrialID, as.numeric(as.character(factor(switch_trial, labels = c(-5, 0.5))))), shape = 8, size = 3, color = "darkgreen") +
-    scale_size_manual(values = c(0.5, 1)) +
-    scale_color_manual(values = c("blue", "red")) +
-    coord_cartesian(x = c(1, 80), y = c(0, 1)) +
-    labs(x = "Trial", y = "Values (left: red; right: blue)") +
-    theme(legend.position = 'none') +
-    facet_wrap(~ sID, ncol = 2)
-  
-  # Plot action probs for one example session
-  gg_example_probs = gg_example_values +
-    geom_line(aes(TrialID, p_action_l_rec), color="red") +
-    geom_line(aes(TrialID, p_action_r_rec), color="blue")
-  
-  if (gg_save) {
-    ggsave(file.path(plot_dir, "gg_example_values.png"), gg_example_values, width = 12, height = 8)
-    ggsave(file.path(plot_dir, "gg_example_probs.png"), gg_example_probs, width = 12, height = 8)
-  }
-  
-  gg_switch_values = ggplot(all_files, aes(trialsinceswitch, values_l_rec, color = reward_port, group = reward_port)) +
-    stat_summary(fun.data = "mean_se", geom = "smooth") +
-    coord_cartesian(x = c(-3, 5))
-  
-  gg_trial_values = ggplot(all_files) +
-    stat_summary(aes(TrialID, values_l_rec), color = "red", fun.data = "mean_se", geom = "smooth") +
-    stat_summary(aes(TrialID, values_r_rec), color = "blue", fun.data = "mean_se", geom = "smooth") +
-    facet_grid(~ rewardversion)
-  
-  if (gg_save) {
-    ggsave(file.path(plot_dir, "/gg_trial_values.png"), gg_trial_values)
-    ggsave(file.path(plot_dir, "/gg_switch_values.png"), gg_switch_values)
-  }
-}
-```
-```{r Genrec Plots}
-if (data == "fitted_sim") {
-  # Plot generated against recovered parameter values
-  genrec = read.csv(file.path(genrec_dir, 'genrec.csv'))
-  genrec$X = NULL
-  gen_plot = subset(genrec, learning_style != "estimate-switch")
-  gg_genrec_a = ggplot(gen_plot, aes(alpha_gen, alpha_rec, color=fit_par, shape=fit_par)) +
-    geom_abline(slope=1, linetype="dotted") +
-    geom_point() +
-    scale_shape_manual(values=1:length(unique(gen_plot$fit_par))) +
-    facet_grid(learning_style ~ method)
-  gg_genrec_b = gg_genrec_a + aes(beta_gen, beta_rec)
-  gg_genrec_e = gg_genrec_a + aes(epsilon_gen, epsilon_rec)
-  gg_genrec_p = gg_genrec_a + aes(perseverance_gen, perseverance_rec)
-  gg_genrec_d = gg_genrec_a + aes(decay_gen, decay_rec)
-  gg_genrec_wr = gg_genrec_a + aes(w_reward_gen, w_reward_rec)
-  gg_genrec_we = gg_genrec_a + aes(w_explore_gen, w_explore_rec)
-  gg_genrec_wn = gg_genrec_a + aes(w_noreward_gen, w_noreward_gen)
-  
-  if (gg_save) {
-    ggsave(file.path(plot_dir, "/gg_genrec_a.png"), gg_genrec_a, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_b.png"), gg_genrec_b, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_e.png"), gg_genrec_e, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_p.png"), gg_genrec_p, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_d.png"), gg_genrec_d, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_wr.png"), gg_genrec_wr, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_we.png"), gg_genrec_we, width = 11, height = 8)
-    ggsave(file.path(plot_dir, "/gg_genrec_wn.png"), gg_genrec_wn, width = 11, height = 8)
-  }
-}
-```
-```{Plot parameters}
-if (data == "fitted_humans") {
-  
-  all_params = reshape(subset(all_params, select = c("sID", "age_group", "BIC", "learning_style")),
-          timevar = "learning_style", idvar = c("sID", "age_group"), direction = "wide")
-  
-  ggplot(all_params, aes(sID, BIC.flat - BIC.Bayes, color = sID)) +
-    geom_point(position = "jitter") +
-    geom_hline(yintercept = 0, linetype = "dotted")
-  
-  all_paramsl = melt(all_params, measure.vars = c("BIC", "AIC"), variable.name = "measure")
-
-  gg_fit = ggplot(subset(all_paramsl, measure == "BIC"), aes(learning_style, value, color = learning_style)) +
-    stat_summary(fun.data = "mean_se", geom = "pointrange") +
-    # geom_point(position = "jitter", alpha = 0.5) +
-    facet_grid(age_group ~ .) +
-    labs(x = "", y = "BIC")
-    theme(legend.position = "none")
-  
-  fitted_paramsl = melt(all_params, measure.vars = c("alpha", "beta", "epsilon", "perseverance", "decay"), variable.name = "parameter")
-  fitted_paramsl[fitted_paramsl$parameter == 'beta', 'value'] = fitted_paramsl[fitted_paramsl$parameter == 'beta', 'value'] / 10
-  gg_params = ggplot(fitted_paramsl, aes(parameter, value, color = age_group, fill = age_group)) +
-    stat_summary(fun.data = "mean_se", geom = "pointrange", position = position_dodge(width = 0.8)) +
-    # geom_point(position = "jitter", alpha = 0.3) +
-    labs(x = "", y = "Parameter value", color = "Age group", fill = "Age group") +
-    facet_grid(learning_style ~ .)
-  
-  if (gg_save) {
-    ggsave(file.path(plot_dir, "gg_fit2.png"), gg_fit)
-    ggsave(file.path(plot_dir, "gg_params.png"), gg_params)
-  }
-}
 ```
 
 # Analyze behavior
