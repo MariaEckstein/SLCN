@@ -24,13 +24,13 @@ def get_agent_stuff(data_set, learning_style, fit_par_names):
             'TS_bias_scaler': TS_bias_scaler}
 
 
-def get_task_stuff(data_set):
+def get_task_stuff(data_set, prob_switch_rand_path=None):
 
     if data_set == 'PS':
         task_stuff = {'n_actions': 2,
                       'p_reward': 0.75,
                       'n_trials': 200,
-                      'path': 'C:/Users/maria/MEGAsync/SLCN/ProbabilisticSwitching/Prerandomized sequences',
+                      'path': prob_switch_rand_path,
                       'av_run_length': 10}  # DOUBLE-CHECK!!!!
 
     else:
@@ -70,12 +70,22 @@ def get_comp_stuff(data_set):
         return None
 
 
-def get_parameter_stuff(data_set, fit_par_names):
+def get_parameter_stuff(data_set, fit_par_names, learning_style):
 
     par_names = ['alpha', 'alpha_high', 'beta', 'beta_high', 'epsilon', 'forget', 'TS_bias']
-    default_pars = np.array([.1,  99,       .5,       99,       0.,        0.,       .3])
+    default_pars = np.array([.1,  99,       .5,       99,       0.,        0.,       .3])  # 99 means same as low
     par_hard_limits = ((0., 1.), (0., 1.), (0., 1.), (0., 1.), (0., 1.),  (0., 1.), (0., 1.))
     par_soft_limits = ((0., .5), (0., .5), (0., 1.), (0., 1.), (0., .25), (0., .1), (0., 1.))
+
+    # Adjust parameters to create flat agent
+    if 'flat' in learning_style:  # 'flat', 'simple_flat', 'counter_flat'
+        default_pars[np.argwhere([par == 'beta_high' for par in par_names])] = 100.
+        default_pars[np.argwhere([par == 'alpha_high' for par in par_names])] = 0.
+        default_pars[np.argwhere([par == 'TS_bias' for par in par_names])] = 100.
+    if learning_style == 's-flat':
+        default_pars[np.argwhere([par == 'beta_high' for par in par_names])] = 0.
+        default_pars[np.argwhere([par == 'alpha_high' for par in par_names])] = 0.
+        default_pars[np.argwhere([par == 'TS_bias' for par in par_names])] = 1.
 
     # For PS agent, remove TS_bias parameter
     if data_set == 'PS':
@@ -95,7 +105,7 @@ def get_parameter_stuff(data_set, fit_par_names):
 def get_minimizer_stuff(run_on_cluster, heatmap_data_path):
 
     if run_on_cluster:
-        return {'save_plot_data': False,
+        return {'save_plot_data': True,
                 'heatmap_data_path': heatmap_data_path,
                 'verbose': False,
                 'brute_Ns': 50,
@@ -110,13 +120,13 @@ def get_minimizer_stuff(run_on_cluster, heatmap_data_path):
         return {'save_plot_data': False,
                 'heatmap_data_path': heatmap_data_path,
                 'verbose': False,
-                'brute_Ns': 3,
+                'brute_Ns': 15,
                 'hoppin_T': 10.0,
                 'hoppin_stepsize': 0.5,
                 'NM_niter': 2,
                 'NM_xatol': .01,
                 'NM_fatol': 1e-5,
-                'NM_maxfev': 100}
+                'NM_maxfev': 10}
 
 
 def get_random_pars(parameters, set_specific_parameters, learning_style):
@@ -125,16 +135,6 @@ def get_random_pars(parameters, set_specific_parameters, learning_style):
     gen_pars = np.array([lim[0] + np.random.rand() * (lim[1] - lim[0]) for lim in parameters['par_soft_limits']])
     fixed_par_idx = np.invert(parameters['fit_pars'])
     gen_pars[fixed_par_idx] = parameters['default_pars'][fixed_par_idx]
-
-    # Adjust parameters to create flat agent
-    if 'flat' in learning_style:  # 'flat', 'simple_flat', 'counter_flat'
-        gen_pars[np.argwhere([par == 'beta_high' for par in parameters['par_names']])] = 100.
-        gen_pars[np.argwhere([par == 'alpha_high' for par in parameters['par_names']])] = 0.
-        gen_pars[np.argwhere([par == 'TS_bias' for par in parameters['par_names']])] = 100.
-    if learning_style == 's-flat':
-        gen_pars[np.argwhere([par == 'beta_high' for par in parameters['par_names']])] = 0.
-        gen_pars[np.argwhere([par == 'alpha_high' for par in parameters['par_names']])] = 0.
-        gen_pars[np.argwhere([par == 'TS_bias' for par in parameters['par_names']])] = 1.
 
     # Alternatively, let user set parameters
     if set_specific_parameters:

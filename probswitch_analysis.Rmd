@@ -130,10 +130,10 @@ summary(all_files)
 ```{r Get behavioral summary and win-stay loose-shift}
 # Behavior
 all_files_sum = ddply(subset(all_files, !is.na(choice_12_back)),
-                      .(sID, age_group, outcome_12_back, choice_12_back), summarize,
+                      .(sID, age_group, model_name, outcome_12_back, choice_12_back), summarize,
                       choice = mean(choice_left, na.rm = T))
 all_files_sum2 = ddply(subset(all_files, !is.na(trialsinceswitch)),
-                       .(sID, age_group, trialsinceswitch), summarize,
+                       .(sID, age_group, model_name, trialsinceswitch), summarize,
                        choice = mean(choice_left, na.rm = T),
                        RT = median(RT, na.rm = T))
 # Win-stay loose-shift
@@ -161,10 +161,7 @@ gg_RTt = ggplot(all_files_sum2, aes(trialsinceswitch, RT, fill = age_group)) +
 gg_ACC = ggplot(all_files, aes(TrialID, 100 * as.numeric(ACC), fill = age_group)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
   labs(y = "% correct", fill = "Age group") +
-  facet_grid(~ age_group)
-if (data == "fitted_sim") {
-  gg_ACC = gg_ACC + facet_grid(learning_style ~ method)
-}
+  facet_grid(model_name ~ age_group)
 
 # ACC over blocks
 gg_ACC_blocks = ggplot(subset(all_files, !is.na(choice_left)),
@@ -174,10 +171,7 @@ gg_ACC_blocks = ggplot(subset(all_files, !is.na(choice_left)),
   geom_vline(xintercept = 0, linetype = "dotted") +
   coord_cartesian(x = c(-3, 7)) +
   labs(x = "Trials since switch", y = "% choice left", color = "Reward port", shape = "Age group") +
-  facet_grid(~ age_group)
-if (data == "fitted_sim") {
-  gg_ACC_blocks = gg_ACC_blocks + facet_grid(learning_style ~ method)
-}
+  facet_grid(model_name ~ age_group)
 
 # Response times
 gg_RT_blocks = gg_ACC_blocks + aes(y = RT) + coord_cartesian(x = c(-3, 7), y = c(250, 650))
@@ -186,10 +180,7 @@ gg_RT_blocks = gg_ACC_blocks + aes(y = RT) + coord_cartesian(x = c(-3, 7), y = c
 gg_rewards = ggplot(all_files, aes(TrialID, 100 * reward, fill = age_group)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar") +
   labs(y = "% reward received", color = "Age group") +
-  facet_grid(~ age_group)
-if (data != "human") {
-  gg_rewards = gg_rewards + facet_grid(learning_style ~ method)
-}
+  facet_grid(model_name ~ age_group)
 
 gg_rewards2 = ggplot(subset(all_files_sum, !is.na(choice_12_back)),
                      aes(outcome_12_back, 100 * choice, fill = choice_12_back, group = choice_12_back, shape = age_group)) +
@@ -197,10 +188,7 @@ gg_rewards2 = ggplot(subset(all_files_sum, !is.na(choice_12_back)),
   stat_summary(fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), position = position_dodge(0.9)) +
   coord_cartesian(y = c(0, 100)) +
   labs(x = "Reward history (1 trial back, 2 trials back)", y = "% left choice", fill = "Previous two choices", shape = "Age group") +
-  facet_grid(~ age_group)
-if (data == "fitted_sim") {
-  gg_rewards2 = gg_rewards2 + facet_grid(learning_style ~ method)
-}
+  facet_grid(model_name ~ age_group)
 
 if (gg_save) {
   if (data %in% c("human", "fitted_human")) {
@@ -233,7 +221,7 @@ if (gg_save) {
 
 ```{r Prepare data for regression}
 # Prepare data
-all_files_regr = subset(all_files, select = c("sID", "TrialID", "block", "reward", "selected_box"))
+all_files_regr = subset(all_files, select = c("sID", "model_name", "TrialID", "block", "reward", "selected_box"))
 ## Times rewarded and times selected
 all_files_regr$selected = as.numeric(as.character(factor(all_files_regr$selected_box, levels = c(0, 1), labels = c(-1, 1))))  # 0 / -1: left; +1: right
 ## Choice regressors
@@ -258,44 +246,46 @@ reward_predictors = c("reward", "noReward")
 
 nback_regr_dat = data.frame()
 for (subj in unique(all_files_regr$sID)) {
-  for (n in 1:12) {
-    subj_dat = subset(all_files_regr, sID == subj, !is.na(selected_box))
-    
-    ## Add nback columns
-    for (cond in c(choice_predictors, reward_predictors, sel_rew_predictors)) {
-      col_name = paste0("back", n, cond)
-      subj_dat[,col_name] = c(rep(NA, n), subj_dat[1:(nrow(subj_dat)-n), cond])
+  for (model in unique(all_files_regr$model_name)) {
+    for (n in 1:12) {
+      subj_dat = subset(all_files_regr, sID == subj & model_name == model, !is.na(selected_box))
+      
+      ## Add nback columns
+      for (cond in c(choice_predictors, reward_predictors, sel_rew_predictors)) {
+        col_name = paste0("back", n, cond)
+        subj_dat[,col_name] = c(rep(NA, n), subj_dat[1:(nrow(subj_dat)-n), cond])
+      }
+      
+      ## Selected/rewarded model (predictors: selected [left: -1, right: +1], reward [left: -1, right: +1, none: 0])
+      sel_rew_formula = paste("selected_box ~", paste(paste0("back", n, sel_rew_predictors), collapse = " + "), "+ (1 | block)")
+      sel_rew_mod = glm(as.formula(sel_rew_formula),
+                family = "binomial",
+                data = subj_dat)
+      sel_rew_coefs = as.data.frame(summary(sel_rew_mod)$coef)
+      sel_rew_coefss = cbind(sID = subj, model_name = model, model = "selectedRewarded", predictor = rownames(sel_rew_coefs), back = n, data.frame(sel_rew_coefs, row.names = NULL))
+      
+      ## Choice model (predictors: left_rew [reward: +1, no reward: -1, none: 0], right_rew [reward: +1, no reward: -1, none: 0])
+      choice_formula = paste("selected_box ~ ", paste(paste0("back", n, choice_predictors), collapse = "+"))
+      choice_mod = glm(as.formula(choice_formula),
+                family = "binomial",
+                data = subj_dat)
+      choice_coefs = as.data.frame(summary(choice_mod)$coef)
+      choice_coefss = cbind(sID = subj, model_name = model, model = "leftRight", predictor = rownames(choice_coefs), back = n, data.frame(choice_coefs, row.names = NULL))
+  
+      ## Reward model (predictors: reward [left: -1, right: +1, none: 0], no reward [left: -1, right: +1, none: 0])
+      reward_formula = paste("selected_box ~ ", paste(paste0("back", n, reward_predictors), collapse = "+"))
+      reward_mod = glm(as.formula(reward_formula),
+                family = "binomial",
+                data = subj_dat)
+      reward_coefs = as.data.frame(summary(reward_mod)$coef)
+      reward_coefss = cbind(sID = subj, model_name = model, model = "rewardNoReward", predictor = rownames(reward_coefs), back = n, data.frame(reward_coefs, row.names = NULL))
+      
+      nback_regr_dat = rbind(nback_regr_dat, choice_coefss, reward_coefss, sel_rew_coefss)
     }
-    
-    ## Selected/rewarded model (predictors: selected [left: -1, right: +1], reward [left: -1, right: +1, none: 0])
-    sel_rew_formula = paste("selected_box ~", paste(paste0("back", n, sel_rew_predictors), collapse = " + "), "+ (1 | block)")
-    sel_rew_mod = glm(as.formula(sel_rew_formula),
-              family = "binomial",
-              data = subj_dat)
-    sel_rew_coefs = as.data.frame(summary(sel_rew_mod)$coef)
-    sel_rew_coefss = cbind(sID = subj, model = "selectedRewarded", predictor = rownames(sel_rew_coefs), back = n, data.frame(sel_rew_coefs, row.names = NULL))
-    
-    ## Choice model (predictors: left_rew [reward: +1, no reward: -1, none: 0], right_rew [reward: +1, no reward: -1, none: 0])
-    choice_formula = paste("selected_box ~ ", paste(paste0("back", n, choice_predictors), collapse = "+"))
-    choice_mod = glm(as.formula(choice_formula),
-              family = "binomial",
-              data = subj_dat)
-    choice_coefs = as.data.frame(summary(choice_mod)$coef)
-    choice_coefss = cbind(sID = subj, model = "leftRight", predictor = rownames(choice_coefs), back = n, data.frame(choice_coefs, row.names = NULL))
-
-    ## Reward model (predictors: reward [left: -1, right: +1, none: 0], no reward [left: -1, right: +1, none: 0])
-    reward_formula = paste("selected_box ~ ", paste(paste0("back", n, reward_predictors), collapse = "+"))
-    reward_mod = glm(as.formula(reward_formula),
-              family = "binomial",
-              data = subj_dat)
-    reward_coefs = as.data.frame(summary(reward_mod)$coef)
-    reward_coefss = cbind(sID = subj, model = "rewardNoReward", predictor = rownames(reward_coefs), back = n, data.frame(reward_coefs, row.names = NULL))
-    
-    nback_regr_dat = rbind(nback_regr_dat, choice_coefss, reward_coefss, sel_rew_coefss)
   }
 }
 # Beautify
-nback_regr_dat = merge(nback_regr_dat, ages, by.x = "sID", by.y = "ID", all.x = T)
+nback_regr_dat = merge(nback_regr_dat, ages, all.x = T)
 nback_regr_dat$predictor = gsub("back.", "", nback_regr_dat$predictor)
 nback_regr_dat$predictor = gsub("[0-99]", "", nback_regr_dat$predictor)
 nback_regr_dat$sig_Estimate = 1 / (1 + exp(-nback_regr_dat$Estimate / 2))  # transform so that I can see all
@@ -309,7 +299,7 @@ gg_nback_regr_agecont =
   geom_smooth() +
   geom_point() +
   labs(x = "Age (years)", y = "P(right) ~ choice_reward", color = "Choice", fill = "Choice", alpha = "# Trials back: 12-...") +
-  facet_grid(model ~ .)
+  facet_grid(model ~ model_name)
 gg_nback_regr_agecont_sig = gg_nback_regr_agecont + aes(y = sig_Estimate)
 
 gg_nback_regr_agecats =
@@ -318,7 +308,7 @@ gg_nback_regr_agecats =
   stat_summary(fun.data = mean_se, geom = "pointrange") +
   stat_summary(fun.data = mean_se, geom = "line") +
   labs(x = "# trials back", y = "beta weight", color = "Side") +
-  facet_grid(~ predictor)
+  facet_grid(model_name ~ predictor)
 gg_nback_regr_agecats_sig = gg_nback_regr_agecats + aes(y = sig_Estimate)
 
 # Save plots

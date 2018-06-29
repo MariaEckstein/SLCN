@@ -116,8 +116,7 @@ class Agent(object):
 
             # Update Q values based on RPEs
             self.Q_low[:, stimulus[1], action] += self.alpha * self.p_TS * self.RPEs_low
-            if not 'flat' in self.learning_style:
-                self.Q_high[self.context_int, :] += self.alpha_high * self.p_TS * self.RPEs_high
+            self.Q_high[self.context_int, :] += self.alpha_high * self.p_TS * self.RPEs_high
 
         # Calculate trial log likelihood and add to sum
         self.LL += np.log(self.p_actions[action])

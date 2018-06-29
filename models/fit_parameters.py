@@ -1,50 +1,72 @@
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
 from scipy.optimize import brute
 from scipy.optimize import basinhopping
 from basinhopping_specifics import MyTakeStep, MyBounds
 from minimizer_heatmap import PlotMinimizerHeatmap, CollectPaths, CollectMinima
-# from alien_task import Task
-# from competition_phase import CompetitionPhase
-# from alien_agents import Agent
-# from alien_record_data import RecordData
 from simulate_interactive import SimulateInteractive
-from ps_task import Task
-from ps_agents import RLAgent as Agent
-from ps_record_data import RecordData
 
 
 class FitParameters(object):
-    def __init__(self, parameters, task_stuff, comp_stuff, agent_stuff):
+    def __init__(self, data_set, learning_style, parameters, task_stuff, comp_stuff, agent_stuff):
         self.parameters = parameters
         self.task_stuff = task_stuff
         self.comp_stuff = comp_stuff
         self.agent_stuff = agent_stuff
         self.n_fit_par = sum(parameters['fit_pars'])
+        self.data_set = data_set
+        self.learning_style = learning_style
 
-    def simulate_agent(self, data_set, all_pars, interactive=False):
+    def simulate_agent(self, all_pars, agent_id, interactive=False):
+
+        # Import the right agent and task
+        if self.data_set == 'Aliens':
+            from alien_task import Task
+            from competition_phase import CompetitionPhase
+            from alien_agents import Agent
+            from alien_record_data import RecordData
+        else:
+            from ps_task import Task
+            from ps_record_data import RecordData
+            if self.learning_style == 'Bayes':
+                from ps_agents import BayesAgent as Agent
+            else:
+                from ps_agents import RLAgent as Agent
 
         # Initialize task, agent, record, and interactive game
         task = Task(self.task_stuff, 4)
         agent = Agent(self.agent_stuff, all_pars, self.task_stuff)
         record_data = RecordData(mode='create_from_scratch', task=task)
         if interactive:
-            sim_int = SimulateInteractive(data_set, agent)
+            sim_int = SimulateInteractive(self.data_set, agent)
         else:
             sim_int = None
 
         # Play the game, phase by phase, trial by trial
-        if data_set == 'Aliens':
+        if self.data_set == 'Aliens':
             self.simulate_aliens(task, agent, record_data, interactive, sim_int)
         else:
             self.simulate_PS(task, agent, record_data, interactive, sim_int)
 
-        record_data.add_parameters(agent, '')  # add parameters (alpha, beta, etc.) only
+        record_data.add_parameters(agent, agent_id)  # add parameters (alpha, beta, etc.) only
         return record_data.get()
 
     def calculate_NLL(self, vary_pars, agent_data, collect_paths=None, verbose=False,
                       goal='calculate_NLL', suff='_rec'):
+
+        # Import the right agent and task
+        if self.data_set == 'Aliens':
+            from alien_task import Task
+            from competition_phase import CompetitionPhase
+            from alien_agents import Agent
+            from alien_record_data import RecordData
+        else:
+            from ps_task import Task
+            from ps_record_data import RecordData
+            if self.learning_style == 'Bayes':
+                from ps_agents import BayesAgent as Agent
+            else:
+                from ps_agents import RLAgent as Agent
 
         # Get agent parameters
         all_pars = self.parameters['default_pars']
@@ -89,7 +111,7 @@ class FitParameters(object):
         elif goal == 'calculate_fit':
             return [-agent.LL, BIC, AIC]
         elif goal == 'add_decisions_and_fit':
-            record_data.add_parameters(agent, self.parameters, suff=suff)  # add parameters and fit_pars
+            record_data.add_parameters(agent, None, self.parameters, suff=suff)  # add parameters and fit_pars
             record_data.add_fit(-agent.LL, BIC, AIC, suff=suff)
             return record_data.get()
 

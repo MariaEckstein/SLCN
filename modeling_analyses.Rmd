@@ -12,7 +12,7 @@ gg_save = T
 data_set = "PS"
 parameter_names = c("alpha", "alpha_high", "beta", "beta_high", "epsilon", "TS_bias", "forget")
 
-data_dir = paste0("C:/Users/maria/MEGAsync/SLCN/", data_set, "GenRec/fit_par")
+data_dir = paste0("C:/Users/maria/MEGAsync/SLCN/", data_set, "GenRecCluster/fit_par")
 plot_dir = file.path(data_dir, "plots")
 
 if (!dir.exists(plot_dir)) {
@@ -39,10 +39,19 @@ all_files = data.frame()
 
 for(filename in filenames) {
 
+  # Read in subj file, add trial_index and ACC
   subj_file = read.csv(file.path(data_dir, filename))
   subj_file$trial_index = 1:nrow(subj_file)
   subj_file$ACC = with(subj_file, selected_box == correct_box)
   
+  # Add columns for missing parameters
+  for (colname in c(parameter_names, paste0(parameter_names, "_rec"))) {
+    if (!colname %in% colnames(subj_file)) {
+      subj_file[,colname] = 0
+    }
+  }
+  
+  # Attach to all_files
   all_files = as.data.frame(rbind(all_files, subj_file))
 }
 

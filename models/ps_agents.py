@@ -60,6 +60,9 @@ class RLAgent(object):
 
     def learn(self, action, reward):
 
+        # Calculate trial log likelihood and add to sum
+        self.LL += np.log(self.p_actions[action])
+
         # Calculate RPEs
         self.RPEs_high = reward - self.Q_high
         self.RPEs_low = reward - self.Q_low[:, action]
@@ -71,9 +74,6 @@ class RLAgent(object):
         self.Q_low[:, action] += update_low
         if 'counter' in self.learning_style:
             self.Q_low[:, 1-action] -= update_low
-
-        # Calculate trial log likelihood and add to sum
-        self.LL += np.log(self.p_actions[action])
 
     def get_p_from_Q(self, Q, beta, epsilon):
 
@@ -100,36 +100,61 @@ class RLAgent(object):
 class BayesAgent(object):
     def __init__(self, agent_stuff, all_pars, task_stuff):
 
+        # Big general stuff
         self.learning_style = agent_stuff['learning_style']
         self.n_actions = task_stuff['n_actions']
+
+        # Parameters and prior knowledge
         [_, _, _, _, self.epsilon, _] = all_pars
         self.p_switch = task_stuff['p_reward'] / np.mean(task_stuff['av_run_length'])  # true average switch probability
         self.p_reward = task_stuff['p_reward']  # true reward probability
+
+        # "Memory"
         self.p_actions = np.ones(self.n_actions) / self.n_actions  # initialize prior uniformly over all actions
         self.LL = 0
 
+        # Additional stuff for simulate_interactive
+        self.Q_high = np.nan
+        self.Q_low = np.full([2, 2], np.nan)
+        self.p_TS = np.nan
+        self.Q_actions = np.nan
+        self.RPEs_high = np.nan
+        self.RPEs_low = np.nan
+
     def select_action(self):
-        action = np.random.choice(range(self.n_actions), p=self.p_actions)
-        self.LL += np.log(self.p_actions[action])
-        return action
+        return np.random.choice(range(self.n_actions), p=self.p_actions)
 
     def learn(self, action, reward):
 
-        # Get likelihood P(r|box)
-        if reward:
-            lik_boxes = np.zeros(self.n_actions) + 0.001  # P(r==1|box==wrong) = 0
-            lik_boxes[action] = self.p_reward  # P(r==1|box==magical) = p_reward
-        else:
-            lik_boxes = np.ones(self.n_actions) - 0.001  # P(r==0|box==wrong) = 1
-            lik_boxes[action] = 1 - self.p_reward  # P(r==0|box==magical) = 1 - p_reward
+        # Calculate trial log likelihood and add to sum
+        self.LL += np.log(self.p_actions[action])
 
-        # Get posterior P(box==magical|r==r) = P(r==r|box==magical) * P(box==magical) / P(r==r)
+        # Get likelihood [P(r|non_chosen_box==magic), P(r|chosen_box=magic)]
+        if reward:
+            lik_boxes = np.zeros(self.n_actions) + 0.001  # P(r==1|non_chosen_box==magical) = 0
+            lik_boxes[action] = self.p_reward  # P(r==1|chosen_box==magical) = p_reward
+        else:
+            lik_boxes = np.ones(self.n_actions) - 0.001  # P(r==0|non_chosen_box==magical) = 1
+            lik_boxes[action] = 1 - self.p_reward  # P(r==0|chosen_box==magical) = 1 - p_reward
+
+        # Get posterior [P(chosen_box==magical|r==r), P(non_chosen_box==magical|r==r)], with
+        # P(box==magical|r==r) = P(r==r|box==magical) * P(box==magical) / P(r==r)
         posterior = lik_boxes * self.p_actions / np.sum(lik_boxes * self.p_actions)  # normalize such that sum == 1
 
-        # Get probability that the same box will be magical on the next trial
-        next_trial_if_no_switch = (1 - self.p_switch) * posterior
-        next_trial_if_switch = self.p_switch * np.flipud(posterior)
-        self.p_actions = next_trial_if_no_switch + next_trial_if_switch
+        # Get probabilities for the next trial
+        p_actions = (1 - self.p_switch) * posterior + self.p_switch * (1 - posterior)
 
         # Add epsilon noise
-        # self.p_actions = self.epsilon / len(self.p_actions) + (1 - self.epsilon) * self.p_actions
+        p_actions = self.epsilon / len(p_actions) + (1 - self.epsilon) * p_actions
+
+        # Make sure probabilities are in the right ranges
+        p_actions[np.argwhere(p_actions < 0)] = 0
+        p_actions[np.argwhere(p_actions > 1)] = 1
+        assert np.round(sum(p_actions), 3) == 1, 'Error in get_p_from_Q: probabilities must sum to 1.'
+        assert np.all(p_actions >= 0), 'Error in get_p_from_Q: probabilities must be >= 0.'
+        assert np.all(p_actions <= 1), 'Error in get_p_from_Q: probabilities must be <= 1.'
+
+        self.p_actions = p_actions
+
+        # For interactive game
+        self.Q_actions = lik_boxes

@@ -13,10 +13,12 @@ class RecordData(object):
         else:
             self.subj_file = agent_data
 
-    def add_parameters(self, agent, parameters, suff=''):
+    def add_parameters(self, agent, agent_id, parameters=None, suff=''):
         self.subj_file['learning_style'] = agent.learning_style
+        if agent_id is not None:
+            self.subj_file['sID'] = agent_id
         if parameters:
-            self.subj_file['fit_pars'] = str(parameters['fit_pars'])
+            self.subj_file['fit_pars' + suff] = str(parameters['fit_pars'])
         if hasattr(agent, 'alpha'):
             self.subj_file['alpha' + suff] = agent.alpha
             self.subj_file['alpha_high' + suff] = agent.alpha_high
