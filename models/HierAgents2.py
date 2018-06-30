@@ -9,52 +9,42 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-# Step 1: Define update_Q in Theano scan to avoid the loop over trials
+# Define update_Q and p_from_Q as Theano scan functions to get around the loop over trials
 from update_Q import update_Q, p_from_Q
-
-# Get agent data (choices, rewards)
 n_trials = 5
-alpha = 0.5
-beta = 3
 
+# Get to-be-modeled data (agent's choices & obtained rewards)
 agent_data = pd.read_csv(glob.glob('C:/Users/maria/MEGAsync/SLCN/PSGenRec/*.csv')[0])
 left_choices = 1 - np.array(agent_data['selected_box'])[:n_trials]
 right_choices = np.array(agent_data['selected_box'])[:n_trials]
 rewards = agent_data['reward'].tolist()[:n_trials]
 
-Q_left = update_Q(rewards, left_choices, alpha).T[0]
-Q_right = update_Q(rewards, right_choices, alpha).T[0]
+with pm.Model() as model:
 
-p_left = p_from_Q(Q_left, Q_right, beta)
-p_right = p_from_Q(Q_right, Q_left, beta)
+    # Specify model parameters
+    epsilon = pm.Uniform('epsilon', lower=0, upper=1)
+    alpha = pm.Uniform('alpha', lower=0, upper=1)
+    beta = 2  # pm.Uniform('beta', lower=0, upper=5)
 
-print(np.column_stack((Q_left, Q_right, p_left, p_right, rewards, left_choices)))
+    # Calculate Q-values of left button and right button
+    Q_left = update_Q(rewards, left_choices, alpha).T[0]
+    # Q_right = update_Q(rewards, right_choices, alpha).T[0]
+    #
+    # # Transform Q-values into action probabilities using a softmax transform
+    # p_left = p_from_Q(Q_left, Q_right, beta)
+    # p_right = p_from_Q(Q_right, Q_left, beta)
+    #
+    # # print(np.column_stack((Q_left, Q_right, p_left, p_right, p_left + p_right, rewards, left_choices)))
+    # print(np.column_stack((p_left, p_right)))
+    #
+    # # Observed choice
+    # observed_choice = pm.Bernoulli('observed_choice', p=np.column_stack((p_left, p_right)), observed=np.column_stack((right_choices, left_choices)))
 
+    observed_choice = pm.Bernoulli('observed_choice', p=epsilon, observed=right_choices)
 
+    # Inference
+    trace = pm.sample(1000, tune=500, cores=1)
 
-#
-# with pm.Model() as model:
-#
-#     # Specify parameters
-#     alpha = pm.Uniform('alpha', lower=0, upper=1)
-#     beta = pm.Normal('beta', mu=3, sd=2)
-#
-#     # Specify agent
-#     pchoice = 0.5 * np.ones(2)
-#     Q = 0.5 * np.zeros(2)
-#
-#     # Run the task
-#
-#
-#
-#     for trial in range(len(choice)):
-#
-#         pchoice[0] = 1 / (1 + np.exp(beta * (Q[1] - Q[0])))
-#         pchoice[1] = 1 - pchoice[0]
-#
-#         choice[trial] = pm.Categorical(pchoice)
-#         a = choice[trial]
-#
-#         RPE = reward[trial] - Q[a]
-#
-#         Q[a] = Q[a] + alpha * RPE
+# Plot results
+pm.traceplot(trace)
+plt.show()

@@ -12,7 +12,7 @@ gg_save = T
 data_set = "PS"
 parameter_names = c("alpha", "alpha_high", "beta", "beta_high", "epsilon", "TS_bias", "forget")
 
-data_dir = paste0("C:/Users/maria/MEGAsync/SLCN/", data_set, "GenRecCluster/fit_par")
+data_dir = paste0("C:/Users/maria/MEGAsync/SLCN/", data_set, "humanDataCluster/fit_par")
 plot_dir = file.path(data_dir, "plots")
 
 if (!dir.exists(plot_dir)) {
@@ -55,7 +55,7 @@ for(filename in filenames) {
   all_files = as.data.frame(rbind(all_files, subj_file))
 }
 
-for (col_name in c("model_name", parameter_names, paste0(parameter_names, "_rec"))) {
+for (col_name in c("model_name", "LL", parameter_names, paste0(parameter_names, "_rec"))) {
   if (!col_name %in% colnames(all_files)) {
     all_files[,col_name] = 0
   }
@@ -66,33 +66,48 @@ summary(all_files)
 ```{r Get parameter_dat}
 
 # Get one row per dataset
-parameter_dat = ddply(all_files, c("sID", "model_name", "learning_style", "NLL_rec", parameter_names, paste0(parameter_names, "_rec")), summarize,
+parameter_dat = ddply(all_files, c("sID", "model_name_rec", "learning_style", "NLL_rec", parameter_names, paste0(parameter_names, "_rec")), summarize,
                       NLL = -LL[trial_index == max(trial_index)],
                       AIC = AIC_rec[1])  # NLL in the last trial of InitialLearning
 
 # Split generated and recovered into two separate columns
-parameter_long_gen = melt(subset(parameter_dat, select = c(parameter_names, "NLL", "sID", "model_name")),
+parameter_long_gen = melt(subset(parameter_dat, select = c(parameter_names, "NLL", "sID", "model_name_rec")),
                           measure.vars = c(parameter_names, "NLL"), variable.name = "parameter", value.name = "gen_par")
-parameter_long_rec = melt(subset(parameter_dat, select = c(paste0(parameter_names, "_rec"), "NLL_rec", "sID", "model_name")),
+parameter_long_rec = melt(subset(parameter_dat, select = c(paste0(parameter_names, "_rec"), "NLL_rec", "sID", "model_name_rec")),
                           measure.vars = c(paste0(parameter_names, "_rec"), "NLL_rec"), variable.name = "parameter", value.name = "rec_par")
 parameter_long_rec$parameter = gsub("_rec", "", parameter_long_rec$parameter)
-parameter_long = merge(parameter_long_gen, parameter_long_rec, by = c("sID", "model_name", "parameter"))
+parameter_long = merge(parameter_long_gen, parameter_long_rec, by = c("sID", "model_name_rec", "parameter"))
 
 # Make sure that the resulting dimensions are right
 assertthat::assert_that(dim(parameter_long)[1] == (length(parameter_names) + 1) * dim(parameter_dat)[1])
+
+
+parameter_AIC = reshape(subset(parameter_dat, select = c("AIC", "sID", "model_name_rec")),
+        direction = "wide", timevar = "model_name_rec", idvar = "sID")
+parameter_AIC$counter_minus_Bayes = with(parameter_AIC, AIC.counter_flat_alpha_beta_epsilon - AIC.Bayes_epsilon)
+parameter_AIC$simple_minus_Bayes = with(parameter_AIC, AIC.simple_flat_alpha_beta_epsilon - AIC.Bayes_epsilon)
+
+parameter_AIC_long = melt(subset(parameter_AIC, select = c("sID", "counter_minus_Bayes", "simple_minus_Bayes")),
+     measure.vars = c("counter_minus_Bayes", "simple_minus_Bayes"), variable.name = "model", value.name = "AIC")
 ```
 
 # Analyze
 
 ```{r Plot AIC scores of all models}
-gg_AICs = ggplot(parameter_dat, aes(model_name, AIC, color = learning_style)) +
+gg_AICs = ggplot(parameter_dat, aes(model_name_rec, AIC, color = learning_style)) +
   stat_summary(fun.data = mean_se, geom = "bar") +
-  stat_summary(fun.data = mean_se, geom = "bar") +
-  geom_point() +
+  stat_summary(fun.data = mean_se, geom = "pointrange") +
+  geom_point(position = "jitter", alpha = 0.3) +
   theme(legend.position = "none")
+
+gg_AICs_rel = ggplot(parameter_AIC_long, aes(model, AIC)) +
+  stat_summary(fun.data = mean_se, geom = "bar") +
+  stat_summary(fun.data = mean_se, geom = "pointrange") +
+  geom_point(position = "jitter", alpha = 0.3)
 
 if (gg_save) {
     ggsave(file.path(plot_dir, "gg_AICs.png"), gg_AICs, width = 1 + length(unique(parameter_dat$learning_style)), height = 3)
+    ggsave(file.path(plot_dir, "gg_AICs_rel.png"), gg_AICs_rel, width = 1 + length(unique(parameter_dat$learning_style)), height = 3)
 }
 ```
 ```{r Plot parameters over age}
@@ -102,7 +117,7 @@ assertthat::assert_that(dim(parameter_long_age)[1] == dim(parameter_long)[1])
 gg_params_across_age = ggplot(parameter_long_age, aes(PreciseYrs, rec_par)) +
   geom_point() +
   geom_smooth() +
-  facet_wrap(model_name ~ parameter, scales = 'free')
+  facet_wrap(model_name_rec ~ parameter, scales = 'free')
 
 if (gg_save) {
     ggsave(file.path(plot_dir, "gg_params_across_age.png"), gg_params_across_age, width = 6, height = 6)
@@ -126,7 +141,7 @@ gg_gr =
   geom_point() +
   geom_text(aes(label = ifelse(outlier, sID, ""), hjust = 0)) +
   theme(legend.position = "none") +
-  facet_wrap(model_name ~ parameter, scale = "free", ncol = 3)
+  facet_wrap(model_name_rec ~ parameter, scale = "free", ncol = 3)
 gg_gen_rec = gg_gr + geom_abline(slope = 0, linetype = "dotted")
 gg_gen_rec2 = gg_gr + aes(y = rec_par) + geom_abline(slope = 1, linetype = "dotted")
 
@@ -137,10 +152,10 @@ gg_gen_rec2_lim$data = subset(gg_gen_rec2_lim$data, abs(gen_minus_rec) < 5)
 
 # Save plots
 if (gg_save) {
-  ggsave(file.path(plot_dir, "gg_gen_rec.png"), gg_gen_rec, width = 6, height = 3 * length(unique(parameter_dat$model_name)))
-  ggsave(file.path(plot_dir, "gg_gen_rec2.png"), gg_gen_rec2, width = 6, height = 3 * length(unique(parameter_dat$model_name)))
-  ggsave(file.path(plot_dir, "gg_gen_rec_lim.png"), gg_gen_rec_lim, width = 6, height = 3 * length(unique(parameter_dat$model_name)))
-  ggsave(file.path(plot_dir, "gg_gen_rec2_lim.png"), gg_gen_rec2_lim, width = 6, height = 3 * length(unique(parameter_dat$model_name)))
+  ggsave(file.path(plot_dir, "gg_gen_rec.png"), gg_gen_rec, width = 6, height = 3 * length(unique(parameter_dat$model_name_rec)))
+  ggsave(file.path(plot_dir, "gg_gen_rec2.png"), gg_gen_rec2, width = 6, height = 3 * length(unique(parameter_dat$model_name_rec)))
+  ggsave(file.path(plot_dir, "gg_gen_rec_lim.png"), gg_gen_rec_lim, width = 6, height = 3 * length(unique(parameter_dat$model_name_rec)))
+  ggsave(file.path(plot_dir, "gg_gen_rec2_lim.png"), gg_gen_rec2_lim, width = 6, height = 3 * length(unique(parameter_dat$model_name_rec)))
 }
 ```
 ```{r start button}
