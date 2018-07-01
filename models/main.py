@@ -106,7 +106,7 @@ def fit(sets, file_name, fitted_data_path, heatmap_data_path, prob_switch_random
     print("Fitted parameters: {0}".format(np.round(rec_pars, 3)))
 
     # Calculate NLL,... of minimizing parameters
-    agent_data = fit_params.calculate_NLL(vary_pars=rec_pars[np.argwhere(parameters['fit_pars'])],
+    agent_data = fit_params.calculate_NLL(vary_pars=rec_pars[np.argwhere(parameters['fit_pars']).T[0]],
                                           agent_data=agent_data,
                                           goal='add_decisions_and_fit',
                                           suff='_rec')
@@ -139,17 +139,18 @@ def simulate_based_on_data(sets, file_name, simulation_data_path, prob_switch_ra
                                get_agent_stuff(data_set, sets['learning_style'], parameters['fit_par_names']))
     rec_par_columns = [par + '_rec' for par in parameters['par_names']]
     sim_pars = pd.read_csv(file_name).loc[0, rec_par_columns].tolist()
-    sim_pars[np.argwhere([par == 'beta' for par in parameters['par_names']])] /= agent_stuff['beta_scaler']
-    sim_pars[np.argwhere([par == 'beta_high' for par in parameters['par_names']])] /= agent_stuff['beta_high_scaler']
+    sim_pars[np.argwhere([par == 'beta' for par in parameters['par_names']]).T[0][0]] /= agent_stuff['beta_scaler']
+    sim_pars[np.argwhere([par == 'beta_high' for par in parameters['par_names']]).T[0][0]] /= agent_stuff['beta_high_scaler']
     # sim_pars[np.argwhere([par == 'TS_bias' for par in parameters['par_names']])] /= agent_stuff['TS_bias_scaler']
 
     agent_id = pd.read_csv(file_name).loc[0, 'sID']
     for sim_agent_id in range(sets['n_agents']):
-        print('Simulating agent {0} with parameters recovered from participant {1} {2}'.format(
-            sim_agent_id, agent_id, np.round(sim_pars, 3)))
-        agent_data = fit_params.simulate_agent(sim_pars, sim_agent_id)
+        print('Simulating {3} agent {0} with parameters recovered from participant {1} {2}'.format(
+            sim_agent_id, agent_id, np.round(sim_pars, 3), sets['learning_style']))
+        agent_data = fit_params.simulate_agent(sim_pars, agent_id)
+        agent_data['model_name'] = '_'.join([sets['learning_style'], '_'.join(parameters['fit_par_names'])])
 
-        created_file_name = simulation_data_path + data_set + str(agent_id) + '_' + str(sim_agent_id) + ".csv"
+        created_file_name = simulation_data_path + data_set + sets['learning_style'] + str(agent_id) + '_' + str(sim_agent_id) + ".csv"
         print("Saving data to {0}".format(created_file_name))
         agent_data.to_csv(created_file_name)
 

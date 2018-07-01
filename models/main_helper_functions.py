@@ -117,16 +117,16 @@ def get_minimizer_stuff(run_on_cluster, heatmap_data_path):
                 'NM_maxfev': 1000}
 
     else:
-        return {'save_plot_data': False,
+        return {'save_plot_data': True,
                 'heatmap_data_path': heatmap_data_path,
                 'verbose': False,
                 'brute_Ns': 15,
                 'hoppin_T': 10.0,
                 'hoppin_stepsize': 0.5,
-                'NM_niter': 2,
+                'NM_niter': 10,
                 'NM_xatol': .01,
                 'NM_fatol': 1e-5,
-                'NM_maxfev': 10}
+                'NM_maxfev': 300}
 
 
 def get_random_pars(parameters, set_specific_parameters, learning_style):

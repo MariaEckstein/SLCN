@@ -7,8 +7,9 @@ output: html_notebook
 
 ```{r Set up parameters}
 gg_save = T
-data = "fitted_human"  # Can be "human", "fitted_human"
+data = "simulated_human"  # Can be "human", "fitted_human", or "simulated_human"
 parameter_names = c("alpha", "alpha_high", "beta", "beta_high", "epsilon", "TS_bias", "forget")
+desired_columns = c("sID", "selected_box", "reward", "RT", "correct", "correct_box", "learning_style", "model_name", "NLL", parameter_names, paste0(parameter_names, "_rec"))
 library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo")
 
   
@@ -16,6 +17,8 @@ if (data == "human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSHumanData"
 } else if (data == "fitted_human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSGenRec"
+} else if (data == "simulated_human") {
+  data_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanDataCluster/fit_par/simulations"
 }
 plot_dir = file.path(data_dir, "plots")
 
@@ -55,9 +58,23 @@ for(filename in filenames) {
     subj_file = subj_file[47:nrow(subj_file),]  # needs to be changed for future participants - 51
   } else {
     subj_file = read.csv(file.path(data_dir, filename))
-    subj_file$X = NULL
-    subj_file$p_switch_rec = NULL
   }
+  
+  # Make sure all files have the same columns
+  ## Remove unwanted columns
+  for (col_name in colnames(subj_file)) {
+    if (!col_name %in% desired_columns) {
+      subj_file[,col_name] = NULL
+    }
+  }
+  ## Add NA columns for wanted columns
+  for (col_name in desired_columns) {
+    if (!col_name %in% colnames(subj_file)) {
+      subj_file[,col_name] = NA
+    }
+  }
+  
+  # Add columns
   subj_file$TrialID = 1:nrow(subj_file)
   subj_file$rewardversion = subj_file$sID %% 4
   subj_file$ACC = with(subj_file, selected_box == correct_box)
@@ -111,12 +128,6 @@ all_files$same_choice_12_back = all_files$choice_1_back == all_files$choice_2_ba
 all_files$choice_12_back = ifelse(all_files$choice_1_back, "left", "right")
 all_files$choice_12_back[!all_files$same_choice_12_back | is.na(all_files$same_choice_12_back)] = NA
 all_files$reward_port = factor(all_files$correct_box, levels = c(0, 1), labels = c("Left", "Right"))
-
-for (colname in c("learning_style", "model_name", parameter_names)) {
-  if (!colname %in% colnames(all_files)) {
-    all_files[,colname] = 0
-  }
-}
 all_files$learning_style = factor(all_files$learning_style)
 
 old_nrows = nrow(all_files)

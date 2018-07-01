@@ -15,7 +15,7 @@ sets = {'run_on_cluster': False,
 
         'set_specific_parameters': False,
         'use_humans': True,
-        'n_agents': 2}
+        'n_agents': 5}
 check_user_settings(sets)
 
 # Get data paths, plot paths, etc.
@@ -24,7 +24,7 @@ if sets['use_humans']:
     file_name_pattern = '*.csv'
 else:
     file_name_pattern = '*' + sets['learning_style'] + '*.csv'
-agent_ids = range(100, 102)
+agent_ids = range(173, 177)
 
 # Interactive game
 # interactive_game(sets, paths['prob_switch_randomized_sequences'])
@@ -35,21 +35,23 @@ agent_ids = range(100, 102)
 #              paths['agent_data_path'],
 #              paths['prob_switch_randomized_sequences'])
 
-# Fit data to files in the given directory (either human data or simulated agents)
-for file_name in glob.glob(paths['agent_data_path'] + file_name_pattern):
-    fit(sets, file_name,
-        paths['fitted_data_path'],
-        paths['heatmap_data_path'],
-        paths['prob_switch_randomized_sequences'])
+# # Fit data to files in the given directory (either human data or simulated agents)
+# for file_name in glob.glob(paths['agent_data_path'] + file_name_pattern)[0:4]:
+#     fit(sets, file_name,
+#         paths['fitted_data_path'],
+#         paths['heatmap_data_path'],
+#         paths['prob_switch_randomized_sequences'])
 
-# Plot heatmaps to show how the fitting went
-for agent_id in agent_ids:
-    plot_heatmaps(sets, agent_id,
-                  paths['heatmap_data_path'],
-                  paths['heatmap_plot_path'])
+# # Plot heatmaps to show how the fitting went
+# for agent_id in agent_ids:
+#     plot_heatmaps(sets, agent_id,
+#                   paths['heatmap_data_path'],
+#                   paths['heatmap_plot_path'])
 
-# # Simulate data based on fitted parameters
-# for file_name in glob.glob(paths['fitted_data_path'] + '*.csv'):
-#     simulate_based_on_data(sets, file_name,
-#                            paths['simulation_data_path'],
-#                            paths['prob_switch_randomized_sequences'])
+# Simulate data based on fitted parameters
+file_name_pattern = '*' + sets['learning_style'] + '*.csv'
+path = 'C:/Users/maria/MEGAsync/SLCN/PShumanDataCluster/fit_par/'  # paths['fitted_data_path']
+for file_name in glob.glob(path + file_name_pattern):
+    simulate_based_on_data(sets, file_name,
+                           paths['simulation_data_path'],
+                           paths['prob_switch_randomized_sequences'])

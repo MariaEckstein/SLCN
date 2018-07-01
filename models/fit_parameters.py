@@ -70,7 +70,8 @@ class FitParameters(object):
 
         # Get agent parameters
         all_pars = self.parameters['default_pars']
-        all_pars[np.argwhere(self.parameters['fit_pars'])] = vary_pars
+        fit_par_idx = np.argwhere(self.parameters['fit_pars']).T[0]
+        all_pars[fit_par_idx] = vary_pars
 
         # Initialize agent and record
         agent = Agent(self.agent_stuff, all_pars, self.task_stuff)
@@ -120,8 +121,9 @@ class FitParameters(object):
         if minimizer_stuff['save_plot_data']:
             plot_heatmap = PlotMinimizerHeatmap(heatmap_data_path)
             hoppin_paths = CollectPaths(colnames=self.parameters['fit_par_names'])
+            fit_par_idx = np.argwhere(self.parameters['fit_pars']).T[0]
             brute_results = brute(func=self.calculate_NLL,
-                                  ranges=([self.parameters['par_hard_limits'][i] for i in np.argwhere(self.parameters['fit_pars'])]),
+                                  ranges=([self.parameters['par_hard_limits'][i] for i in fit_par_idx]),
                                   args=(agent_data, hoppin_paths, minimizer_stuff['verbose']),
                                   Ns=minimizer_stuff['brute_Ns'],
                                   full_output=True,
@@ -165,7 +167,7 @@ class FitParameters(object):
               .format(np.round(hoppin_fit_par, 3), np.round(hoppin_NLL, 3)))
 
         # Combine fit parameters and fixed parameters and return all
-        fit_par_idx = np.argwhere(self.parameters['fit_pars'])
+        fit_par_idx = np.argwhere(self.parameters['fit_pars']).T[0]
         minimized_pars = self.parameters['default_pars']
         minimized_pars[fit_par_idx] = hoppin_fit_par
         return minimized_pars
