@@ -26,7 +26,10 @@
 
 import numpy as np
 import pandas as pd
+
 import glob
+import pickle
+import datetime
 
 import pymc3 as pm
 import theano
@@ -36,9 +39,10 @@ import matplotlib.pyplot as plt
 
 
 # Switches for this script
-verbose = True
-n_trials = 199
-data_dir = 'C:/Users/maria/MEGAsync/SLCN/PSGenRecCluster/fit_par/PSsimple_flat*.csv'
+verbose = False
+n_trials = 129
+base_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/'
+data_dir = base_dir + '/PS_*.csv'
 n_subj = len(glob.glob(data_dir))
 
 
@@ -54,14 +58,18 @@ def p_from_Q(Q_left, Q_right, beta, epsilon):
 
 # Load to-be-modeled data
 filenames = glob.glob(data_dir)[:n_subj]
-left_choices = np.zeros((n_trials, len(filenames)))
-rewards = np.zeros(left_choices.shape)
+right_choices = np.zeros((n_trials, len(filenames)))
+rewards = np.zeros(right_choices.shape)
 
 for sID, filename in enumerate(filenames):
     agent_data = pd.read_csv(filename)
-    left_choices[:, sID] = 1 - np.array(agent_data['selected_box'])[:n_trials]
-    rewards[:, sID] = agent_data['reward'].tolist()[:n_trials]
-right_choices = 1 - left_choices
+    if agent_data.shape[0] > n_trials:
+        right_choices[:, sID] = np.array(agent_data['selected_box'])[:n_trials]
+        rewards[:, sID] = agent_data['reward'].tolist()[:n_trials]
+rewards = np.delete(rewards, range(sID, n_subj), 1)
+right_choices = np.delete(right_choices, range(sID, n_subj), 1)
+left_choices = 1 - right_choices
+n_subj = right_choices.shape[1]
 
 # Look at data
 if verbose:
@@ -82,24 +90,24 @@ if verbose:
 # Fit model
 with pm.Model() as model:
 
-    # Population-level priors (as un-informative as possible)
-    alpha_mu = pm.Uniform('alpha_mu', lower=0, upper=1)
-    beta_mu = pm.Lognormal('beta_mu', mu=0, sd=1)
-    epsilon_mu = pm.Uniform('epsilon_mu', lower=0, upper=1)
+    # # Population-level priors (as un-informative as possible)
+    # alpha_mu = pm.Uniform('alpha_mu', lower=0, upper=1)
+    # beta_mu = pm.Lognormal('beta_mu', mu=0, sd=1)
+    # epsilon_mu = pm.Uniform('epsilon_mu', lower=0, upper=1)
+    #
+    # alpha_sd = T.as_tensor_variable(0.1)  # pm.HalfNormal('alpha_sd', sd=0.5)
+    # beta_sd = T.as_tensor_variable(3)  # pm.HalfNormal('beta_sd', sd=3)
+    # epsilon_sd = T.as_tensor_variable(0.1)  # pm.HalfNormal('epsilon_sd', sd=0.5)
+    #
+    # # Individual parameters - hierarchical (specify bounds to avoid initial energy==-inf because logp(RV)==-inf)
+    # alpha = pm.Bound(pm.Normal, lower=0, upper=1)('alpha', mu=alpha_mu, sd=alpha_sd, shape=n_subj)
+    # beta = pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu, sd=beta_sd, shape=n_subj)
+    # epsilon = pm.Bound(pm.Normal, lower=0, upper=1)('epsilon', mu=epsilon_mu, sd=epsilon_sd, shape=n_subj)
 
-    # alpha_sd = pm.HalfNormal('alpha_sd', sd=0.5)
-    # beta_sd = pm.HalfNormal('beta_sd', sd=3)
-    # epsilon_sd = pm.HalfNormal('epsilon_sd', sd=0.5)
-
-    # Individual parameters - hierarchical (specify bounds to avoid initial energy==-inf because logp(RV)==-inf)
-    alpha = pm.Bound(pm.Normal, lower=0, upper=1)('alpha', mu=alpha_mu, sd=0.1, shape=n_subj)  # alpha_sd)
-    beta = pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu, sd=3, shape=n_subj)  # beta_sd)
-    epsilon = pm.Bound(pm.Normal, lower=0, upper=1)('epsilon', mu=epsilon_mu, sd=0.1, shape=n_subj)  # epsilon_sd)
-
-    # # Individual parameters - flat
-    # alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj)
-    # beta = pm.Lognormal('beta', mu=0, sd=1, shape=n_subj)
-    # epsilon = pm.Uniform('epsilon', lower=0, upper=1, shape=n_subj)
+    # Individual parameters - flat
+    alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj)
+    beta = pm.Lognormal('beta', mu=0, sd=1, shape=n_subj)
+    epsilon = pm.Uniform('epsilon', lower=0, upper=1, shape=n_subj)
 
     # Observed data (choices & rewards)
     rewards = T.as_tensor_variable(rewards)
@@ -147,9 +155,17 @@ with pm.Model() as model:
         # model_choices_print = T.printing.Print('model_choices')(model_choices)
 
     # Sample the model (should be >=5000, tune>=500)
-    trace = pm.sample(5000, tune=500, chains=2, cores=1)
+    trace = pm.sample(10000, tune=500, chains=3, cores=1)
 
-# Show results
-pm.traceplot(trace)
-plt.show()
-print(pm.summary(trace).round(2))
+    # Show results
+    pm.traceplot(trace)
+    model_summary = pm.summary(trace)
+
+    # Save results
+    now = datetime.datetime.now()
+    model_id = str(now.year) + '_' + str(now.month) + '_' + str(now.day) + '_nsubj' + str(n_subj) + 'Flat_mu'
+    with open(base_dir + 'trace_' + model_id + '.pickle', 'wb') as handle:
+        pickle.dump(trace, handle)
+    with open(base_dir + 'model_' + model_id + '.pickle', 'wb') as handle:
+        pickle.dump(model, handle)
+    plt.savefig(base_dir + model_id + 'plot.png')

@@ -3,7 +3,7 @@ import scipy.io as spio
 
 
 class Task(object):
-    def __init__(self, task_stuff, agent_id):
+    def __init__(self, task_stuff=None, agent_id=0):
         self.n_actions = task_stuff['n_actions']
         self.p_reward = task_stuff['p_reward']
         self.n_trials = task_stuff['n_trials']
@@ -42,7 +42,7 @@ class Task(object):
                 self._exchange_rewards()
                 self.switched = False
 
-            # Keep count of things (can I move that outside the loop?)
+            # Keep count of things (can I move this outside the loop?)
             self.n_correct += 1
             self.n_rewards += reward
         else:
