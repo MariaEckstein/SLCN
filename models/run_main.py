@@ -8,14 +8,14 @@ sets = {'run_on_cluster': False,
 
 	    #########################
 	    ##### ADJUST ME!!! ######
-        'fit_par_names': ['alpha', 'beta', 'epsilon'],
-        'learning_style': 'simple_flat',
+        'fit_par_names': ['epsilon'],
+        'learning_style': 'Bayes',
 	    #########################
 	    #########################
 
         'set_specific_parameters': False,
         'use_humans': True,
-        'n_agents': 5}
+        'n_agents': 1}
 check_user_settings(sets)
 
 # Get data paths, plot paths, etc.

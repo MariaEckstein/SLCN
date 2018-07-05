@@ -83,7 +83,7 @@ class RLAgent(object):
             denominator = 1. + sum([np.exp(beta * (Q[j] - Q[i])) for j in range(len(Q)) if j != i])
             p_actions[i] = 1. / denominator
 
-        # Add epsilon noise and get probabilities into [0, 1] (minimizer will sometimes go outside)
+        # Add epsilon noise and get probabilities into [0, 1] (minimizer will sometimes go outside) -> change that!
         p_actions = epsilon / len(p_actions) + (1 - epsilon) * p_actions
         p_actions[np.argwhere(p_actions < 0)] = 0
         p_actions[np.argwhere(p_actions > 1)] = 1
@@ -148,9 +148,11 @@ class BayesAgent(object):
         p_actions = self.epsilon / len(p_actions) + (1 - self.epsilon) * p_actions
 
         # Make sure probabilities are in the right ranges
-        p_actions[np.argwhere(p_actions < 0)] = 0
-        p_actions[np.argwhere(p_actions > 1)] = 1
-        assert np.round(sum(p_actions), 3) == 1, 'Error in get_p_from_Q: probabilities must sum to 1.'
+        if np.any(p_actions > 1) or np.any(p_actions < 0):
+            p_actions[:] = 0
+        # p_actions[np.argwhere(p_actions < 0)] = 0
+        # p_actions[np.argwhere(p_actions > 1)] = 1
+        # assert np.round(sum(p_actions), 3) == 1, 'Error in get_p_from_Q: probabilities must sum to 1.'
         assert np.all(p_actions >= 0), 'Error in get_p_from_Q: probabilities must be >= 0.'
         assert np.all(p_actions <= 1), 'Error in get_p_from_Q: probabilities must be <= 1.'
 
