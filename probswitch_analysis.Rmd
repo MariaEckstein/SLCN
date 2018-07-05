@@ -14,11 +14,11 @@ library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2");
 
   
 if (data == "human") {
-  data_dir = "C:/Users/maria/MEGAsync/SLCN/PSHumanData"
+  data_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData"
 } else if (data == "fitted_human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSGenRec"
 } else if (data == "simulated_human") {
-  data_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanDataCluster/fit_par/simulations"
+  data_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
 }
 plot_dir = file.path(data_dir, "plots")
 
@@ -208,9 +208,9 @@ if (gg_save) {
     ggsave(file.path(plot_dir, "/gg_ACC.png"), gg_ACC)
     ggsave(file.path(plot_dir, "/gg_RT_blocks.png"), gg_RT_blocks, width = 8, height = 3)
   }
-  ggsave(file.path(plot_dir, "/gg_ACC_blocks.png"), gg_ACC_blocks, width = 8, height = 3)
+  ggsave(file.path(plot_dir, "/gg_ACC_blocks.png"), gg_ACC_blocks, width = 8, height = 1 + 2 * length(unique(gg_ACC_blocks$data$model_name)))
   ggsave(file.path(plot_dir, "/gg_rewards.png"), gg_rewards)
-  ggsave(file.path(plot_dir, "/gg_rewards2.png"), gg_rewards2, width = 8, height = 3)
+  ggsave(file.path(plot_dir, "/gg_rewards2.png"), gg_rewards2, width = 8, height = 1 + 2 * length(unique(gg_ACC_blocks$data$model_name)))
 }
 ```
 ```{r WSLS}
@@ -261,37 +261,40 @@ for (subj in unique(all_files_regr$sID)) {
     for (n in 1:12) {
       subj_dat = subset(all_files_regr, sID == subj & model_name == model, !is.na(selected_box))
       
-      ## Add nback columns
-      for (cond in c(choice_predictors, reward_predictors, sel_rew_predictors)) {
-        col_name = paste0("back", n, cond)
-        subj_dat[,col_name] = c(rep(NA, n), subj_dat[1:(nrow(subj_dat)-n), cond])
+      if (nrow(subj_dat) > 0) {
+      
+        ## Add nback columns
+        for (cond in c(choice_predictors, reward_predictors, sel_rew_predictors)) {
+          col_name = paste0("back", n, cond)
+          subj_dat[,col_name] = c(rep(NA, n), subj_dat[1:(nrow(subj_dat)-n), cond])
+        }
+        
+        ## Selected/rewarded model (predictors: selected [left: -1, right: +1], reward [left: -1, right: +1, none: 0])
+        sel_rew_formula = paste("selected_box ~", paste(paste0("back", n, sel_rew_predictors), collapse = " + "), "+ (1 | block)")
+        sel_rew_mod = glm(as.formula(sel_rew_formula),
+                  family = "binomial",
+                  data = subj_dat)
+        sel_rew_coefs = as.data.frame(summary(sel_rew_mod)$coef)
+        sel_rew_coefss = cbind(sID = subj, model_name = model, model = "selectedRewarded", predictor = rownames(sel_rew_coefs), back = n, data.frame(sel_rew_coefs, row.names = NULL))
+        
+        ## Choice model (predictors: left_rew [reward: +1, no reward: -1, none: 0], right_rew [reward: +1, no reward: -1, none: 0])
+        choice_formula = paste("selected_box ~ ", paste(paste0("back", n, choice_predictors), collapse = "+"))
+        choice_mod = glm(as.formula(choice_formula),
+                  family = "binomial",
+                  data = subj_dat)
+        choice_coefs = as.data.frame(summary(choice_mod)$coef)
+        choice_coefss = cbind(sID = subj, model_name = model, model = "leftRight", predictor = rownames(choice_coefs), back = n, data.frame(choice_coefs, row.names = NULL))
+    
+        ## Reward model (predictors: reward [left: -1, right: +1, none: 0], no reward [left: -1, right: +1, none: 0])
+        reward_formula = paste("selected_box ~ ", paste(paste0("back", n, reward_predictors), collapse = "+"))
+        reward_mod = glm(as.formula(reward_formula),
+                  family = "binomial",
+                  data = subj_dat)
+        reward_coefs = as.data.frame(summary(reward_mod)$coef)
+        reward_coefss = cbind(sID = subj, model_name = model, model = "rewardNoReward", predictor = rownames(reward_coefs), back = n, data.frame(reward_coefs, row.names = NULL))
+        
+        nback_regr_dat = rbind(nback_regr_dat, choice_coefss, reward_coefss, sel_rew_coefss)
       }
-      
-      ## Selected/rewarded model (predictors: selected [left: -1, right: +1], reward [left: -1, right: +1, none: 0])
-      sel_rew_formula = paste("selected_box ~", paste(paste0("back", n, sel_rew_predictors), collapse = " + "), "+ (1 | block)")
-      sel_rew_mod = glm(as.formula(sel_rew_formula),
-                family = "binomial",
-                data = subj_dat)
-      sel_rew_coefs = as.data.frame(summary(sel_rew_mod)$coef)
-      sel_rew_coefss = cbind(sID = subj, model_name = model, model = "selectedRewarded", predictor = rownames(sel_rew_coefs), back = n, data.frame(sel_rew_coefs, row.names = NULL))
-      
-      ## Choice model (predictors: left_rew [reward: +1, no reward: -1, none: 0], right_rew [reward: +1, no reward: -1, none: 0])
-      choice_formula = paste("selected_box ~ ", paste(paste0("back", n, choice_predictors), collapse = "+"))
-      choice_mod = glm(as.formula(choice_formula),
-                family = "binomial",
-                data = subj_dat)
-      choice_coefs = as.data.frame(summary(choice_mod)$coef)
-      choice_coefss = cbind(sID = subj, model_name = model, model = "leftRight", predictor = rownames(choice_coefs), back = n, data.frame(choice_coefs, row.names = NULL))
-  
-      ## Reward model (predictors: reward [left: -1, right: +1, none: 0], no reward [left: -1, right: +1, none: 0])
-      reward_formula = paste("selected_box ~ ", paste(paste0("back", n, reward_predictors), collapse = "+"))
-      reward_mod = glm(as.formula(reward_formula),
-                family = "binomial",
-                data = subj_dat)
-      reward_coefs = as.data.frame(summary(reward_mod)$coef)
-      reward_coefss = cbind(sID = subj, model_name = model, model = "rewardNoReward", predictor = rownames(reward_coefs), back = n, data.frame(reward_coefs, row.names = NULL))
-      
-      nback_regr_dat = rbind(nback_regr_dat, choice_coefss, reward_coefss, sel_rew_coefss)
     }
   }
 }
@@ -323,14 +326,14 @@ gg_nback_regr_agecats =
 gg_nback_regr_agecats_sig = gg_nback_regr_agecats + aes(y = sig_Estimate)
 
 # Save plots
-ggsave(file.path(plot_dir, "gg_nback_regr_agecats.png"), gg_nback_regr_agecats, width=8, height=3)
-ggsave(file.path(plot_dir, "gg_nback_regr_agecats_sig.png"), gg_nback_regr_agecats_sig, width=8, height=3)
+ggsave(file.path(plot_dir, "gg_nback_regr_agecats.png"), gg_nback_regr_agecats, width=8, height=1 + 2 * length(unique(gg_ACC_blocks$data$model_name)))
+ggsave(file.path(plot_dir, "gg_nback_regr_agecats_sig.png"), gg_nback_regr_agecats_sig, width=8, height=1 + 2 * length(unique(gg_ACC_blocks$data$model_name)))
 ggsave(file.path(plot_dir, "gg_nback_regr_agecont.png"), gg_nback_regr_agecont, width=7, height=12)
 ggsave(file.path(plot_dir, "gg_nback_regr_agecont_sig.png"), gg_nback_regr_agecont_sig, width=7, height=12)
 ```
 ```{r Fit exponential model to regression weights}
 # Visualize one example
-dat = subset(nback_regr_dat, sID == 17 & predictor == "reward")
+dat = subset(nback_regr_dat, sID == unique(nback_regr_dat$sID)[1] & predictor == "reward")
 # exp_mod = nls(Estimate ~ k * exp(-lambda * back), data = dat, start = list(k = .1, lambda = .1))
 exp_mod = nls(Estimate ~ k * exp(-back), data = dat, start = list(k = .1))
 plot(dat$back, dat$Estimate)
@@ -351,7 +354,7 @@ for (subj in unique(nback_regr_dat$sID)) {
     }
   }
 }
-exp_coefs = merge(exp_coefs, ages, by.x = "sID", by.y = "ID", all.x = T)
+exp_coefs = merge(exp_coefs, ages, all.x = T)
 exp_coefs$sig_Estimate = NA
 exp_coefs$sig_Estimate[exp_coefs$exp_predictor == "k"] = 1 / (1 + exp(-exp_coefs$Estimate[exp_coefs$exp_predictor == "k"] / 5))
 exp_coefs$sig_Estimate[exp_coefs$exp_predictor == "lambda"] = 1 / (1 + exp(-exp_coefs$Estimate[exp_coefs$exp_predictor == "lambda"] / .5))
@@ -413,8 +416,8 @@ gg_PDS_criterion = gg_age_criterion + aes(x = PDS)
 # Prominence of WSLS
 wsls_wide = reshape(subset(wsls, select = -age_group), direction = "wide", timevar = "reward", idvar = "sID")
 wsls_wide$wsls = with(wsls_wide, stay.1 + (1 - stay.0))
-wsls_wide = merge(wsls_wide, ages, by.x = "sID", by.y = "ID", all.x = T)
-wsls = merge(wsls, ages, by.x = "sID", by.y = "ID", all.x = T)
+wsls_wide = merge(wsls_wide, ages, all.x = T)
+wsls = merge(wsls, ages, all.x = T)
 
 gg_age_wsls = ggplot(wsls, aes(PreciseYrs, stay, color = reward)) +
   geom_point() +
@@ -425,7 +428,7 @@ gg_PDS_wsls = gg_age_wsls + aes(x = PDS)
 all_files
 rewhist_dat = ddply(all_files, .(sID, outcome_12_back), summarize,
                     stay = mean(same_choice_01_back, na.rm = T))
-rewhist_dat = merge(rewhist_dat, ages, by.x = "sID", by.y = "ID", all.x = T)
+rewhist_dat = merge(rewhist_dat, ages, all.x = T)
 gg_age_rewhist =
   ggplot(subset(rewhist_dat, !is.na(outcome_12_back)), aes(PreciseYrs, stay, color = outcome_12_back)) +
   geom_point() +
@@ -440,40 +443,48 @@ gg_age_RT_sd = ggplot(RT_sd_dat, aes(PreciseYrs, RT_sd)) +
   geom_smooth()
 gg_PDS_RT_sd = gg_age_RT_sd + aes(x = PDS)
 
-# RT ~ trialID || age
-RT_slope_dat = data.frame()
-for (subj in unique(all_files$sID)) {
-  subj_dat = subset(all_files, sID == subj)
-  RT_mod = lm(RT ~ TrialID, data = subj_dat)
-  coefs = as.data.frame(summary(RT_mod)$coefficients)
-  coefss = cbind(sID = subj, predictor = rownames(coefs), data.frame(coefs, row.names = NULL))
-  RT_slope_dat = rbind(RT_slope_dat, rbind(coefss))
-}
-RT_slope_dat = merge(RT_slope_dat, ages, by.x = "sID", by.y = "ID", all.x = T)
-
-gg_age_RT_slope = ggplot(subset(RT_slope_dat, predictor == "TrialID"), aes(PreciseYrs, Estimate)) +# & `Pr...t..` < 0.05
-  geom_point() +
-  geom_smooth()
-gg_PDS_RT_slope = gg_age_RT_slope + aes(x = PDS)
-
 # Save plots
-ggsave(file.path(plot_dir, "gg_age_criterion.png"), gg_age_criterion)
-ggsave(file.path(plot_dir, "gg_PDS_criterion.png"), gg_PDS_criterion)
-ggsave(file.path(plot_dir, "gg_PDS_ACC.png"), gg_PDS_ACC)
-ggsave(file.path(plot_dir, "gg_age_ACC.png"), gg_age_ACC)
-ggsave(file.path(plot_dir, "gg_age_RT.png"), gg_age_RT)
-ggsave(file.path(plot_dir, "gg_PDS_RT.png"), gg_PDS_RT)
-ggsave(file.path(plot_dir, "gg_age_RT_sd.png"), gg_age_RT_sd)
-ggsave(file.path(plot_dir, "gg_PDS_RT_sd.png"), gg_PDS_RT_sd)
-ggsave(file.path(plot_dir, "gg_age_wsls.png"), gg_age_wsls)
-ggsave(file.path(plot_dir, "gg_PDS_wsls.png"), gg_PDS_wsls)
-ggsave(file.path(plot_dir, "gg_age_rewhist.png"), gg_age_rewhist)
-ggsave(file.path(plot_dir, "gg_PDS_rewhist.png"), gg_PDS_rewhist)
-ggsave(file.path(plot_dir, "gg_age_RT_slope.png"), gg_age_RT_slope)
-ggsave(file.path(plot_dir, "gg_age_n_blocks.png"), gg_age_n_blocks)
-ggsave(file.path(plot_dir, "gg_PDS_n_blocks.png"), gg_PDS_n_blocks)
-ggsave(file.path(plot_dir, "gg_age_overall_stay.png"), gg_age_overall_stay)
-ggsave(file.path(plot_dir, "gg_PDS_overall_stay.png"), gg_PDS_overall_stay)
+if (gg_save) {
+  ggsave(file.path(plot_dir, "gg_age_criterion.png"), gg_age_criterion)
+  ggsave(file.path(plot_dir, "gg_PDS_criterion.png"), gg_PDS_criterion)
+  ggsave(file.path(plot_dir, "gg_PDS_ACC.png"), gg_PDS_ACC)
+  ggsave(file.path(plot_dir, "gg_age_ACC.png"), gg_age_ACC)
+  ggsave(file.path(plot_dir, "gg_age_wsls.png"), gg_age_wsls)
+  ggsave(file.path(plot_dir, "gg_PDS_wsls.png"), gg_PDS_wsls)
+  ggsave(file.path(plot_dir, "gg_age_rewhist.png"), gg_age_rewhist)
+  ggsave(file.path(plot_dir, "gg_PDS_rewhist.png"), gg_PDS_rewhist)
+  ggsave(file.path(plot_dir, "gg_age_n_blocks.png"), gg_age_n_blocks)
+  ggsave(file.path(plot_dir, "gg_PDS_n_blocks.png"), gg_PDS_n_blocks)
+  ggsave(file.path(plot_dir, "gg_age_overall_stay.png"), gg_age_overall_stay)
+  ggsave(file.path(plot_dir, "gg_PDS_overall_stay.png"), gg_PDS_overall_stay)
+}
+
+if (data != "simulated_human") {
+  # RT ~ trialID || age
+  RT_slope_dat = data.frame()
+  for (subj in unique(all_files$sID)) {
+    subj_dat = subset(all_files, sID == subj)
+    RT_mod = lm(RT ~ TrialID, data = subj_dat)
+    coefs = as.data.frame(summary(RT_mod)$coefficients)
+    coefss = cbind(sID = subj, predictor = rownames(coefs), data.frame(coefs, row.names = NULL))
+    RT_slope_dat = rbind(RT_slope_dat, rbind(coefss))
+  }
+  RT_slope_dat = merge(RT_slope_dat, ages, all.x = T)
+  
+  gg_age_RT_slope = ggplot(subset(RT_slope_dat, predictor == "TrialID"), aes(PreciseYrs, Estimate)) +# & `Pr...t..` < 0.05
+    geom_point() +
+    geom_smooth()
+  gg_PDS_RT_slope = gg_age_RT_slope + aes(x = PDS)
+
+  # Save plots
+  if (gg_save) {
+    ggsave(file.path(plot_dir, "gg_age_RT.png"), gg_age_RT)
+    ggsave(file.path(plot_dir, "gg_PDS_RT.png"), gg_PDS_RT)
+    ggsave(file.path(plot_dir, "gg_age_RT_sd.png"), gg_age_RT_sd)
+    ggsave(file.path(plot_dir, "gg_PDS_RT_sd.png"), gg_PDS_RT_sd)
+    ggsave(file.path(plot_dir, "gg_age_RT_slope.png"), gg_age_RT_slope)
+  }
+}
 ```
 ```{r Start button}
 ```

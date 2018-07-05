@@ -12,7 +12,7 @@ gg_save = T
 data_set = "PS"
 parameter_names = c("alpha", "alpha_high", "beta", "beta_high", "epsilon", "TS_bias", "forget")
 
-data_dir = paste0("C:/Users/maria/MEGAsync/SLCN/", data_set, "humanDataCluster/fit_par")
+data_dir = paste0("C:/Users/maria/MEGAsync/SLCN/", data_set, "GenRecCluster/fit_par")
 plot_dir = file.path(data_dir, "plots")
 
 if (!dir.exists(plot_dir)) {
@@ -114,7 +114,7 @@ if (gg_save) {
 parameter_long_age = merge(parameter_long, ages, by = "sID", all.x = T)
 assertthat::assert_that(dim(parameter_long_age)[1] == dim(parameter_long)[1])
 
-gg_params_across_age = ggplot(parameter_long_age, aes(PreciseYrs, rec_par)) +
+gg_params_across_age = ggplot(subset(parameter_long_age, rec_par != 0), aes(PreciseYrs, rec_par)) +
   geom_point() +
   geom_smooth() +
   facet_wrap(model_name_rec ~ parameter, scales = 'free')
@@ -137,7 +137,7 @@ parameter_long$outlier = parameter_long$sID %in% outliers
 
 # Plot
 gg_gr =
-  ggplot(subset(parameter_long, gen_par != 0), aes(gen_par, rec_par - gen_par, color = outlier)) +
+  ggplot(subset(parameter_long, gen_par != 0 & rec_par != 0), aes(gen_par, rec_par - gen_par, color = outlier)) +
   geom_point() +
   geom_text(aes(label = ifelse(outlier, sID, ""), hjust = 0)) +
   theme(legend.position = "none") +
