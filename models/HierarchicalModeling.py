@@ -1,3 +1,169 @@
+import numpy as np
+import pandas as pd
+
+import glob
+import pickle
+import datetime
+import os
+
+import pymc3 as pm
+import theano
+import theano.tensor as T
+from shared_modeling_simulation import Shared
+
+import matplotlib.pyplot as plt
+
+
+# Switches for this script
+verbose = False
+n_trials = 200
+n_subj = 10
+model_name = 'Bayes'
+fit_hierarchical = False
+
+# Get data path and save path
+shared = Shared()
+# data_dir = shared.get_paths()['human data']
+data_dir = shared.get_paths()['simulations']
+file_name_pattern = 'PS' + model_name + '*.csv'
+save_dir = shared.get_paths()['fitting results']
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
+
+# Prepare things for loading data
+filenames = glob.glob(data_dir + file_name_pattern)[:n_subj]
+assert len(filenames) > 0, "Error: There are no files with pattern {0} in {1}".format(file_name_pattern, data_dir)
+choices = np.zeros((n_trials, len(filenames)))
+rewards = np.zeros(choices.shape)
+
+# Load data and bring in the right format
+for sID, filename in enumerate(filenames):
+    agent_data = pd.read_csv(filename)
+    if agent_data.shape[0] > n_trials:
+        choices[:, sID] = np.array(agent_data['selected_box'])[:n_trials]
+        rewards[:, sID] = agent_data['reward'].tolist()[:n_trials]
+
+# Remove excess columns
+rewards = np.delete(rewards, range(sID+1, n_subj), 1)
+choices = np.delete(choices, range(sID+1, n_subj), 1)
+n_subj = choices.shape[1]
+
+# Look at data
+if verbose:
+    print("Loaded {0} datasets with pattern {1} from {2}.".format(n_subj, file_name_pattern, data_dir))
+    print("Right choices - shape: {0}\n{1}\n".format(choices.shape, choices))
+    print("Rewards - shape: {0}\n{1}\n".format(rewards.shape, rewards))
+
+# Fit model
+print("Compiling the model...")
+with pm.Model() as model:
+
+    if fit_hierarchical:
+
+        # Population-level priors (as un-informative as possible)
+        alpha_mu = pm.Uniform('alpha_mu', lower=0, upper=1)
+        calpha_scaler_mu = pm.Uniform('calpha_scaler_mu', lower=0, upper=1)
+        beta_mu = pm.Lognormal('beta_mu', mu=0, sd=1)
+        epsilon_mu = pm.Uniform('epsilon_mu', lower=0, upper=1)
+
+        alpha_sd = 0.1  # pm.HalfNormal('alpha_sd', sd=0.5)
+        beta_sd = 3  # pm.HalfNormal('beta_sd', sd=3)
+        epsilon_sd = 0.1  # pm.HalfNormal('epsilon_sd', sd=0.5)
+
+        # Individual parameters (specify bounds to avoid initial energy==-inf because logp(RV)==-inf)
+        alpha = pm.Bound(pm.Normal, lower=0, upper=1)('alpha', mu=alpha_mu, sd=alpha_sd, shape=n_subj)
+        calpha_scaler = pm.Bound(pm.Normal, lower=0, upper=1)('calpha_scaler',
+                                                              mu=calpha_scaler_mu, sd=alpha_sd, shape=n_subj)
+        calpha = pm.Deterministic('calpha', alpha * calpha_scaler)
+        beta = pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu, sd=beta_sd, shape=n_subj)
+        epsilon = pm.Bound(pm.Normal, lower=0, upper=1)('epsilon', mu=epsilon_mu, sd=epsilon_sd, shape=n_subj)
+
+    else:
+
+        # Individual parameters
+        epsilon = pm.Uniform('epsilon', lower=0, upper=1, shape=n_subj)
+        if model_name == 'RL':
+            alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj)
+            calpha_scaler = pm.Uniform('calpha_scaler', lower=0, upper=1, shape=n_subj)
+            calpha = pm.Deterministic('calpha', alpha * calpha_scaler)
+            beta = pm.Lognormal('beta', mu=0, sd=1, shape=n_subj)
+
+        elif model_name == 'Bayes':
+            p_switch = pm.Uniform('p_switch', lower=0, upper=1, shape=n_subj)  # pm.Bound(pm.Normal, lower=0, upper=1)('p_switch', mu=0.1, sd=0.01, shape=n_subj)  # 0.1 * T.ones(n_subj)  #
+            # p_reward = pm.Uniform('p_reward', lower=0, upper=1, shape=n_subj)  # pm.Bound(pm.Normal, lower=0, upper=1)('p_reward', mu=0.75, sd=0.1, shape=n_subj)
+            p_reward = 0.75 * T.ones(n_subj)
+            # p_noisy_task = pm.Uniform('p_noisy_task', lower=0, upper=1, shape=n_subj)  # pm.Bound(pm.Normal, lower=0, upper=1)('p_noisy_task', mu=0.01, sd=0.01, shape=n_subj)  # 0.01 * T.ones(n_subj)  #
+            p_noisy_task = 0.01 * T.ones(n_subj)
+
+    # Observed data (choices & rewards)
+    rewards = T.as_tensor_variable(rewards)
+    choices = T.as_tensor_variable(choices)
+    initial_p = T.as_tensor_variable(0.5 * np.ones((1, n_subj)))  # get first entry
+
+    if model_name == 'RL':
+
+        # Calculate Q-values
+        initial_Q_left = T.as_tensor_variable(0.5 * np.ones(n_subj))
+        initial_Q_right = T.as_tensor_variable(0.5 * np.ones(n_subj))
+        [Q_left, Q_right], _ = theano.scan(fn=shared.update_Q,
+                                           sequences=[rewards, choices],
+                                           outputs_info=[initial_Q_left, initial_Q_right],
+                                           non_sequences=[alpha, calpha])
+
+        # Translate Q-values into probabilities
+        p_right = shared.p_from_Q(Q_left, Q_right, beta)
+        p_right = shared.add_epsilon_noise(p_right, epsilon)[:-1]  # remove last entry
+
+    elif model_name == 'Bayes':
+
+        if verbose:
+            T.printing.Print('choices')(choices)
+            T.printing.Print('rewards')(rewards)
+
+        # Get likelihoods
+        lik_cor, lik_inc = shared.get_likelihoods(rewards, choices, p_reward, p_noisy_task)
+
+        # Get posterior
+        p_right = T.as_tensor_variable(0.5 * np.ones(n_subj))
+        p_right, _ = theano.scan(fn=shared.post_from_lik,
+                                 sequences=[lik_cor, lik_inc],
+                                 outputs_info=[p_right])
+
+        # Get probability for subsequent trial
+        p_right = shared.get_p_subsequent_trial(p_right, p_switch)
+
+        # Add epsilon noise
+        p_right = shared.add_epsilon_noise(p_right, epsilon)[:-1]  # remove last entry
+
+    p_right = T.concatenate([initial_p, p_right], axis=0)  # combine
+
+    # Use Bernoulli to sample responses
+    model_choices = pm.Bernoulli('model_choices', p=p_right, observed=choices)
+
+    # Check model logp and RV logps (will crash if they are nan or -inf)
+    if verbose:
+        print("model.logp(model.test_point): {0}".format(model.logp(model.test_point)))
+        for RV in model.basic_RVs:
+            print("logp of {0}: {1}".format(RV.name, RV.logp(model.test_point)))
+
+    # Sample the model (should be >=5000, tune>=500)
+    trace = pm.sample(5000, tune=50, chains=1, cores=1)
+
+# Show results
+pm.traceplot(trace)
+model_summary = pm.summary(trace)
+
+# Save results
+now = datetime.datetime.now()
+model_id = str(now.year) + '_' + str(now.month) + '_' + str(now.day) + '_nsubj' + str(n_subj) + 'Bayes4'
+print('Pickling trace, model, and plot to {0}{1}'.format(save_dir, model_id))
+with open(save_dir + 'trace_' + model_id + '.pickle', 'wb') as handle:
+    pickle.dump(trace, handle)
+with open(save_dir + 'model_' + model_id + '.pickle', 'wb') as handle:
+    pickle.dump(model, handle)
+plt.savefig(save_dir + 'plot_' + model_id + '.png')
+
+# NOTES
 # Hierarchical fitting example: http://docs.pymc.io/notebooks/multilevel_modeling.html
 # And: http://docs.pymc.io/notebooks/rugby_analytics.html
 # with pm.Model() as model:
@@ -24,60 +190,6 @@
 # logp(RV) == -inf and/or logp(model) == -inf because Bernoulli can't handle negative probabilities, which can arise
 # in Q_from_P when parameters are unbounded; see https://discourse.pymc.io/t/frequently-asked-questions/74)
 
-import numpy as np
-import pandas as pd
-
-import glob
-import pickle
-import datetime
-
-import pymc3 as pm
-import theano
-import theano.tensor as T
-
-import matplotlib.pyplot as plt
-
-
-# Switches for this script
-verbose = False
-n_trials = 129
-base_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/'
-data_dir = base_dir + '/PS_*.csv'
-n_subj = len(glob.glob(data_dir))
-
-
-# Define RL model functions
-def update_Q(reward, choice, Q_old, alpha):
-    return Q_old + choice * alpha * (reward - Q_old)
-
-
-def p_from_Q(Q_left, Q_right, beta, epsilon):
-    p_left = 1 / (1 + np.exp(-beta * (Q_left - Q_right)))  # translate Q-values into probabilities using softmax
-    return epsilon * 0.5 + (1 - epsilon) * p_left  # add epsilon noise
-
-
-# Load to-be-modeled data
-filenames = glob.glob(data_dir)[:n_subj]
-right_choices = np.zeros((n_trials, len(filenames)))
-rewards = np.zeros(right_choices.shape)
-
-for sID, filename in enumerate(filenames):
-    agent_data = pd.read_csv(filename)
-    if agent_data.shape[0] > n_trials:
-        right_choices[:, sID] = np.array(agent_data['selected_box'])[:n_trials]
-        rewards[:, sID] = agent_data['reward'].tolist()[:n_trials]
-rewards = np.delete(rewards, range(sID, n_subj), 1)
-right_choices = np.delete(right_choices, range(sID, n_subj), 1)
-left_choices = 1 - right_choices
-n_subj = right_choices.shape[1]
-
-# Look at data
-if verbose:
-    print("Number of datasets:", n_subj)
-    print("Left choices - shape: {0}\n{1}\n".format(left_choices.shape, left_choices))
-    print("Right choices - shape: {0}\n{1}\n".format(right_choices.shape, right_choices))
-    print("Rewards - shape: {0}\n{1}\n".format(rewards.shape, rewards))
-
 # # Mimic loop instantiated by theano.scan for debugging
 # Q_old = 0.499 * np.ones((n_subj))
 # alpha = 0.1 * np.ones((n_subj))
@@ -85,87 +197,11 @@ if verbose:
 #     print("Q_old:", Q_old)
 #     print("Choice:", choice)
 #     print("Reward:", reward)
-#     Q_old = update_Q(reward, choice, Q_old, alpha)
+#     Q_old = shared.update_Q(reward, choice, Q_old, alpha)
 
-# Fit model
-with pm.Model() as model:
-
-    # # Population-level priors (as un-informative as possible)
-    # alpha_mu = pm.Uniform('alpha_mu', lower=0, upper=1)
-    # beta_mu = pm.Lognormal('beta_mu', mu=0, sd=1)
-    # epsilon_mu = pm.Uniform('epsilon_mu', lower=0, upper=1)
-    #
-    # alpha_sd = T.as_tensor_variable(0.1)  # pm.HalfNormal('alpha_sd', sd=0.5)
-    # beta_sd = T.as_tensor_variable(3)  # pm.HalfNormal('beta_sd', sd=3)
-    # epsilon_sd = T.as_tensor_variable(0.1)  # pm.HalfNormal('epsilon_sd', sd=0.5)
-    #
-    # # Individual parameters - hierarchical (specify bounds to avoid initial energy==-inf because logp(RV)==-inf)
-    # alpha = pm.Bound(pm.Normal, lower=0, upper=1)('alpha', mu=alpha_mu, sd=alpha_sd, shape=n_subj)
-    # beta = pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu, sd=beta_sd, shape=n_subj)
-    # epsilon = pm.Bound(pm.Normal, lower=0, upper=1)('epsilon', mu=epsilon_mu, sd=epsilon_sd, shape=n_subj)
-
-    # Individual parameters - flat
-    alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj)
-    beta = pm.Lognormal('beta', mu=0, sd=1, shape=n_subj)
-    epsilon = pm.Uniform('epsilon', lower=0, upper=1, shape=n_subj)
-
-    # Observed data (choices & rewards)
-    rewards = T.as_tensor_variable(rewards)
-    left_choices = T.as_tensor_variable(left_choices)
-    right_choices = T.as_tensor_variable(right_choices)
-
-    # Calculate Q-values using RL model
-    Q_old = T.as_tensor_variable(0.49 * np.ones(n_subj))
-    Q_left, _ = theano.scan(fn=update_Q,
-                            sequences=[rewards, left_choices],
-                            outputs_info=[Q_old],
-                            non_sequences=[alpha])
-    Q_right, _ = theano.scan(fn=update_Q,
-                             sequences=[rewards, right_choices],
-                             outputs_info=[Q_old],
-                             non_sequences=[alpha])
-
-    # Get probabilities (one of the two actions is enough; add initial Q as first element in trial 0)
-    p_left = p_from_Q(Q_left, Q_right, beta, epsilon)[:-1]  # remove last entry
-    Q_old = T.as_tensor_variable(0.49 * np.ones((1, n_subj)))  # get first entry
-    complete_p_left = T.concatenate([Q_old, p_left], axis=0)  # combine
-
-    # Use Bernoulli to sample responses
-    model_choices = pm.Bernoulli('model_choices', p=complete_p_left, observed=left_choices)
-
-    if verbose:
-
-        # Check model logp and RV logps (will crash if they are nan or -inf)
-        print("model.logp(model.test_point):", model.logp(model.test_point))
-        for RV in model.basic_RVs:
-            print("logp of {0}: {1}:".format(RV.name, RV.logp(model.test_point)))
-
-        # Print variable start_values for debugging
-        Q_old_print = T.printing.Print('Q_old')(Q_old)
-        alpha_mu_print = T.printing.Print('alpha_mu')(alpha_mu)
-        beta_mu_print = T.printing.Print('beta_mu')(beta_mu)
-        epsilon_mu_print = T.printing.Print('epsilon_mu')(epsilon_mu)
-        alpha_print = T.printing.Print('alpha')(alpha)
-        beta_print = T.printing.Print('beta')(beta)
-        epsilon_print = T.printing.Print('epsilon')(epsilon)
-        Q_left_print = T.printing.Print('Q_left')(Q_left)
-        Q_right_print = T.printing.Print('Q_right')(Q_right)
-        p_left_print = T.printing.Print('p_left')(p_left)
-        complete_p_left_print = T.printing.Print('complete_p_left')(complete_p_left)
-        # model_choices_print = T.printing.Print('model_choices')(model_choices)
-
-    # Sample the model (should be >=5000, tune>=500)
-    trace = pm.sample(10000, tune=500, chains=3, cores=1)
-
-    # Show results
-    pm.traceplot(trace)
-    model_summary = pm.summary(trace)
-
-    # Save results
-    now = datetime.datetime.now()
-    model_id = str(now.year) + '_' + str(now.month) + '_' + str(now.day) + '_nsubj' + str(n_subj) + 'Flat_mu'
-    with open(base_dir + 'trace_' + model_id + '.pickle', 'wb') as handle:
-        pickle.dump(trace, handle)
-    with open(base_dir + 'model_' + model_id + '.pickle', 'wb') as handle:
-        pickle.dump(model, handle)
-    plt.savefig(base_dir + model_id + 'plot.png')
+# Starting to think about our hierarchical models:
+# https://discourse.pymc.io/t/filtering-e-g-particle-filter-sequential-mc/117
+# https://gist.github.com/fonnesbeck/342989 (old - prob not useful)
+# https://github.com/hstrey/Hidden-Markov-Models-pymc3/blob/master/Multi-State%20HMM.ipynb (looks better!)
+# https://stackoverflow.com/questions/42146225/problems-building-a-discrete-hmm-in-pymc3
+# https://stackoverflow.com/questions/19875621/hidden-markov-in-pymc3/20288474
