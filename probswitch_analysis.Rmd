@@ -9,7 +9,7 @@ output: html_notebook
 gg_save = T
 data = "simulated_human"  # Can be "human", "fitted_human", or "simulated_human"
 parameter_names = c("alpha", "alpha_high", "beta", "beta_high", "epsilon", "TS_bias", "forget")
-desired_columns = c("sID", "selected_box", "reward", "RT", "correct", "correct_box", "learning_style", "model_name", "NLL", parameter_names, paste0(parameter_names, "_rec"))
+desired_columns = c("sID", "selected_box", "p_right", "reward", "RT", "correct", "correct_box", "learning_style", "model_name", "NLL", parameter_names, paste0(parameter_names, "_rec"))
 library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo")
 
   
@@ -18,7 +18,7 @@ if (data == "human") {
 } else if (data == "fitted_human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSGenRec"
 } else if (data == "simulated_human") {
-  data_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
+  data_dir = "C:/Users/maria/MEGAsync/SLCN/PSsimulations" # "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
 }
 plot_dir = file.path(data_dir, "plots")
 
@@ -73,6 +73,9 @@ for(filename in filenames) {
       subj_file[,col_name] = NA
     }
   }
+  if (is.na(subj_file$model_name[1])) {
+    subj_file$model_name = subj_file$learning_style
+  }
   
   # Add columns
   subj_file$TrialID = 1:nrow(subj_file)
@@ -119,6 +122,8 @@ for(filename in filenames) {
   
   all_files = as.data.frame(rbind(all_files, subj_file))
 }
+
+summary(all_files)
 ```
 ```{r Remaining fixes for all_filess}
 all_files$outcome_12_back = paste(all_files$outcome_1_back, all_files$outcome_2_back)
@@ -132,6 +137,8 @@ all_files$learning_style = factor(all_files$learning_style)
 
 old_nrows = nrow(all_files)
 all_files = merge(all_files, ages, all.x = T)
+all_files$age_group = as.character(all_files$age_group)
+all_files$age_group[is.na(all_files$age_group)] = "None"
 assertthat::assert_that(nrow(all_files) == old_nrows)
 summary(all_files)
 ```

@@ -16,10 +16,11 @@ import matplotlib.pyplot as plt
 
 # Switches for this script
 verbose = False
+print_logps = False
 n_trials = 200
-n_subj = 10
+n_subj = 3
 model_name = 'Bayes'
-fit_hierarchical = False
+fitting_method = 'flat'  # 'hiearchical', 'flat',
 
 # Get data path and save path
 shared = Shared()
@@ -50,15 +51,16 @@ n_subj = choices.shape[1]
 
 # Look at data
 if verbose:
-    print("Loaded {0} datasets with pattern {1} from {2}.".format(n_subj, file_name_pattern, data_dir))
-    print("Right choices - shape: {0}\n{1}\n".format(choices.shape, choices))
+    print("Loaded {0} datasets with pattern {1} from {2}\n.".format(n_subj, file_name_pattern, data_dir))
+    print("Choices - shape: {0}\n{1}\n".format(choices.shape, choices))
     print("Rewards - shape: {0}\n{1}\n".format(rewards.shape, rewards))
 
 # Fit model
-print("Compiling the model...")
+# LL = np.zeros(n_subj)
+print("Compiling the model...\n")
 with pm.Model() as model:
 
-    if fit_hierarchical:
+    if fitting_method == 'hierarchical':
 
         # Population-level priors (as un-informative as possible)
         alpha_mu = pm.Uniform('alpha_mu', lower=0, upper=1)
@@ -75,12 +77,13 @@ with pm.Model() as model:
         calpha_scaler = pm.Bound(pm.Normal, lower=0, upper=1)('calpha_scaler',
                                                               mu=calpha_scaler_mu, sd=alpha_sd, shape=n_subj)
         calpha = pm.Deterministic('calpha', alpha * calpha_scaler)
-        beta = pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu, sd=beta_sd, shape=n_subj)
+        beta = pm.Normal('beta', mu=beta_mu, sd=beta_sd, shape=n_subj)
         epsilon = pm.Bound(pm.Normal, lower=0, upper=1)('epsilon', mu=epsilon_mu, sd=epsilon_sd, shape=n_subj)
 
-    else:
+    elif fitting_method == 'flat':
 
         # Individual parameters
+        # epsilon = 0.1 * T.ones(n_subj)
         epsilon = pm.Uniform('epsilon', lower=0, upper=1, shape=n_subj)
         if model_name == 'RL':
             alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj)
@@ -90,21 +93,22 @@ with pm.Model() as model:
 
         elif model_name == 'Bayes':
             p_switch = pm.Uniform('p_switch', lower=0, upper=1, shape=n_subj)  # pm.Bound(pm.Normal, lower=0, upper=1)('p_switch', mu=0.1, sd=0.01, shape=n_subj)  # 0.1 * T.ones(n_subj)  #
-            # p_reward = pm.Uniform('p_reward', lower=0, upper=1, shape=n_subj)  # pm.Bound(pm.Normal, lower=0, upper=1)('p_reward', mu=0.75, sd=0.1, shape=n_subj)
-            p_reward = 0.75 * T.ones(n_subj)
-            # p_noisy_task = pm.Uniform('p_noisy_task', lower=0, upper=1, shape=n_subj)  # pm.Bound(pm.Normal, lower=0, upper=1)('p_noisy_task', mu=0.01, sd=0.01, shape=n_subj)  # 0.01 * T.ones(n_subj)  #
-            p_noisy_task = 0.01 * T.ones(n_subj)
+            # p_switch = 0.1 * T.ones(n_subj)
+            p_reward = pm.Uniform('p_reward', lower=0.1, upper=0.9, shape=n_subj)  # pm.Bound(pm.Normal, lower=0, upper=1)('p_reward', mu=0.75, sd=0.1, shape=n_subj)
+            # p_reward = 0.75 * T.ones(n_subj)
+            p_noisy_task = pm.Uniform('p_noisy_task', lower=0, upper=1, shape=n_subj)  # pm.Bound(pm.Normal, lower=0, upper=1)('p_noisy_task', mu=0.01, sd=0.01, shape=n_subj)  # 0.01 * T.ones(n_subj)  #
+            # p_noisy_task = 0.01 * T.ones(n_subj)
 
     # Observed data (choices & rewards)
     rewards = T.as_tensor_variable(rewards)
     choices = T.as_tensor_variable(choices)
-    initial_p = T.as_tensor_variable(0.5 * np.ones((1, n_subj)))  # get first entry
+    initial_p = 0.5 * T.ones((1, n_subj))  # get first entry
 
     if model_name == 'RL':
 
         # Calculate Q-values
-        initial_Q_left = T.as_tensor_variable(0.5 * np.ones(n_subj))
-        initial_Q_right = T.as_tensor_variable(0.5 * np.ones(n_subj))
+        initial_Q_left = 0.5 * T.ones(n_subj)
+        initial_Q_right = 0.5 * T.ones(n_subj)
         [Q_left, Q_right], _ = theano.scan(fn=shared.update_Q,
                                            sequences=[rewards, choices],
                                            outputs_info=[initial_Q_left, initial_Q_right],
@@ -112,42 +116,37 @@ with pm.Model() as model:
 
         # Translate Q-values into probabilities
         p_right = shared.p_from_Q(Q_left, Q_right, beta)
-        p_right = shared.add_epsilon_noise(p_right, epsilon)[:-1]  # remove last entry
+        p_right = shared.add_epsilon_noise(p_right, epsilon)
 
     elif model_name == 'Bayes':
-
-        if verbose:
-            T.printing.Print('choices')(choices)
-            T.printing.Print('rewards')(rewards)
 
         # Get likelihoods
         lik_cor, lik_inc = shared.get_likelihoods(rewards, choices, p_reward, p_noisy_task)
 
-        # Get posterior
-        p_right = T.as_tensor_variable(0.5 * np.ones(n_subj))
+        # Get posterior, calculate probability of subsequent trial, add epsilon noise
+        p_right = 0.5 * T.ones(n_subj)
         p_right, _ = theano.scan(fn=shared.post_from_lik,
                                  sequences=[lik_cor, lik_inc],
-                                 outputs_info=[p_right])
+                                 outputs_info=[p_right],
+                                 non_sequences=[p_switch, epsilon])
 
-        # Get probability for subsequent trial
-        p_right = shared.get_p_subsequent_trial(p_right, p_switch)
-
-        # Add epsilon noise
-        p_right = shared.add_epsilon_noise(p_right, epsilon)[:-1]  # remove last entry
-
-    p_right = T.concatenate([initial_p, p_right], axis=0)  # combine
+    p_right = T.concatenate([initial_p, p_right[:-1]], axis=0)  # add initial p=0.5 at the beginning
 
     # Use Bernoulli to sample responses
     model_choices = pm.Bernoulli('model_choices', p=p_right, observed=choices)
+    # action_prob = p_right * choices + (1 - p_right) * (1 - choices)
+    # LL += np.log(action_prob)
 
     # Check model logp and RV logps (will crash if they are nan or -inf)
-    if verbose:
-        print("model.logp(model.test_point): {0}".format(model.logp(model.test_point)))
+    if verbose or print_logps:
+        print("Checking that none of the logp are -inf:")
+        print("Test point: {0}".format(model.test_point))
+        print("\tmodel.logp(model.test_point): {0}".format(model.logp(model.test_point)))
         for RV in model.basic_RVs:
-            print("logp of {0}: {1}".format(RV.name, RV.logp(model.test_point)))
+            print("\tlogp of {0}: {1}".format(RV.name, RV.logp(model.test_point)))
 
     # Sample the model (should be >=5000, tune>=500)
-    trace = pm.sample(5000, tune=50, chains=1, cores=1)
+    trace = pm.sample(1000, tune=20, chains=2, cores=1)
 
 # Show results
 pm.traceplot(trace)
@@ -155,7 +154,7 @@ model_summary = pm.summary(trace)
 
 # Save results
 now = datetime.datetime.now()
-model_id = str(now.year) + '_' + str(now.month) + '_' + str(now.day) + '_nsubj' + str(n_subj) + 'Bayes4'
+model_id = str(now.year) + '_' + str(now.month) + '_' + str(now.day) + '_' + str(now.hour) + '_' + str(now.minute) + '_nsubj' + str(n_subj) + 'Bayes'
 print('Pickling trace, model, and plot to {0}{1}'.format(save_dir, model_id))
 with open(save_dir + 'trace_' + model_id + '.pickle', 'wb') as handle:
     pickle.dump(trace, handle)

@@ -10,9 +10,9 @@ from PStask import Task
 
 # Switches for this script
 verbose = True
-n_trials = 200
-n_subj = 50
-model_name = 'Bayes'  # 'Bayes' or 'RL'
+n_trials = 201
+n_subj = 3
+learning_style = 'Bayes'  # 'Bayes' or 'RL'
 
 # Get save path
 shared = Shared()
@@ -27,7 +27,6 @@ if not os.path.exists(save_dir):
 
 alpha_mu, alpha_sd = 0.25, 0.1
 beta_mu, beta_sd = 5, 3
-epsilon_mu, epsilon_sd = 0.25, 0.1
 p_switch_mu, p_switch_sd = 0.1, 0.1
 p_reward_mu, p_reward_sd = 0.75, 0.3
 p_noisy_task_mu, p_noisy_task_sd = 0.05, 0.1
@@ -35,7 +34,7 @@ p_noisy_task_mu, p_noisy_task_sd = 0.05, 0.1
 alpha_lower, alpha_upper = 0, 1
 calpha_scaler_lower, calpha_scaler_upper = 0, 1
 beta_lower, beta_upper = 0, 50
-epsilon_lower, epsilon_upper = 0, 1
+epsilon_lower, epsilon_upper = 0, 0.25
 
 # Individual parameters (drawn from truncated normal with parameters above)
 alpha = stats.truncnorm(alpha_lower - alpha_mu / alpha_sd, (alpha_upper - alpha_mu) / alpha_sd,
@@ -44,8 +43,7 @@ calpha_scaler = np.random.rand(n_subj)
 calpha = alpha * calpha_scaler
 beta = stats.truncnorm(beta_lower - beta_mu / beta_sd, (beta_upper - beta_mu) / beta_sd,
                        loc=beta_mu, scale=beta_sd).rvs(n_subj)
-# epsilon = stats.truncnorm(epsilon_lower - epsilon_mu / epsilon_sd, (epsilon_upper - epsilon_mu) / epsilon_sd,
-#                           loc=epsilon_mu, scale=epsilon_sd).rvs(n_subj)
+# epsilon = np.random.uniform(low=epsilon_lower, high=epsilon_upper, size=n_subj)
 epsilon = 0.1 * np.ones(n_subj)
 # p_switch = stats.truncnorm(-p_switch_mu / p_switch_sd, (1 - p_switch_mu) / p_switch_sd,
 #                            loc=p_switch_mu, scale=p_switch_sd).rvs(n_subj)
@@ -68,10 +66,12 @@ if verbose:
 
 # Set up data frames
 rewards = np.zeros((n_trials, n_subj))
-right_choices = np.zeros(rewards.shape)
+choices = np.zeros(rewards.shape)
+correct_boxes = np.zeros(rewards.shape)
 Qs_left = np.zeros(rewards.shape)
 Qs_right = np.zeros(rewards.shape)
 ps_right = np.zeros(rewards.shape)
+LLs = np.zeros(rewards.shape)
 
 # Initialize task
 task_info_path = shared.get_paths()['PS task info']
@@ -80,19 +80,21 @@ task = Task(task_info_path, n_subj)
 # Initial Q-values
 Q_left = 0.5 * np.ones(n_subj)
 Q_right = 0.5 * np.ones(n_subj)
+LL = np.zeros(n_subj)
 
 print('Simulating {0} agents on {1} trials.'.format(n_subj, n_trials))
 for trial in range(n_trials):
 
     task.prepare_trial()
 
-    if model_name == 'RL':
+    if learning_style == 'RL':
 
         # Translate Q-values into action probabilities, make a choice, obtain reward, update Q-values
         p_right = shared.p_from_Q(Q_left, Q_right, beta, epsilon)
         choice = np.random.binomial(n=1, p=p_right)
         reward = task.produce_reward(choice)
         Q_left, Q_right = shared.update_Q(reward, choice, Q_left, Q_right, alpha, calpha)
+        LL += np.log(p_right * choice + (1 - p_right) * (1 - choice))
 
         if verbose:
             print("\tTRIAL {0}".format(trial))
@@ -101,47 +103,53 @@ for trial in range(n_trials):
             print("Reward:", reward)
             print("Q_left:", Q_left.round(3))
             print("Q_right:", Q_right.round(3))
+            print("LL:", LL)
 
-    elif model_name == 'Bayes':
+    elif learning_style == 'Bayes':
 
         try:
             lik_cor, lik_inc = shared.get_likelihoods(reward, choice, p_reward, p_noisy_task)
-            p_right = shared.post_from_lik(lik_cor, lik_inc, p_right)
+            p_right = shared.post_from_lik(lik_cor, lik_inc, p_right, p_switch, epsilon)
         except NameError:
             p_right = 0.5 * np.ones(n_subj)
 
-        p_right = shared.get_p_subsequent_trial(p_right, p_switch)
-        p_right = shared.add_epsilon_noise(p_right, epsilon)
-
         choice = np.random.binomial(n=1, p=p_right)
         reward = task.produce_reward(choice)
+        LL += np.log(p_right * choice + (1 - p_right) * (1 - choice))
 
         if verbose:
             print("\tTRIAL {0}".format(trial))
             print("p_right:", p_right.round(3))
             print("Choice:", choice)
             print("Reward:", reward)
+            print("LL:", LL)
 
     # Store trial data
     ps_right[trial] = p_right
-    right_choices[trial] = choice
+    choices[trial] = choice
     rewards[trial] = reward
+    correct_boxes[trial] = task.correct_box
     Qs_left[trial] = Q_left
     Qs_right[trial] = Q_right
+    LLs[trial] = LL
 
 # Save data
 for sID in range(n_subj):
 
     # Create pandas DataFrame
     subj_data = pd.DataFrame()
-    subj_data["selected_box"] = right_choices[:, sID]
+    subj_data["selected_box"] = choices[:, sID]
     subj_data["reward"] = rewards[:, sID]
+    subj_data["correct_box"] = correct_boxes[:, sID]
     subj_data["p_right"] = ps_right[:, sID]
     subj_data["Q_left"] = Qs_left[:, sID]
     subj_data["Q_right"] = Qs_right[:, sID]
     subj_data["alpha"], subj_data["beta"], subj_data["epsilon"] = alpha[sID], beta[sID], epsilon[sID]
+    subj_data["sID"] = sID
+    subj_data["learning_style"] = learning_style
+    subj_data["LL"] = LLs[:, sID]
 
     # Save to disc
-    file_name = save_dir + "PS" + model_name + str(sID) + ".csv"
+    file_name = save_dir + "PS" + learning_style + str(sID) + ".csv"
     print('Saving file {0}'.format(file_name))
     subj_data.to_csv(file_name)
