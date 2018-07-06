@@ -3,39 +3,58 @@
 import pickle
 
 import pymc3 as pm
+import matplotlib.pyplot as plt
 
 from shared_modeling_simulation import Shared
 
 
+# Which models should be analyzed and compared?
+model1_name = '2018_7_6_12_55_simulations_Bayes_hierarchical_n_samples100'
+model2_name = '2018_7_6_12_58_simulations_Bayes_flat_n_samples100'
+
 # Initialize shared
-shared = Shared(None)
+shared = Shared()
 
 # Load fitted parameters
-print("Loading models")
 parameter_dir = shared.get_paths()['fitting results']
-with open(parameter_dir + 'trace_2018_7_2_nsubj155Hier_mu.pickle', 'rb') as handle:
-    trace = pickle.load(handle)
-with open(parameter_dir + 'model_2018_7_2_nsubj155Hier_mu.pickle', 'rb') as handle:
-    model = pickle.load(handle)
+print("Loading models {0} and {1}...".format(model1_name, model2_name))
+
+with open(parameter_dir + model1_name + '.pickle', 'rb') as handle:
+    RL_hier_data = pickle.load(handle)
+    RL_hier_trace = RL_hier_data['trace']
+    RL_hier_model = RL_hier_data['model']
+    RL_hier_model.name = 'RL_hier'
+
+with open(parameter_dir + model2_name + '.pickle', 'rb') as handle:
+    RL_flat_data = pickle.load(handle)
+    RL_flat_trace = RL_flat_data['trace']
+    RL_flat_model = RL_flat_data['model']
+    RL_flat_model.name = 'RL_flat'
 
 # Plots
-pm.traceplot(trace)
-pm.forestplot(trace)
+print("Plotting traces...")
+pm.traceplot(RL_hier_trace)
+plt.show()
+pm.forestplot(RL_hier_trace)
+plt.show()
 
 # Get model model WAICs
-waic = pm.waic(trace, model)
+waic = pm.waic(RL_hier_trace, RL_hier_model)
 waic.WAIC
 
-# # Compare WAIC scores
-# df_comp_WAIC = pm.compare({model_simple_flat: trace_simple_flat,
-#                            model_counter_flat: trace_counter_flat})
-#
-# pm.compareplot(df_comp_WAIC)
-#
-# # Compare leave-one-out cross validation
-# df_comp_LOO = pm.compare({model_simple_flat: trace_simple_flat,
-#                           model_counter_flat: trace_counter_flat}, ic='LOO')
-#
-# pm.compareplot(df_comp_LOO)
+# Compare WAIC scores
+print("Comparing models...")
+df_comp_WAIC = pm.compare({RL_flat_model: RL_flat_trace,
+                           RL_hier_model: RL_hier_trace})
+
+pm.compareplot(df_comp_WAIC)
+plt.show()
+
+# Compare leave-one-out cross validation
+df_comp_LOO = pm.compare({RL_flat_model: RL_flat_trace,
+                          RL_hier_model: RL_hier_trace}, ic='LOO')
+
+pm.compareplot(df_comp_LOO)
+plt.show()
 
 stop = True

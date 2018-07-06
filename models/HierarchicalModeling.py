@@ -17,16 +17,31 @@ import matplotlib.pyplot as plt
 # Switches for this script
 verbose = False
 print_logps = False
-n_trials = 200
-n_subj = 3
-model_name = 'Bayes'
-fitting_method = 'flat'  # 'hiearchical', 'flat',
+
+# Which model should be run?
+learning_style = 'RL'  # 'RL' or 'Bayes'
+fitting_method = 'hierarchical'  # 'hierarchical', 'flat'
+
+# Which data should be fitted?
+fitted_data_name = 'humans'  # 'humans', 'simulations'
+
+# Sampling details
+n_samples = 10000
+n_tune = 200
+n_chains = 2
 
 # Get data path and save path
 shared = Shared()
-# data_dir = shared.get_paths()['human data']
-data_dir = shared.get_paths()['simulations']
-file_name_pattern = 'PS' + model_name + '*.csv'
+if fitted_data_name == 'humans':
+    data_dir = shared.get_paths()['human data']
+    file_name_pattern = 'PS*.csv'
+    n_trials = 128
+    n_subj = 500
+else:
+    data_dir = shared.get_paths()['simulations']
+    file_name_pattern = 'PS' + learning_style + '*.csv'
+    n_trials = 200
+    n_subj = 50
 save_dir = shared.get_paths()['fitting results']
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
@@ -50,61 +65,68 @@ choices = np.delete(choices, range(sID+1, n_subj), 1)
 n_subj = choices.shape[1]
 
 # Look at data
+print("Loaded {0} datasets with pattern {1} from {2}...\n".format(n_subj, file_name_pattern, data_dir))
 if verbose:
-    print("Loaded {0} datasets with pattern {1} from {2}\n.".format(n_subj, file_name_pattern, data_dir))
     print("Choices - shape: {0}\n{1}\n".format(choices.shape, choices))
     print("Rewards - shape: {0}\n{1}\n".format(rewards.shape, rewards))
 
 # Fit model
 # LL = np.zeros(n_subj)
-print("Compiling the model...\n")
+print("Compiling {0} {1} model for {2} with {3} samples and {4} tuning steps...\n".format(
+    fitting_method, learning_style, fitted_data_name, n_samples, n_tune))
+
 with pm.Model() as model:
 
     if fitting_method == 'hierarchical':
 
         # Population-level priors (as un-informative as possible)
-        alpha_mu = pm.Uniform('alpha_mu', lower=0, upper=1)
-        calpha_scaler_mu = pm.Uniform('calpha_scaler_mu', lower=0, upper=1)
-        beta_mu = pm.Lognormal('beta_mu', mu=0, sd=1)
-        epsilon_mu = pm.Uniform('epsilon_mu', lower=0, upper=1)
+        epsilon_mu, epsilon_sd = pm.Uniform('epsilon_mu', lower=0, upper=1), 0.2
 
-        alpha_sd = 0.1  # pm.HalfNormal('alpha_sd', sd=0.5)
-        beta_sd = 3  # pm.HalfNormal('beta_sd', sd=3)
-        epsilon_sd = 0.1  # pm.HalfNormal('epsilon_sd', sd=0.5)
+        if learning_style == 'RL':
+            alpha_mu, alpha_sd = pm.Uniform('alpha_mu', lower=0, upper=1), 0.1  # pm.HalfNormal('alpha_sd', sd=0.1)
+            calpha_sc_mu, calpha_sc_sd = pm.Uniform('calpha_sc_mu', lower=0, upper=1), 0.1  # pm.HalfNormal('calpha_sc_sd', sd=0.1)
+            beta_mu, beta_sd = pm.Lognormal('beta_mu', mu=0, sd=1), 3  # pm.HalfNormal('beta_sd', sd=0.1)
 
-        # Individual parameters (specify bounds to avoid initial energy==-inf because logp(RV)==-inf)
-        alpha = pm.Bound(pm.Normal, lower=0, upper=1)('alpha', mu=alpha_mu, sd=alpha_sd, shape=n_subj)
-        calpha_scaler = pm.Bound(pm.Normal, lower=0, upper=1)('calpha_scaler',
-                                                              mu=calpha_scaler_mu, sd=alpha_sd, shape=n_subj)
-        calpha = pm.Deterministic('calpha', alpha * calpha_scaler)
-        beta = pm.Normal('beta', mu=beta_mu, sd=beta_sd, shape=n_subj)
+        elif learning_style == 'Bayes':
+            p_switch_mu, p_switch_sd = pm.Uniform('p_switch_mu', lower=0, upper=1), 0.1  # pm.HalfNormal('p_switch_sd', sd=0.1)
+            p_reward_mu, p_reward_sd = pm.Uniform('p_reward_mu', lower=0, upper=1), 0.1  # pm.HalfNormal('p_reward_sd', sd=0.1)
+            p_noisy_mu, p_noisy_sd = pm.Uniform('p_noisy_mu', lower=0, upper=1), 0.1  # pm.HalfNormal('p_noisy_sd', sd=0.1)
+
+        # Individual parameters (bounds avoid initial energy==-inf because logp(RV)==-inf)
         epsilon = pm.Bound(pm.Normal, lower=0, upper=1)('epsilon', mu=epsilon_mu, sd=epsilon_sd, shape=n_subj)
+
+        if learning_style == 'RL':
+            alpha = pm.Bound(pm.Normal, lower=0, upper=1)('alpha', mu=alpha_mu, sd=alpha_sd, shape=n_subj)
+            calpha_sc = pm.Bound(pm.Normal, lower=0, upper=1)('calpha_sc', mu=calpha_sc_mu, sd=alpha_sd, shape=n_subj)
+            calpha = pm.Deterministic('calpha', alpha * calpha_sc)
+            beta = pm.Normal('beta', mu=beta_mu, sd=beta_sd, shape=n_subj)
+
+        elif learning_style == 'Bayes':
+            p_switch = pm.Bound(pm.Normal, lower=0, upper=1)('p_switch', mu=p_switch_mu, sd=p_switch_sd, shape=n_subj)
+            p_reward = pm.Bound(pm.Normal, lower=0, upper=1)('p_reward', mu=p_reward_mu, sd=p_reward_sd, shape=n_subj)
+            p_noisy = pm.Bound(pm.Normal, lower=0, upper=1)('p_noisy', mu=p_noisy_mu, sd=p_noisy_sd, shape=n_subj)
 
     elif fitting_method == 'flat':
 
         # Individual parameters
-        # epsilon = 0.1 * T.ones(n_subj)
         epsilon = pm.Uniform('epsilon', lower=0, upper=1, shape=n_subj)
-        if model_name == 'RL':
+        if learning_style == 'RL':
             alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj)
-            calpha_scaler = pm.Uniform('calpha_scaler', lower=0, upper=1, shape=n_subj)
-            calpha = pm.Deterministic('calpha', alpha * calpha_scaler)
+            calpha_sc = pm.Uniform('calpha_sc', lower=0, upper=1, shape=n_subj)
+            calpha = alpha * calpha_sc
             beta = pm.Lognormal('beta', mu=0, sd=1, shape=n_subj)
 
-        elif model_name == 'Bayes':
-            p_switch = pm.Uniform('p_switch', lower=0, upper=1, shape=n_subj)  # pm.Bound(pm.Normal, lower=0, upper=1)('p_switch', mu=0.1, sd=0.01, shape=n_subj)  # 0.1 * T.ones(n_subj)  #
-            # p_switch = 0.1 * T.ones(n_subj)
-            p_reward = pm.Uniform('p_reward', lower=0.1, upper=0.9, shape=n_subj)  # pm.Bound(pm.Normal, lower=0, upper=1)('p_reward', mu=0.75, sd=0.1, shape=n_subj)
-            # p_reward = 0.75 * T.ones(n_subj)
-            p_noisy_task = pm.Uniform('p_noisy_task', lower=0, upper=1, shape=n_subj)  # pm.Bound(pm.Normal, lower=0, upper=1)('p_noisy_task', mu=0.01, sd=0.01, shape=n_subj)  # 0.01 * T.ones(n_subj)  #
-            # p_noisy_task = 0.01 * T.ones(n_subj)
+        elif learning_style == 'Bayes':
+            p_switch = pm.Uniform('p_switch', lower=0, upper=1, shape=n_subj)
+            p_reward = pm.Uniform('p_reward', lower=0, upper=1, shape=n_subj)
+            p_noisy = pm.Uniform('p_noisy', lower=0, upper=1, shape=n_subj)
 
     # Observed data (choices & rewards)
     rewards = T.as_tensor_variable(rewards)
     choices = T.as_tensor_variable(choices)
     initial_p = 0.5 * T.ones((1, n_subj))  # get first entry
 
-    if model_name == 'RL':
+    if learning_style == 'RL':
 
         # Calculate Q-values
         initial_Q_left = 0.5 * T.ones(n_subj)
@@ -114,14 +136,13 @@ with pm.Model() as model:
                                            outputs_info=[initial_Q_left, initial_Q_right],
                                            non_sequences=[alpha, calpha])
 
-        # Translate Q-values into probabilities
-        p_right = shared.p_from_Q(Q_left, Q_right, beta)
-        p_right = shared.add_epsilon_noise(p_right, epsilon)
+        # Translate Q-values into probabilities and add epsilon noise
+        p_right = shared.p_from_Q(Q_left, Q_right, beta, epsilon)
 
-    elif model_name == 'Bayes':
+    elif learning_style == 'Bayes':
 
         # Get likelihoods
-        lik_cor, lik_inc = shared.get_likelihoods(rewards, choices, p_reward, p_noisy_task)
+        lik_cor, lik_inc = shared.get_likelihoods(rewards, choices, p_reward, p_noisy)
 
         # Get posterior, calculate probability of subsequent trial, add epsilon noise
         p_right = 0.5 * T.ones(n_subj)
@@ -146,7 +167,7 @@ with pm.Model() as model:
             print("\tlogp of {0}: {1}".format(RV.name, RV.logp(model.test_point)))
 
     # Sample the model (should be >=5000, tune>=500)
-    trace = pm.sample(1000, tune=20, chains=2, cores=1)
+    trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=1)
 
 # Show results
 pm.traceplot(trace)
@@ -154,12 +175,11 @@ model_summary = pm.summary(trace)
 
 # Save results
 now = datetime.datetime.now()
-model_id = str(now.year) + '_' + str(now.month) + '_' + str(now.day) + '_' + str(now.hour) + '_' + str(now.minute) + '_nsubj' + str(n_subj) + 'Bayes'
-print('Pickling trace, model, and plot to {0}{1}'.format(save_dir, model_id))
-with open(save_dir + 'trace_' + model_id + '.pickle', 'wb') as handle:
-    pickle.dump(trace, handle)
-with open(save_dir + 'model_' + model_id + '.pickle', 'wb') as handle:
-    pickle.dump(model, handle)
+model_id = '_'.join([str(now.year), str(now.month), str(now.day), str(now.hour), str(now.minute),
+                     fitted_data_name, learning_style, fitting_method, 'n_samples' + str(n_samples)])
+print('Pickling trace and model, saving traceplot to {0}{1}...\n'.format(save_dir, model_id))
+with open(save_dir + model_id + '.pickle', 'wb') as handle:
+    pickle.dump({'trace': trace, 'model': model}, handle, protocol=pickle.HIGHEST_PROTOCOL)
 plt.savefig(save_dir + 'plot_' + model_id + '.png')
 
 # NOTES
