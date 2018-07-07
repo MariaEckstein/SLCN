@@ -9,8 +9,8 @@ from shared_modeling_simulation import Shared
 
 
 # Which models should be analyzed and compared?
-model1_name = '2018_7_6_12_55_simulations_Bayes_hierarchical_n_samples100'
-model2_name = '2018_7_6_12_58_simulations_Bayes_flat_n_samples100'
+model1_name = '2018_7_6_16_58_humans_Bayes_hierarchical_n_samples10000'
+model2_name = '2018_7_6_16_48_humans_RL_hierarchical_n_samples10000'
 
 # Initialize shared
 shared = Shared()
@@ -31,16 +31,16 @@ with open(parameter_dir + model2_name + '.pickle', 'rb') as handle:
     RL_flat_model = RL_flat_data['model']
     RL_flat_model.name = 'RL_flat'
 
-# Plots
-print("Plotting traces...")
-pm.traceplot(RL_hier_trace)
-plt.show()
-pm.forestplot(RL_hier_trace)
-plt.show()
+# # Plots
+# print("Plotting traces...")
+# pm.traceplot(RL_hier_trace)
+# plt.show()
+# pm.forestplot(RL_hier_trace)
+# plt.show()
 
-# Get model model WAICs
-waic = pm.waic(RL_hier_trace, RL_hier_model)
-waic.WAIC
+# # Get model model WAICs
+# waic = pm.waic(RL_hier_trace, RL_hier_model)
+# print(waic.WAIC)
 
 # Compare WAIC scores
 print("Comparing models...")

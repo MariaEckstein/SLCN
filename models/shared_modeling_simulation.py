@@ -8,6 +8,7 @@ class Shared(object):
 
         return {'human data': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/',
                 'fitting results': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/',
+                'ages file name': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo.csv',
                 'simulations': 'C:/Users/maria/MEGAsync/SLCN/PSsimulations/',
                 'old simulations': 'C:/Users/maria/MEGAsync/SLCN/PSGenRecCluster/fit_par/',
                 'PS task info': 'C:/Users/maria/MEGAsync/SLCN/ProbabilisticSwitching/Prerandomized sequences/'}
