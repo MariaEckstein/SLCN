@@ -1,7 +1,3 @@
-import numpy as np
-import pandas as pd
-
-import glob
 import pickle
 import datetime
 import os
@@ -9,267 +5,152 @@ import os
 import pymc3 as pm
 import theano
 import theano.tensor as T
-from shared_modeling_simulation import Shared
-
 import matplotlib.pyplot as plt
+
+from shared_modeling_simulation import get_paths, p_from_Q, update_Q, get_likelihoods, post_from_lik
+from modeling_helpers import load_data, get_population_level_priors, get_slopes
 
 
 # Switches for this script
+run_on_cluster = False
 verbose = False
 print_logps = False
+file_name_suff = 'test'
 
 # Which model should be run?
-fitting_method = 'hierarchical'  # 'hierarchical', 'flat'
-fit_RL = True
-fit_Bayes = True
-compare_RL_Bayes = True
+fit_age_slopes = False
 
 # Which data should be fitted?
 fitted_data_name = 'humans'  # 'humans', 'simulations'
-kids_and_teens_only = True
+kids_and_teens_only = False
 adults_only = False
 
 # Sampling details
-n_samples = 5000
-n_tune = 200
+n_samples = 20
+n_tune = 1
 n_chains = 2
-
-# Get data path and save path
-shared = Shared()
-if fitted_data_name == 'humans':
-    learning_style = ''
-    data_dir = shared.get_paths()['human data']
-    file_name_pattern = 'PS*.csv'
-    n_trials = 128
-    n_subj = 500
+if run_on_cluster:
+    n_cores = 8
 else:
-    learning_style = 'hierarchical'
-    data_dir = shared.get_paths()['simulations']
-    file_name_pattern = 'PS' + learning_style + '*.csv'
-    n_trials = 200
-    n_subj = 50
-save_dir = shared.get_paths()['fitting results']
+    n_cores = 1
+
+# Load to-be-fitted data
+n_subj, rewards, choices, ages = load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only, verbose)
+
+# Prepare things for saving
+save_dir = get_paths(run_on_cluster)['fitting results']
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
-# Prepare things for loading data
-filenames = glob.glob(data_dir + file_name_pattern)[:n_subj]
-assert len(filenames) > 0, "Error: There are no files with pattern {0} in {1}".format(file_name_pattern, data_dir)
-choices = np.zeros((n_trials, len(filenames)))
-rewards = np.zeros(choices.shape)
-ages = np.zeros(n_subj)
-
-# Load data and bring in the right format
-SLCNinfo = pd.read_csv(shared.get_paths()['ages file name'])
-for file_idx, filename in enumerate(filenames):
-    agent_data = pd.read_csv(filename)
-    if agent_data.shape[0] > n_trials:
-        choices[:, file_idx] = np.array(agent_data['selected_box'])[:n_trials]
-        rewards[:, file_idx] = agent_data['reward'].tolist()[:n_trials]
-        sID = agent_data['sID'][0]
-        ages[file_idx] = SLCNinfo[SLCNinfo['ID'] == sID]['PreciseYrs'].values
-
-# Remove excess columns
-rewards = np.delete(rewards, range(file_idx+1, n_subj), 1)
-choices = np.delete(choices, range(file_idx+1, n_subj), 1)
-ages = ages[:file_idx+1]
-
-if kids_and_teens_only:
-    rewards = rewards[:, ages <= 18]
-    choices = choices[:, ages <= 18]
-    ages = ages[ages <= 18]
-elif adults_only:
-    rewards = rewards[:, ages > 18]
-    choices = choices[:, ages > 18]
-    ages = ages[ages > 18]
-
-n_subj = choices.shape[1]
-
-# Look at data
-print("Loaded {0} datasets with pattern {1} from {2}...\n".format(n_subj, file_name_pattern, data_dir))
-if verbose:
-    print("Choices - shape: {0}\n{1}\n".format(choices.shape, choices))
-    print("Rewards - shape: {0}\n{1}\n".format(rewards.shape, rewards))
+now = datetime.datetime.now()
+save_id = '_'.join([file_name_suff,
+                    str(now.year), str(now.month), str(now.day), str(now.hour), str(now.minute),
+                    fitted_data_name, 'n_samples' + str(n_samples)])
 
 # Fit model
-# LL = np.zeros(n_subj)
-print("Compiling {0} {1} model for {2} with {3} samples and {4} tuning steps...\n".format(
-    fitting_method, learning_style, fitted_data_name, n_samples, n_tune))
+model_dict = {}
+print("Compiling models for {0} with {1} samples and {2} tuning steps...\n".format(fitted_data_name, n_samples, n_tune))
 
-with pm.Model() as Bayes_model:
+for model_name in ('RL', 'Bayes'):
+    with pm.Model() as model:
 
-    # Observed data (choices & rewards)
-    rewards = T.as_tensor_variable(rewards)
-    choices = T.as_tensor_variable(choices)
-    ages = T.as_tensor_variable(ages)
-
-    # Model parameters
-    if fitting_method == 'hierarchical':
+        # Observed data (choices & rewards)
+        rewards = T.as_tensor_variable(rewards)
+        choices = T.as_tensor_variable(choices)
+        ages = T.as_tensor_variable(ages)
 
         # Population-level priors (as un-informative as possible)
-        epsilon_mu, epsilon_sd = pm.Uniform('epsilon_mu', lower=0, upper=1), 0.1
-        epsilon_slope = pm.Uniform('epsilon_slope', lower=-1, upper=1)  # T.as_tensor_variable(0.)  #
-        p_switch_mu, p_switch_sd = pm.Uniform('p_switch_mu', lower=0, upper=1), 0.1  # pm.HalfNormal('p_switch_sd', sd=0.1)
-        p_switch_slope = pm.Uniform('p_switch_slope', lower=-1, upper=1)  # T.as_tensor_variable(0.)
-        p_reward_mu, p_reward_sd = pm.Uniform('p_reward_mu', lower=0, upper=1), 0.1  # pm.HalfNormal('p_reward_sd', sd=0.1)
-        p_reward_slope = pm.Uniform('p_reward_slope', lower=-1, upper=1)  # T.as_tensor_variable(0.)
-        # p_noisy_mu, p_noisy_sd = pm.Uniform('p_noisy_mu', lower=0, upper=1), 0.1  # pm.HalfNormal('p_noisy_sd', sd=0.1)
+        priors = get_population_level_priors()
+        slopes = get_slopes(fit_age_slopes)
+        [eps_mu, eps_sd, beta_mu, beta_sd] = [priors[k] for k in ['eps_mu', 'eps_sd', 'beta_mu', 'beta_sd']]
+        [eps_sl, beta_sl] = [slopes[k] for k in ['eps_sl', 'beta_sl']]
 
-        # Individual parameters (bounds avoid initial energy==-inf because logp(RV)==-inf)
-        epsilon = pm.Bound(pm.Normal, lower=0,
-                           upper=1)('epsilon', mu=epsilon_mu + ages * epsilon_slope, sd=epsilon_sd, shape=n_subj)
-        p_switch = pm.Bound(pm.Normal, lower=0,
-                            upper=1)('p_switch', mu=p_switch_mu + ages * p_switch_slope, sd=p_switch_sd, shape=n_subj)
-        p_reward = pm.Bound(pm.Normal, lower=0,
-                            upper=1)('p_reward', mu=p_reward_mu + ages * p_reward_slope, sd=p_reward_sd, shape=n_subj)
-        p_noisy = 0.01 * T.ones(n_subj)  # pm.Bound(pm.Normal, lower=0, upper=1)('p_noisy', mu=p_noisy_mu, sd=p_noisy_sd, shape=n_subj)
+        if model_name == 'Bayes':
+            [p_switch_mu, p_switch_sd, p_reward_mu, p_reward_sd] = [
+                priors[k] for k in ['p_switch_mu', 'p_switch_sd', 'p_reward_mu', 'p_reward_sd']]
+            [p_switch_sl, p_reward_sl] = [slopes[k] for k in ['p_switch_sl', 'p_reward_sl']]
 
-    elif fitting_method == 'flat':
+        elif model_name == 'RL':
+            alpha_mu, alpha_sd, calpha_sc_mu, calpha_sc_sd = [
+                priors[k] for k in ['alpha_mu', 'alpha_sd', 'calpha_sc_mu', 'calpha_sc_sd']]
+            alpha_sl, calpha_sl = [slopes[k] for k in ['alpha_sl', 'calpha_sl']]
 
-        # Individual parameters
-        epsilon = pm.Uniform('epsilon', lower=0, upper=1, shape=n_subj)
-        p_switch = pm.Uniform('p_switch', lower=0, upper=1, shape=n_subj)
-        p_reward = pm.Uniform('p_reward', lower=0, upper=1, shape=n_subj)
-        p_noisy = pm.Uniform('p_noisy', lower=0, upper=1, shape=n_subj)
+        # Individual parameters (bounds avoid initial energy==-inf due to logp(RV)==-inf)
+        eps = pm.Bound(pm.Normal, lower=0, upper=1)('eps', mu=eps_mu + ages * eps_sl, sd=eps_sd, shape=n_subj)
+        beta = pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu + ages * beta_sl, sd=beta_sd, shape=n_subj)
 
-    # Get likelihoods
-    lik_cor, lik_inc = shared.get_likelihoods(rewards, choices, p_reward, p_noisy)
+        if model_name == 'Bayes':
+            p_switch = pm.Bound(pm.Normal, lower=0, upper=1
+                                )('p_switch', mu=p_switch_mu + ages * p_switch_sl, sd=p_switch_sd, shape=n_subj)
+            p_reward = pm.Bound(pm.Normal, lower=0, upper=1
+                                )('p_reward', mu=p_reward_mu + ages * p_reward_sl, sd=p_reward_sd, shape=n_subj)
+            p_noisy = 1e-5 * T.ones(n_subj)
 
-    # Get posterior, calculate probability of subsequent trial, add epsilon noise
-    p_right = 0.5 * T.ones(n_subj)
-    p_right, _ = theano.scan(fn=shared.post_from_lik,
-                             sequences=[lik_cor, lik_inc],
-                             outputs_info=[p_right],
-                             non_sequences=[p_switch, epsilon])
+        elif model_name == 'RL':
+            alpha = pm.Bound(pm.Normal, lower=0, upper=1
+                             )('alpha', mu=alpha_mu + ages * alpha_sl, sd=alpha_sd, shape=n_subj)
+            calpha_sc = pm.Bound(pm.Normal, lower=0, upper=1
+                                 )('calpha_sc', mu=calpha_sc_mu + ages * calpha_sl, sd=alpha_sd, shape=n_subj)
+            calpha = pm.Deterministic('calpha', alpha * calpha_sc)
 
-    initial_p = 0.5 * T.ones((1, n_subj))  # get first entry
-    p_right = T.concatenate([initial_p, p_right[:-1]], axis=0)  # add initial p=0.5 at the beginning
+        # Run the model
+        if model_name == 'Bayes':
 
-    # Use Bernoulli to sample responses
-    model_choices = pm.Bernoulli('model_choices', p=p_right, observed=choices)
-    # action_prob = p_right * choices + (1 - p_right) * (1 - choices)
-    # LL += np.log(action_prob)
+            # Get likelihoods
+            lik_cor, lik_inc = get_likelihoods(rewards, choices, p_reward, p_noisy)
 
-    # Check model logp and RV logps (will crash if they are nan or -inf)
-    if verbose or print_logps:
-        print("Checking that none of the logp are -inf:")
-        print("Test point: {0}".format(Bayes_model.test_point))
-        print("\tmodel.logp(Bayes_model.test_point): {0}".format(Bayes_model.logp(Bayes_model.test_point)))
-        for RV in Bayes_model.basic_RVs:
-            print("\tlogp of {0}: {1}".format(RV.name, RV.logp(Bayes_model.test_point)))
+            # Get posterior, calculate probability of subsequent trial, add eps noise
+            p_right = 0.5 * T.ones(n_subj)
+            p_right, _ = theano.scan(fn=post_from_lik,
+                                     sequences=[lik_cor, lik_inc],
+                                     outputs_info=[p_right],
+                                     non_sequences=[p_switch, eps])
 
-    # Sample the model
-    Bayes_trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=1)
+        elif model_name == 'RL':
 
-# Show results
-pm.traceplot(Bayes_trace)
-Bayes_model_summary = pm.summary(Bayes_trace)
+            # Calculate Q-values
+            Q_left, Q_right = 0.5 * T.ones(n_subj), 0.5 * T.ones(n_subj)
+            [Q_left, Q_right], _ = theano.scan(fn=update_Q,
+                                               sequences=[rewards, choices],
+                                               outputs_info=[Q_left, Q_right],
+                                               non_sequences=[alpha, calpha])
 
-# Save results
-now = datetime.datetime.now()
-Bayes_model_id = '_'.join([str(now.year), str(now.month), str(now.day), str(now.hour), str(now.minute),
-                     fitted_data_name, "Bayes", fitting_method, 'n_samples' + str(n_samples)])
-print('Pickling Bayes trace, model, and model summary, saving traceplot to {0}{1}...\n'.format(save_dir, Bayes_model_id))
-with open(save_dir + Bayes_model_id + '.pickle', 'wb') as handle:
-    pickle.dump({'trace': Bayes_trace, 'model': Bayes_model, 'summary': Bayes_model_summary},
-                handle, protocol=pickle.HIGHEST_PROTOCOL)
-plt.savefig(save_dir + 'plot_' + Bayes_model_id + '.png')
+            # Translate Q-values into probabilities and add eps noise
+            p_right = p_from_Q(Q_left, Q_right, beta, eps)
 
-with pm.Model() as RL_model:
+        # Add initial p=0.5 at the beginning of p_right
+        initial_p = 0.5 * T.ones((1, n_subj))
+        p_right = T.concatenate([initial_p, p_right[:-1]], axis=0)
 
-    # Observed data (choices & rewards)
-    rewards = T.as_tensor_variable(rewards)
-    choices = T.as_tensor_variable(choices)
-    ages = T.as_tensor_variable(ages)
+        # Use Bernoulli to sample responses
+        model_choices = pm.Bernoulli('model_choices', p=p_right, observed=choices)
 
-    # Model parameters
-    if fitting_method == 'hierarchical':
+        # Check model logp and RV logps (will crash if they are nan or -inf)
+        if verbose or print_logps:
+            print("Checking that none of the logp are -inf:")
+            print("Test point: {0}".format(model.test_point))
+            print("\tmodel.logp(model.test_point): {0}".format(model.logp(model.test_point)))
+            for RV in model.basic_RVs:
+                print("\tlogp of {0}: {1}".format(RV.name, RV.logp(model.test_point)))
 
-        # Population-level priors (as un-informative as possible)
-        epsilon_mu, epsilon_sd = pm.Uniform('epsilon_mu', lower=0, upper=1), 0.1
-        epsilon_slope = pm.Uniform('epsilon_slope', lower=-1, upper=1)  # T.as_tensor_variable(0.)
-        alpha_mu, alpha_sd = pm.Uniform('alpha_mu', lower=0, upper=1), 0.1  # pm.HalfNormal('alpha_sd', sd=0.1)
-        alpha_slope = pm.Uniform('alpha_slope', lower=-1, upper=1)  # T.as_tensor_variable(0.)
-        calpha_sc_mu, calpha_sc_sd = pm.Uniform('calpha_sc_mu', lower=0, upper=1), 0.1  # pm.HalfNormal('calpha_sc_sd', sd=0.1)
-        calpha_slope = pm.Uniform('calpha_slope', lower=-1, upper=1)  # T.as_tensor_variable(0.)
-        beta_mu, beta_sd = pm.Lognormal('beta_mu', mu=0, sd=1), 3  # pm.HalfNormal('beta_sd', sd=0.1)
-        beta_slope = pm.Uniform('beta_slope', lower=-1, upper=1)  # T.as_tensor_variable(0.)  #
+        # Sample the model
+        trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores)
 
-        # Individual parameters (bounds avoid initial energy==-inf because logp(RV)==-inf)
-        epsilon = pm.Bound(pm.Normal, lower=0,
-                           upper=1)('epsilon', mu=epsilon_mu + ages * epsilon_slope, sd=epsilon_sd, shape=n_subj)
-        alpha = pm.Bound(pm.Normal, lower=0,
-                         upper=1)('alpha', mu=alpha_mu + ages * alpha_slope, sd=alpha_sd, shape=n_subj)
-        calpha_sc = pm.Bound(pm.Normal, lower=0,
-                             upper=1)('calpha_sc', mu=calpha_sc_mu + ages * calpha_slope, sd=alpha_sd, shape=n_subj)
-        beta = pm.Bound(pm.Normal,
-                        lower=0)('beta', mu=beta_mu + ages * beta_slope, sd=beta_sd, shape=n_subj)
-        calpha = pm.Deterministic('calpha', alpha * calpha_sc)
+    # Results
+    model.name = model_name
+    model_dict.update({model: trace})
+    pm.traceplot(trace)
+    model_summary = pm.summary(trace)
 
-    elif fitting_method == 'flat':
+    # Save results
+    print('Saving trace, trace plot, model, and model summary to {0}{1}...\n'.format(save_dir, save_id + model_name))
 
-        # Individual parameters
-        epsilon = pm.Uniform('epsilon', lower=0, upper=1, shape=n_subj)
-        alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj)
-        calpha_sc = pm.Uniform('calpha_sc', lower=0, upper=1, shape=n_subj)
-        beta = pm.Lognormal('beta', mu=0, sd=1, shape=n_subj)
-        calpha = alpha * calpha_sc
-
-    # Calculate Q-values
-    initial_Q_left = 0.5 * T.ones(n_subj)
-    initial_Q_right = 0.5 * T.ones(n_subj)
-    [Q_left, Q_right], _ = theano.scan(fn=shared.update_Q,
-                                       sequences=[rewards, choices],
-                                       outputs_info=[initial_Q_left, initial_Q_right],
-                                       non_sequences=[alpha, calpha])
-
-    # Translate Q-values into probabilities and add epsilon noise
-    p_right = shared.p_from_Q(Q_left, Q_right, beta, epsilon)
-
-    initial_p = 0.5 * T.ones((1, n_subj))
-    p_right = T.concatenate([initial_p, p_right[:-1]], axis=0)  # add initial p=0.5 at the beginning
-
-    # Use Bernoulli to sample responses
-    model_choices = pm.Bernoulli('model_choices', p=p_right, observed=choices)
-    # action_prob = p_right * choices + (1 - p_right) * (1 - choices)
-    # LL += np.log(action_prob)
-
-    # Check model logp and RV logps (will crash if they are nan or -inf)
-    if verbose or print_logps:
-        print("Checking that none of the logp are -inf:")
-        print("Test point: {0}".format(RL_model.test_point))
-        print("\tRL_model.logp(RL_model.test_point): {0}".format(RL_model.logp(RL_model.test_point)))
-        for RV in RL_model.basic_RVs:
-            print("\tlogp of {0}: {1}".format(RV.name, RV.logp(RL_model.test_point)))
-
-    # Sample the model
-    RL_trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=1)
-
-# Show results
-pm.traceplot(RL_trace)
-RL_model_summary = pm.summary(RL_trace)
-
-# Save results
-now = datetime.datetime.now()
-RL_model_id = '_'.join([str(now.year), str(now.month), str(now.day), str(now.hour), str(now.minute),
-                     fitted_data_name, "RL", fitting_method, 'n_samples' + str(n_samples)])
-print('Pickling RL trace, model, and summary, saving traceplot to {0}{1}...\n'.format(save_dir, RL_model_id))
-with open(save_dir + RL_model_id + '.pickle', 'wb') as handle:
-    pickle.dump({'trace': RL_trace, 'model': RL_model, 'summary': RL_model_summary},
-                handle, protocol=pickle.HIGHEST_PROTOCOL)
-plt.savefig(save_dir + 'plot_' + RL_model_id + '.png')
+    plt.savefig(save_dir + 'plot_' + save_id + model_name + '.png')
+    with open(save_dir + save_id + model_name + '.pickle', 'wb') as handle:
+        pickle.dump({'trace': trace, 'model': model, 'summary': model_summary},
+                    handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 # Compare WAIC scores
 print("Comparing models...")
-RL_model.name = 'RL'
-Bayes_model.name = 'Bayes'
-df_comp_WAIC = pm.compare({RL_model: RL_trace, Bayes_model: Bayes_trace})
-
-pm.compareplot(df_comp_WAIC)
-plt.savefig(save_dir + 'compareplot_WAIC' + RL_model_id + '.png')
-
-# Compare leave-one-out cross validation
-df_comp_LOO = pm.compare({RL_model: RL_trace, Bayes_model: Bayes_trace}, ic='LOO')
-
-pm.compareplot(df_comp_LOO)
-plt.savefig(save_dir + 'compareplot_LOO' + RL_model_id + '.png')
+pm.compareplot(pm.compare(model_dict))
+plt.savefig(save_dir + 'compareplot_WAIC' + save_id + '.png')

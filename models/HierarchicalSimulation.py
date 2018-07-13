@@ -12,7 +12,7 @@ from PStask import Task
 verbose = False
 n_trials = 201
 n_subj = 50
-learning_style = 'RL'  # 'Bayes' or 'RL'
+learning_style = 'Bayes'  # 'Bayes' or 'RL'
 
 # Get save path
 shared = Shared()
@@ -60,9 +60,9 @@ elif learning_style == 'Bayes':
     p_reward = stats.truncnorm(-p_reward_mu / p_reward_sd, (1 - p_reward_mu) / p_reward_sd,
                                loc=p_reward_mu, scale=p_reward_sd).rvs(n_subj)
     # p_reward = 0.75 * np.ones(n_subj)
-    p_noisy_task = stats.truncnorm(-p_noisy_mu / p_noisy_sd, (1 - p_noisy_mu) / p_noisy_sd,
-                                   loc=p_noisy_mu, scale=p_noisy_sd).rvs(n_subj)
-    # p_noisy_task = 0.01 * np.ones(n_subj)
+    # p_noisy_task = stats.truncnorm(-p_noisy_mu / p_noisy_sd, (1 - p_noisy_mu) / p_noisy_sd,
+    #                                loc=p_noisy_mu, scale=p_noisy_sd).rvs(n_subj)
+    p_noisy_task = 0. * np.ones(n_subj)
 
 if verbose:
     print("Epsilons: {0}".format(epsilon.round(2)))
@@ -123,7 +123,7 @@ for trial in range(n_trials):
         try:
             lik_cor, lik_inc = shared.get_likelihoods(reward, choice, p_reward, p_noisy_task)
             p_right = shared.post_from_lik(lik_cor, lik_inc, p_right, p_switch, epsilon)
-        except NameError:
+        except NameError:  # if p_right has not been defined yet
             p_right = 0.5 * np.ones(n_subj)
 
         choice = np.random.binomial(n=1, p=p_right)
