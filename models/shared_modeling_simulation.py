@@ -31,15 +31,22 @@ def p_from_Q(Q_left, Q_right, beta, eps):
     return eps * 0.5 + (1 - eps) * p_right
 
 
-def update_Q(reward, choice, Q_left, Q_right, alpha, calpha):
+def update_Q(reward, choice, Q_left, Q_right, alpha, nalpha, calpha, cnalpha):
 
     # Counter-factual learning: Weigh RPE with alpha for chosen action, and with calpha for unchosen action
+    # Reward-sensitive learning: Different learning rates for positive (rew1) and negative (rew0) outcomes
     RPE = reward - choice * Q_right - (1 - choice) * Q_left  # RPE = reward - Q[chosen]
-    weight_right = choice * alpha - (1 - choice) * calpha   # choice==0: weight=alpha; choice==1; weight=-calpha
-    weight_left = (1 - choice) * alpha - choice * calpha  # sim.
+    alpha_right_rew1 = choice * alpha - (1 - choice) * calpha   # choice==0: weight=alpha; choice==1; weight=-calpha
+    alpha_right_rew0 = choice * nalpha - (1 - choice) * cnalpha   # sim.
+
+    alpha_left_rew1 = (1 - choice) * alpha - choice * calpha  # sim.
+    alpha_left_rew0 = (1 - choice) * nalpha - choice * cnalpha  # sim.
+
+    alpha_right = reward * alpha_right_rew1 + (1 - reward) * alpha_right_rew0
+    alpha_left = reward * alpha_left_rew1 + (1 - reward) * alpha_left_rew0
 
     # Update Q-values for left and right action
-    return Q_left + weight_left * RPE, Q_right + weight_right * RPE
+    return Q_left + alpha_left * RPE, Q_right + alpha_right * RPE
 
 
 def get_likelihoods(rewards, choices, p_reward, p_noisy):

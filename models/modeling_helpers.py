@@ -1,4 +1,6 @@
 import glob
+import datetime
+import os
 
 import numpy as np
 import pandas as pd
@@ -63,82 +65,165 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
         print("Choices - shape: {0}\n{1}\n".format(choices.shape, choices))
         print("Rewards - shape: {0}\n{1}\n".format(rewards.shape, rewards))
 
-    return n_subj, rewards, choices, ages
+    return [n_subj,
+            T.as_tensor_variable(rewards),
+            T.as_tensor_variable(choices),
+            T.as_tensor_variable(ages)]
 
 
-def get_population_level_priors(model_name):
+def get_save_dir_and_save_id(run_on_cluster, file_name_suff, fitted_data_name, n_samples):
 
-    # Get population-level priors (as un-informative as possible)
-    prior_dict = dict()
-    # prior_dict = {'eps_mu': pm.Uniform('eps_mu', lower=0, upper=1),
-    #               'beta_mu': pm.Lognormal('beta_mu', mu=0, sd=3),
-    #               'eps_sd': pm.HalfNormal('eps_sd', sd=0.2),
-    #               'beta_sd': T.as_tensor_variable(2.)}  # pm.HalfNormal('beta_sd', sd=3)}
+    save_dir = get_paths(run_on_cluster)['fitting results']
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
-    if model_name == 'RL':
-        for par_name in ['alpha_mu', 'calpha_sc_mu']:
-            prior_dict.update({par_name: pm.Uniform(par_name, lower=0, upper=1)})
-        for par_name in ['alpha_sd', 'calpha_sc_sd']:
-            prior_dict.update({par_name: T.as_tensor_variable(0.5)})  # pm.HalfNormal(par_name, sd=0.3)})
+    now = datetime.datetime.now()
+    save_id = '_'.join([file_name_suff,
+                        str(now.year), str(now.month), str(now.day), str(now.hour), str(now.minute),
+                        fitted_data_name, 'n_samples' + str(n_samples)])
 
-    elif model_name == 'Bayes':
-        for par_name in ['p_switch_mu', 'p_reward_mu']:
-            prior_dict.update({par_name: pm.Uniform(par_name, lower=0, upper=1)})
-        for par_name in ['p_switch_sd', 'p_reward_sd']:
-            prior_dict.update({par_name: T.as_tensor_variable(0.5)})  # pm.HalfNormal(par_name, sd=0.3)})
-
-    return prior_dict
+    return save_dir, save_id
 
 
-def get_slopes(fit_slopes, model_name):
+# def get_shared_parameters(ages, n_subj):
+#
+#     eps_mu = pm.Uniform('eps_mu', lower=0, upper=1)
+#     beta_mu = T.as_tensor_variable(0.2)  # pm.Lognormal('beta_mu', mu=0, sd=3)
+#
+#     eps_sd = pm.HalfNormal('eps_sd', sd=0.2)
+#     beta_sd = T.as_tensor_variable(2.)
+#
+#     eps_sl = pm.Uniform('eps_sl', lower=-1, upper=1)
+#     beta_sl = pm.Uniform('beta_sl', lower=-1, upper=1)
+#
+#     eps = pm.Bound(pm.Normal, lower=0, upper=1)('eps', mu=eps_mu + ages * eps_sl, sd=eps_sd, shape=n_subj)
+#     beta = pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu + ages * beta_sl, sd=beta_sd, shape=n_subj)
+#
+#     return eps, beta
+#
+#
+# def get_Bayes_model_parameters(ages, n_subj):
+#
+#     p_switch_mu = pm.Uniform('p_switch_mu', lower=0, upper=1)
+#     p_reward_mu = pm.Uniform('p_reward_mu', lower=0, upper=1)
+#
+#     p_switch_sd = T.as_tensor_variable(0.2)
+#     p_reward_sd = T.as_tensor_variable(0.2)
+#
+#     p_switch_sl = pm.Uniform('p_switch_sl', lower=-1, upper=1)
+#     p_reward_sl = pm.Uniform('p_reward_sl', lower=-1, upper=1)
+#
+#     p_switch = pm.Bound(pm.Normal, lower=0, upper=1
+#                         )('p_switch', mu=p_switch_mu + ages * p_switch_sl, sd=p_switch_sd, shape=n_subj)
+#     p_reward = pm.Bound(pm.Normal, lower=0, upper=1
+#                         )('p_reward', mu=p_reward_mu + ages * p_reward_sl, sd=p_reward_sd, shape=n_subj)
+#     p_noisy = 1e-5 * T.ones(n_subj)
+#
+#     return p_switch, p_reward, p_noisy
+#
+#
+# def get_RL_model_parameters(ages, n_subj):
+#
+#     alpha_mu = pm.Uniform('alpha_mu', lower=0, upper=1)
+#     calpha_sc_mu = pm.Uniform('calpha_sc_mu', lower=0, upper=1)
+#
+#     alpha_sd = T.as_tensor_variable(0.2)
+#     calpha_sc_sd = T.as_tensor_variable(0.2)
+#
+#     alpha_sl = pm.Uniform('alpha_sl', lower=-1, upper=1)
+#     calpha_sc_sl = pm.Uniform('calpha_sc_sl', lower=-1, upper=1)
+#
+#     alpha = pm.Bound(pm.Normal, lower=0, upper=1
+#                      )('alpha', mu=alpha_mu + ages * alpha_sl, sd=alpha_sd, shape=n_subj)
+#     calpha_sc = pm.Bound(pm.Normal, lower=0, upper=1
+#                          )('calpha_sc', mu=calpha_sc_mu + ages * calpha_sc_sl, sd=calpha_sc_sd, shape=n_subj)
+#     calpha = pm.Deterministic('calpha', alpha * calpha_sc)
+#
+#     return alpha, calpha
 
-    slopes_dict = dict()
-    if fit_slopes:
 
-        # Slopes can vary between -1 and 1
-        for par_name in ['eps_sl', 'beta_sl']:
-            slopes_dict.update({par_name: pm.Uniform(par_name, lower=-1, upper=1)})
+def print_logp_info(model):
 
-        if model_name == 'RL':
-            for par_name in ['alpha_sl', 'calpha_sc_sl']:
-                slopes_dict.update({par_name: pm.Uniform(par_name, lower=-1, upper=1)})
+    print("Checking that none of the logp are -inf:")
+    print("Test point: {0}".format(model.test_point))
+    print("\tmodel.logp(model.test_point): {0}".format(model.logp(model.test_point)))
 
-        elif model_name == 'Bayes':
-            for par_name in ['p_switch_sl', 'p_reward_sl']:
-                slopes_dict.update({par_name: pm.Uniform(par_name, lower=-1, upper=1)})
-
-    else:
-
-        # All slopes are 0
-        for par_name in ['eps_sl', 'beta_sl']:
-            slopes_dict.update({par_name: T.as_tensor_variable(0.)})
-
-        if model_name == 'RL':
-            for par_name in ['alpha_sl', 'calpha_sc_sl']:
-                slopes_dict.update({par_name: T.as_tensor_variable(0.)})
-
-        elif model_name == 'Bayes':
-            for par_name in ['p_switch_sl', 'p_reward_sl']:
-                slopes_dict.update({par_name: T.as_tensor_variable(0.)})
-
-    return slopes_dict
+    for RV in model.basic_RVs:
+        print("\tlogp of {0}: {1}".format(RV.name, RV.logp(model.test_point)))
 
 
-def get_tilde_pars(model_name, n_subj):
-
-    tilde_dict = dict()
-    for par_name in ['eps_tilde', 'beta_tilde']:
-        tilde_dict.update({par_name: pm.Normal(par_name, mu=0, sd=0.2, shape=n_subj)})
-
-    if model_name == 'RL':
-        for par_name in ['alpha_tilde', 'calpha_sc_tilde']:
-            tilde_dict.update({par_name: pm.Normal(par_name, mu=0, sd=0.2, shape=n_subj)})
-
-    elif model_name == 'Bayes':
-        for par_name in ['p_switch_tilde', 'p_reward_tilde']:
-            tilde_dict.update({par_name: pm.Normal(par_name, mu=0, sd=0.2, shape=n_subj)})
-
-    return tilde_dict
+# def get_population_level_priors(model_name):
+#
+#     # Get population-level priors (as un-informative as possible)
+#     prior_dict = {'eps_mu': pm.Uniform('eps_mu', lower=0, upper=1),
+#                   'beta_mu': T.as_tensor_variable(0.2),  # pm.Lognormal('beta_mu', mu=0, sd=3),
+#                   'eps_sd': pm.HalfNormal('eps_sd', sd=0.2),
+#                   'beta_sd': T.as_tensor_variable(2.)}  # pm.HalfNormal('beta_sd', sd=3)}  #
+#
+#     if model_name == 'RL':
+#         for par_name in ['alpha_mu', 'calpha_sc_mu']:
+#             prior_dict.update({par_name: pm.Uniform(par_name, lower=0, upper=1)})
+#         for par_name in ['alpha_sd', 'calpha_sc_sd']:
+#             prior_dict.update({par_name: T.as_tensor_variable(0.5)})  # pm.HalfNormal(par_name, sd=0.3)})
+#
+#     elif model_name == 'Bayes':
+#         for par_name in ['p_switch_mu', 'p_reward_mu']:
+#             prior_dict.update({par_name: pm.Uniform(par_name, lower=0, upper=1)})
+#         for par_name in ['p_switch_sd', 'p_reward_sd']:
+#             prior_dict.update({par_name: T.as_tensor_variable(0.5)})  # pm.HalfNormal(par_name, sd=0.3)})
+#
+#     return prior_dict
+#
+#
+# def get_slopes(fit_slopes, model_name):
+#
+#     slopes_dict = dict()
+#     if fit_slopes:
+#
+#         # Slopes can vary between -1 and 1
+#         for par_name in ['eps_sl', 'beta_sl']:
+#             slopes_dict.update({par_name: pm.Uniform(par_name, lower=-1, upper=1)})
+#
+#         if model_name == 'RL':
+#             for par_name in ['alpha_sl', 'calpha_sc_sl']:
+#                 slopes_dict.update({par_name: pm.Uniform(par_name, lower=-1, upper=1)})
+#
+#         elif model_name == 'Bayes':
+#             for par_name in ['p_switch_sl', 'p_reward_sl']:
+#                 slopes_dict.update({par_name: pm.Uniform(par_name, lower=-1, upper=1)})
+#
+#     else:
+#
+#         # All slopes are 0
+#         for par_name in ['eps_sl', 'beta_sl']:
+#             slopes_dict.update({par_name: T.as_tensor_variable(0.)})
+#
+#         if model_name == 'RL':
+#             for par_name in ['alpha_sl', 'calpha_sc_sl']:
+#                 slopes_dict.update({par_name: T.as_tensor_variable(0.)})
+#
+#         elif model_name == 'Bayes':
+#             for par_name in ['p_switch_sl', 'p_reward_sl']:
+#                 slopes_dict.update({par_name: T.as_tensor_variable(0.)})
+#
+#     return slopes_dict
+#
+#
+# def get_tilde_pars(model_name, n_subj):
+#
+#     tilde_dict = dict()
+#     for par_name in ['eps_tilde', 'beta_tilde']:
+#         tilde_dict.update({par_name: pm.Normal(par_name, mu=0, sd=0.2, shape=n_subj)})
+#
+#     if model_name == 'RL':
+#         for par_name in ['alpha_tilde', 'calpha_sc_tilde']:
+#             tilde_dict.update({par_name: pm.Normal(par_name, mu=0, sd=0.2, shape=n_subj)})
+#
+#     elif model_name == 'Bayes':
+#         for par_name in ['p_switch_tilde', 'p_reward_tilde']:
+#             tilde_dict.update({par_name: pm.Normal(par_name, mu=0, sd=0.2, shape=n_subj)})
+#
+#     return tilde_dict
 
 # def bound_variables(model_name):
 #
