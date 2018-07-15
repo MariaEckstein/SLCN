@@ -3,16 +3,7 @@ import numpy as np
 
 def get_paths(run_on_cluster):
 
-    if not run_on_cluster:
-        base_path = 'C:/Users/maria/MEGAsync/SLCN'
-        return {'human data': base_path + '/PShumanData/',
-                'fitting results': base_path + '/PShumanData/fitting/',
-                'ages file name': base_path + 'data/SLCNinfo.csv',
-                'simulations': base_path + '/PSsimulations/',
-                'old simulations': base_path + '/PSGenRecCluster/fit_par/',
-                'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
-
-    else:
+    if run_on_cluster:
         base_path = '/home/bunge/maria/Desktop/'
         return {'human data': base_path + '/PShumanData/',
                 'fitting results': base_path + '/PSPyMC3/fitting/',
@@ -21,14 +12,23 @@ def get_paths(run_on_cluster):
                 'old simulations': base_path + '/PShumanData/fit_par/',
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
+    else:
+        base_path = 'C:/Users/maria/MEGAsync/SLCN'
+        return {'human data': base_path + '/PShumanData/',
+                'fitting results': base_path + '/PShumanData/fitting/',
+                'ages file name': base_path + 'data/SLCNinfo.csv',
+                'simulations': base_path + '/PSsimulations/',
+                'old simulations': base_path + '/PSGenRecCluster/fit_par/',
+                'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
-def p_from_Q(Q_left, Q_right, beta, epsilon):
+
+def p_from_Q(Q_left, Q_right, beta, eps):
 
     # translate Q-values into probabilities using softmax
     p_right = 1 / (1 + np.exp(-beta * (Q_right - Q_left)))
 
-    # add epsilon noise
-    return epsilon * 0.5 + (1 - epsilon) * p_right
+    # add eps noise
+    return eps * 0.5 + (1 - eps) * p_right
 
 
 def update_Q(reward, choice, Q_left, Q_right, alpha, calpha):
@@ -67,7 +67,7 @@ def get_likelihoods(rewards, choices, p_reward, p_noisy):
     return lik_cor, lik_inc
 
 
-def post_from_lik(lik_cor, lik_inc, p_right, p_switch, epsilon):
+def post_from_lik(lik_cor, lik_inc, p_right, p_switch, eps, beta):
 
     # Posterior probability that right action is correct, based on likelihood (i.e., received feedback)
     p_right = lik_cor * p_right / (lik_cor * p_right + lik_inc * (1 - p_right))
@@ -75,5 +75,8 @@ def post_from_lik(lik_cor, lik_inc, p_right, p_switch, epsilon):
     # Take into account that a switch might occur
     p_right = (1 - p_switch) * p_right + p_switch * (1 - p_right)
 
-    # Add epsilon noise
-    return epsilon * 0.5 + (1 - epsilon) * p_right
+    # Log-transform probabilities
+    p_right = 1 / (1 + np.exp(-beta * (p_right - (1 - p_right))))
+
+    # Add eps noise
+    return eps * 0.5 + (1 - eps) * p_right

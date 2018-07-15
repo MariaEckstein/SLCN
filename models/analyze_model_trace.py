@@ -4,56 +4,86 @@ import pickle
 
 import pymc3 as pm
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
-from shared_modeling_simulation import Shared
+from shared_modeling_simulation import *
 
 
 # Which models should be analyzed and compared?
-model1_name = '2018_7_10_16_11_humans_RL_hierarchical_n_samples10000'
-model2_name = '2018_7_7_23_17_humans_Bayes_hierarchical_n_samples10000'
-
-# Initialize shared
-shared = Shared(run_on_cluster=False)
+file_names = ['test_sd_fitting_2018_7_13_9_49_humans_n_samples5000RL',
+              'test_sd_fitting_2018_7_13_9_49_humans_n_samples5000Bayes']
+model_names = ['RL', 'Bayes']
 
 # Load fitted parameters
-parameter_dir = shared.get_paths()['fitting results']
-print("Loading models... (names: {0} and {1})\n".format(model1_name, model2_name))
+paths = get_paths(run_on_cluster=False)
+parameter_dir = paths['fitting results']
+save_dir = paths['fitting results']
+print("Loading models... files: {0}\n".format(file_names))
 
-with open(parameter_dir + model1_name + '.pickle', 'rb') as handle:
-    RL_hier_data = pickle.load(handle)
-    RL_hier_trace = RL_hier_data['trace']
-    RL_hier_model = RL_hier_data['model']
-    RL_hier_model.name = 'RL_hier'
 
-with open(parameter_dir + model2_name + '.pickle', 'rb') as handle:
-    RL_flat_data = pickle.load(handle)
-    RL_flat_trace = RL_flat_data['trace']
-    RL_flat_model = RL_flat_data['model']
-    RL_flat_model.name = 'RL_flat'
+# A small wrapper function for displaying the MCMC sampler diagnostics as above
+def report_trace(trace, par_names):
 
-# Plots
-print("Plotting traces for the first model...\n")
-pm.traceplot(RL_hier_trace)
-plt.show()
-pm.forestplot(RL_hier_trace)
-plt.show()
+    # plot the trace of parameters
+    pm.traceplot(trace, varnames=par_names, transform=np.log)
+    plt.show()
 
-# Get model WAICs
-waic = pm.waic(RL_hier_trace, RL_hier_model)
-print(waic.WAIC)
+    # plot the estimate for the mean of parameter cumulating mean
+    param_trace = trace[par_names[0]]
+    mparam_trace = [np.mean(param_trace[:i]) for i in np.arange(1, len(param_trace))]
+    plt.plot(mparam_trace, lw=2.5)
+    plt.xlabel('Iteration')
+    plt.ylabel('MCMC mean of {0}'.format(par_names[0]))
+    plt.title('MCMC estimation')
+    plt.show()
+
+    # display the total number and percentage of divergent
+    divergent = trace['diverging']
+    print('Number of Divergent %d' % divergent.nonzero()[0].size)
+    divperc = divergent.nonzero()[0].size / len(trace) * 100
+    print('Percentage of Divergent %.1f' % divperc)
+
+    # scatter plot for the identifcation of the problematic neighborhoods in parameter space
+    pm.pairplot(trace,
+                sub_varnames=par_names,
+                divergences=True,
+                color='C3', kwargs_divergence={'color': 'C2'})
+    plt.show()
+
+
+model_dict = {}
+for file_name, model_name in zip(file_names, model_names):
+    with open(parameter_dir + file_name + '.pickle', 'rb') as handle:
+        data = pickle.load(handle)
+        trace = data['trace']
+        model = data['model']
+        model.name = model_name
+
+    # # Graph
+    # pm.graph
+
+    # Check for geometric ergodicity
+    print(pm.summary(trace).round(2))  # Rhat should be close to one; number of effective samples > 200
+
+    # Plot divergent samples
+    print(model.basic_RVs)
+    report_trace(trace, ['eps_mu_interval__', 'eps_sd_log__'])
+
+    # Plot traces and parameter estimates
+    print("Plotting traces for {0} model...\n".format(model_name))
+    pm.traceplot(trace)
+    plt.savefig(save_dir + 'traceplot' + model_name + '.png')
+    pm.forestplot(trace)
+    plt.savefig(save_dir + 'forestplot' + model_name + '.png')
+
+    # Get model WAICs
+    waic = pm.waic(trace, model)
+    print(waic.WAIC)
+
+    # Add model to model_dict
+    model_dict.update({model: trace})
 
 # Compare WAIC scores
 print("Comparing models using WAIC...\n")
-df_comp_WAIC = pm.compare({RL_flat_model: RL_flat_trace,
-                           RL_hier_model: RL_hier_trace})
-
-pm.compareplot(df_comp_WAIC)
-plt.show()
-
-# Compare leave-one-out cross validation
-print("Comparing models using LOO...\n")
-df_comp_LOO = pm.compare({RL_flat_model: RL_flat_trace,
-                          RL_hier_model: RL_hier_trace}, ic='LOO')
-
-pm.compareplot(df_comp_LOO)
-plt.show()
+pm.compareplot(pm.compare(model_dict))
+plt.savefig(save_dir + 'compareplot_WAIC' + '_'.join(model_names) + '.png')

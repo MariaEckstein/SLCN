@@ -3,9 +3,8 @@ import pandas as pd
 import scipy.stats as stats
 
 import os
-import pickle
 
-from shared_modeling_simulation import Shared
+from shared_modeling_simulation import *
 from PStask import Task
 
 # Switches for this script
@@ -15,13 +14,12 @@ n_subj = 50
 learning_style = 'Bayes'  # 'Bayes' or 'RL'
 
 # Get save path
-shared = Shared()
-save_dir = shared.get_paths()['simulations']
+save_dir = get_paths(False)['simulations']
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
 # Load fitted parameters
-# parameter_dir = shared.get_paths()['fitting results']
+# parameter_dir = get_paths()['fitting results']
 # with open(parameter_dir + 'trace_2018_7_2_nsubj155Hier_mu.pickle', 'rb') as handle:
 #     trace = pickle.load(handle)
 
@@ -87,7 +85,7 @@ if learning_style == 'RL':
     Qs_right = np.zeros(rewards.shape)
 
 # Initialize task
-task_info_path = shared.get_paths()['PS task info']
+task_info_path = get_paths()['PS task info']
 task = Task(task_info_path, n_subj)
 LL = np.zeros(n_subj)
 
@@ -100,11 +98,11 @@ for trial in range(n_trials):
 
         # Translate Q-values into action probabilities, make a choice, obtain reward, update Q-values
         try:
-            Q_left, Q_right = shared.update_Q(reward, choice, Q_left, Q_right, alpha, calpha)
+            Q_left, Q_right = update_Q(reward, choice, Q_left, Q_right, alpha, calpha)
         except NameError:
             Q_left, Q_right = 0.5 * np.ones(n_subj), 0.5 * np.ones(n_subj)
 
-        p_right = shared.p_from_Q(Q_left, Q_right, beta, epsilon)
+        p_right = p_from_Q(Q_left, Q_right, beta, epsilon)
         choice = np.random.binomial(n=1, p=p_right)
         reward = task.produce_reward(choice)
         LL += np.log(p_right * choice + (1 - p_right) * (1 - choice))
@@ -121,8 +119,8 @@ for trial in range(n_trials):
     elif learning_style == 'Bayes':
 
         try:
-            lik_cor, lik_inc = shared.get_likelihoods(reward, choice, p_reward, p_noisy_task)
-            p_right = shared.post_from_lik(lik_cor, lik_inc, p_right, p_switch, epsilon)
+            lik_cor, lik_inc = get_likelihoods(reward, choice, p_reward, p_noisy_task)
+            p_right = post_from_lik(lik_cor, lik_inc, p_right, p_switch, epsilon)
         except NameError:  # if p_right has not been defined yet
             p_right = 0.5 * np.ones(n_subj)
 
