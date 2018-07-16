@@ -47,7 +47,8 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
     rewards = np.delete(rewards, range(file_idx + 1, n_subj), 1)
     choices = np.delete(choices, range(file_idx + 1, n_subj), 1)
     ages = ages[:file_idx + 1]
-    pd.DataFrame(ages).to_csv('C:/Users/maria/MEGAsync/SLCNdata/ages.csv')
+    # age_groups = []
+    # pd.DataFrame(ages).to_csv('C:/Users/maria/MEGAsync/SLCNdata/ages.csv')
 
     # Delete kid/teen or adult data sets
     if kids_and_teens_only:

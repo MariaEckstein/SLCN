@@ -11,12 +11,13 @@ from shared_modeling_simulation import *
 
 
 # Which models should be analyzed and compared?
-plt.close('all')
 create_pairplot = False
 
-file_names = ['final/Bayes_pswitch_preward_epsilon_2018_7_15_14_22_humans_n_samples2000Bayes',
-              'final/Bayes_pswitch_preward_p_noisy_epsilon_2018_7_15_14_38_humans_n_samples2000Bayes']
-model_names = ['swi_rew_eps', 'swi_rew_noi_eps']
+file_names = ['fitting_sd/RL_beta_sd_2018_7_15_16_48_humans_n_samples2000RL',
+              'fitting_sd/RL_eps_sd_2018_7_15_16_48_humans_n_samples2000RL',
+              'fitting_sd/RL_calpha_sd_2018_7_15_16_50_humans_n_samples2000RL',
+              'fitting_sd/RL_nalpha_sd_2018_7_15_16_50_humans_n_samples2000RL']
+model_names = ['beta', 'eps', 'calpha', 'nalpha']
 # file_names = ['final/RL_alpha_beta_epsilon_2018_7_15_13_52_humans_n_samples2000RL',
 #               'final/RL_alpha_calpha_beta_epsilon_2018_7_15_13_52_humans_n_samples2000RL',
 #               'final/RL_alpha_nalpha_beta_epsilon_2018_7_15_13_54_humans_n_samples2000RL',
@@ -31,6 +32,8 @@ print("Loading models {0}.\n".format(file_names))
 
 model_dict = {}
 for file_name, model_name in zip(file_names, model_names):
+    plt.close('all')
+    print('\tMODEL {0}'.format(model_name))
     with open(parameter_dir + file_name + '.pickle', 'rb') as handle:
         data = pickle.load(handle)
         trace = data['trace']
@@ -69,7 +72,7 @@ for file_name, model_name in zip(file_names, model_names):
     plt.savefig(save_dir + file_name + '_traceplot.png')
     pm.forestplot(trace)
     plt.savefig(save_dir + file_name + '_forestplot.png')
-    print("Saved traces for {0} model to {1}{2}.\n".format(model_name, save_dir, file_name))
+    print("Saved traces for {0} model to {1}{2}.".format(model_name, save_dir, file_name))
 
     # Get model WAICs
     waic = pm.waic(trace, model)

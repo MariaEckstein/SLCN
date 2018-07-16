@@ -26,21 +26,25 @@ class Task(object):
 
     def prepare_trial(self):
 
-        # switch box if necessary
+        # Switch sides if necessary
         current_run_lengths = np.array([self.run_lengths[self.i_episode[subj], subj] for subj in range(self.n_subj)])
-        runs_over = np.argwhere(self.n_rewards == current_run_lengths)
-        self.correct_box[runs_over] = 1 - self.correct_box[runs_over]
-        self.switched[runs_over] = True
-        self.n_rewards[runs_over] = 0
-        self.i_episode[runs_over] += 1
+        switch = self.n_rewards == current_run_lengths
+        self.correct_box[switch] = 1 - self.correct_box[switch]
+
+        # Keep track of things
+        self.switched[switch] = True  # for which subjects has the box switched sides?
+        self.n_rewards[switch] = 0
+        self.i_episode[switch] += 1
 
     def produce_reward(self, action):
 
         # Determine which subjects get coins
         current_coin_wins = np.array([self.coin_wins[self.n_correct[subj], subj] for subj in range(self.n_subj)])
-        current_coin_wins[action != self.correct_box] = False  # no coin for incorrect actions
-        current_coin_wins[self.switched] = True  # always a coin when sides just switched
-        self.switched[:] = False  # reset switch
+        current_coin_wins[self.switched] = True  # always a coin when sides just switched (and correct action)
+        current_coin_wins[action != self.correct_box] = False  # never a coin for incorrect action
+
+        # Keep track of things
+        self.switched[current_coin_wins] = False  # reset switch for subjects who got their coin after the last switch
         self.n_rewards[current_coin_wins] += 1
         self.n_correct[action == self.correct_box] += 1
 

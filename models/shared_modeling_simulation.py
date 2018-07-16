@@ -75,16 +75,27 @@ def get_likelihoods(rewards, choices, p_reward, p_noisy):
     return lik_cor, lik_inc
 
 
-def post_from_lik(lik_cor, lik_inc, p_right, p_switch, eps, beta):
+def post_from_lik(lik_cor, lik_inc, p_right, p_switch, eps, beta, verbose=False):
 
     # Posterior probability that right action is correct, based on likelihood (i.e., received feedback)
     p_right = lik_cor * p_right / (lik_cor * p_right + lik_inc * (1 - p_right))
+    if verbose:
+        print('p_right: {0} (after applying Bayes rule)'.format(p_right.round(3)))
 
     # Take into account that a switch might occur
     p_right = (1 - p_switch) * p_right + p_switch * (1 - p_right)
+    if verbose:
+        print('p_right: {0} (after taking switch into account)'.format(p_right.round(3)))
 
     # Log-transform probabilities
-    p_right = 1 / (1 + np.exp(-beta * (p_right - (1 - p_right))))
+    if not np.all(beta == 999):
+        p_right = 1 / (1 + np.exp(-beta * (p_right - (1 - p_right))))
+    if verbose:
+        print('p_right: {0} (after sigmoid transform)'.format(p_right.round(3)))
 
-    # Add eps noise
-    return eps * 0.5 + (1 - eps) * p_right
+    # Add epsilon noise
+    p_right = eps * 0.5 + (1 - eps) * p_right
+    if verbose:
+        print('p_right: {0} (after adding epsilon noise)'.format(p_right.round(3)))
+
+    return p_right
