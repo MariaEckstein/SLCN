@@ -17,6 +17,7 @@ def get_paths(run_on_cluster):
         return {'human data': base_path + '/PShumanData/',
                 'fitting results': base_path + '/PShumanData/fitting/',
                 'ages file name': base_path + 'data/SLCNinfo.csv',
+                'fitted ages file name': base_path + 'data/ages.csv',
                 'simulations': base_path + '/PSsimulations/',
                 'old simulations': base_path + '/PSGenRecCluster/fit_par/',
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}

@@ -30,14 +30,25 @@ if (!dir.exists(plot_dir)) {
 # Read in and clean data
 
 ```{r Read in ages}
-ages = read.csv("C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo.csv")
-ages$age_group = "Adults"
-ages$age_group[ages$PreciseYrs < 18] = "Teens"
-ages$age_group[ages$PreciseYrs < 13] = "Children"
-ages$age_group = factor(ages$age_group, levels = c("Children", "Teens", "Adults"))
-ages$PDS[ages$age_group == "Adults"] = 6
-colnames(ages)[colnames(ages) == "ID"] = "sID"
-ages
+if (data %in% c("human", "fitted_human")) {
+  ages = read.csv("C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo.csv")
+  ages$age_group = "Adults"
+  ages$age_group[ages$PreciseYrs < 18] = "Teens"
+  ages$age_group[ages$PreciseYrs < 13] = "Children"
+  ages$age_group = factor(ages$age_group, levels = c("Children", "Teens", "Adults"))
+  ages$PDS[ages$age_group == "Adults"] = 6
+  colnames(ages)[colnames(ages) == "ID"] = "sID"
+  ages
+} else {
+  ages = read.csv("C:/Users/maria/MEGAsync/SLCNdata/ages.csv")
+  colnames(ages) = c("sID", "PreciseYrs")
+  ages$age_group = "Adults"
+  ages$age_group[ages$PreciseYrs < 18] = "Teens"
+  ages$age_group[ages$PreciseYrs < 13] = "Children"
+  ages$age_group = factor(ages$age_group, levels = c("Children", "Teens", "Adults"))
+  ages$PDS[ages$age_group == "Adults"] = 6
+  ages
+}
 ```
 ```{r Read in data}
 all_files = data.frame()

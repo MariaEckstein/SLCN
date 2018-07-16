@@ -9,10 +9,10 @@ from modeling_helpers import *
 
 
 # Switches for this script
-run_on_cluster = True
+run_on_cluster = False
 verbose = False
 print_logps = False
-file_name_suff = 'Bayes_pswitch_preward_p_noisy_epsilon'
+file_name_suff = 'Bayes_beta'
 model_names = ('Bayes', '')
 
 # Which data should be fitted?
@@ -47,38 +47,33 @@ for model_name in model_names:
 
         # Get population-level and individual parameters
         eps_mu = pm.Uniform('eps_mu', lower=0, upper=1)
-        # beta_mu = pm.Uniform('beta_mu', lower=0, upper=20)
+        beta_mu = pm.Uniform('beta_mu', lower=0, upper=20)
 
         eps_sd = T.as_tensor_variable(0.2)  #pm.HalfNormal('eps_sd', sd=0.3)  #
-        # beta_sd = T.as_tensor_variable(2)  # pm.HalfNormal('beta_sd', sd=6)  #
+        beta_sd = T.as_tensor_variable(2)  #pm.HalfNormal('beta_sd', sd=6)  #
 
         eps_sl = T.as_tensor_variable(0)  # pm.Uniform('eps_sl', lower=-1, upper=1)
-        # beta_sl = T.as_tensor_variable(0)  # pm.Uniform('beta_sl', lower=-1, upper=1)
+        beta_sl = T.as_tensor_variable(0)  # pm.Uniform('beta_sl', lower=-1, upper=1)
 
-        eps = pm.Bound(pm.Normal, lower=0, upper=1)('eps', mu=eps_mu + ages * eps_sl, sd=eps_sd, shape=n_subj)  # beta = 1 -> sigmoid transform = straight line
-        beta = T.as_tensor_variable(1.)  # pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu + ages * beta_sl, sd=beta_sd, shape=n_subj)
+        eps = pm.Bound(pm.Normal, lower=0, upper=1)('eps', mu=eps_mu + ages * eps_sl, sd=eps_sd, shape=n_subj)
+        beta = pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu + ages * beta_sl, sd=beta_sd, shape=n_subj)  # beta = 1 -> sigmoid transform = straight line
 
         if model_name == 'Bayes':
 
             p_switch_mu = pm.Uniform('p_switch_mu', lower=0, upper=1)
             p_reward_mu = pm.Uniform('p_reward_mu', lower=0, upper=1)
-            p_noisy_mu = pm.Uniform('p_noisy_mu', lower=0, upper=1)
 
             p_switch_sd = T.as_tensor_variable(0.2)  #pm.HalfNormal('p_switch_sd', sd=0.3)  #
             p_reward_sd = T.as_tensor_variable(0.2)  #pm.HalfNormal('p_reward_sd', sd=0.3)  #
-            p_noisy_sd = T.as_tensor_variable(0.2)  #pm.HalfNormal('p_noisy_sd', sd=0.3)  #
 
             p_switch_sl = T.as_tensor_variable(0)  # pm.Uniform('p_switch_sl', lower=-1, upper=1)
             p_reward_sl = T.as_tensor_variable(0)  # pm.Uniform('p_reward_sl', lower=-1, upper=1)
-            p_noisy_sl = T.as_tensor_variable(0)  # pm.Uniform('p_noisy_sl', lower=-1, upper=1)
 
             p_switch = pm.Bound(pm.Normal, lower=0, upper=1
                                 )('p_switch', mu=p_switch_mu + ages * p_switch_sl, sd=p_switch_sd, shape=n_subj)
             p_reward = pm.Bound(pm.Normal, lower=0, upper=1
                                 )('p_reward', mu=p_reward_mu + ages * p_reward_sl, sd=p_reward_sd, shape=n_subj)
-            p_noisy = pm.Bound(pm.Normal, lower=0, upper=1
-                                )('p_noisy', mu=p_noisy_mu + ages * p_noisy_sl, sd=p_noisy_sd, shape=n_subj)
-            # p_noisy = 1e-5 * T.ones(n_subj)
+            p_noisy = 1e-5 * T.ones(n_subj)
 
         elif model_name == 'RL':
 
