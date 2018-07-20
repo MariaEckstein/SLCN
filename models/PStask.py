@@ -38,10 +38,22 @@ class Task(object):
 
     def produce_reward(self, action):
 
-        # Determine which subjects get coins
+        # Look up in self.coin_wins which subjects have pre-scheduled rewards
         current_coin_wins = np.array([self.coin_wins[self.n_correct[subj], subj] for subj in range(self.n_subj)])
-        current_coin_wins[self.switched] = True  # always a coin when sides just switched (and correct action)
-        current_coin_wins[action != self.correct_box] = False  # never a coin for incorrect action
+        current_coin_wins[action != self.correct_box] = False  # no coins for incorrect actions
+
+        # Check which subjects do not have pre-scheduled reward, but should still get a reward because it just switched
+        needs_reward_switch = self.correct_box * self.switched * np.invert(current_coin_wins)
+        print("switch: {0}".format(self.switched))
+        print("needs reward switch: {0}".format(needs_reward_switch))
+        # current_coin_wins[needs_reward_switch] = True  # add reward to current trial
+        # # remove next scheduled reward
+        # for subj in range(self.n_subj):
+        #     if needs_reward_switch[subj]:
+        #         subj_scheduled_rewards = np.argwhere(self.coin_wins[:, subj])
+        #         next_scheduled_reward = min(subj_scheduled_rewards[subj_scheduled_rewards > self.n_correct[subj]])
+        #         self.coin_wins[next_scheduled_reward, subj] = False
+        #         print("Removed reward for subject {0} from trial {1}".format(subj, next_scheduled_reward))
 
         # Keep track of things
         self.switched[current_coin_wins] = False  # reset switch for subjects who got their coin after the last switch

@@ -7,12 +7,18 @@ import matplotlib.pyplot as plt
 from shared_modeling_simulation import *
 from modeling_helpers import *
 
+# z-score age!!
+# Beta prior on p_switch & p_reward:
+# plt.hist(pm.Beta.dist(mu=0.3, sd=0.3).random(size=10000))  => heavily skewed to the left
+# plt.hist(pm.Beta.dist(mu=0.5, sd=0.1).random(size=10000))  => looks like normal
+# plt.hist(pm.Beta.dist(mu=0.5, sd=0.29).random(size=10000))  => looks like uniform
+
 
 # Switches for this script
 run_on_cluster = True
 verbose = False
 print_logps = False
-file_name_suff = 'beta_eps_4alphas_all_sds_except_eps.02'
+file_name_suff = 'RL_alpha_beta'
 model_names = ('RL', '')
 
 # Which data should be fitted?
@@ -21,8 +27,8 @@ kids_and_teens_only = False
 adults_only = False
 
 # Sampling details
-n_samples = 5000
-n_tune = 500
+n_samples = 4000
+n_tune = 100
 n_chains = 2
 if run_on_cluster:
     n_cores = 8
@@ -46,36 +52,31 @@ for model_name in model_names:
     with pm.Model() as model:
 
         # Get population-level and individual parameters
-        eps_mu = pm.Uniform('eps_mu', lower=0, upper=1)
+        # eps_mu = pm.Uniform('eps_mu', lower=0, upper=1)
+        # eps_sd = T.as_tensor_variable(0.01)  #pm.HalfNormal('eps_sd', sd=0.3)
+        # eps_sl = T.as_tensor_variable(0)  # pm.Uniform('eps_sl', lower=-1, upper=1)
+        eps = T.as_tensor_variable(0)  #pm.Beta('eps', mu=eps_mu + ages * eps_sl, sd=eps_sd, shape=n_subj)  #
+
         beta_mu = pm.Uniform('beta_mu', lower=0, upper=20)
-
-        eps_sd = T.as_tensor_variable(0.02)  #pm.HalfNormal('eps_sd', sd=0.3)  #
         beta_sd = pm.HalfNormal('beta_sd', sd=6)  #T.as_tensor_variable(2)  #
-
-        eps_sl = T.as_tensor_variable(0)  # pm.Uniform('eps_sl', lower=-1, upper=1)
         beta_sl = T.as_tensor_variable(0)  # pm.Uniform('beta_sl', lower=-1, upper=1)
-
-        eps = pm.Bound(pm.Normal, lower=0, upper=1)('eps', mu=eps_mu + ages * eps_sl, sd=eps_sd, shape=n_subj)
-        beta = pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu + ages * beta_sl, sd=beta_sd, shape=n_subj)  #T.as_tensor_variable(np.full(n_subj, 999))  #
+        beta = pm.Gamma('beta', mu=beta_mu + ages * beta_sl, sd=beta_sd, shape=n_subj)  #T.as_tensor_variable(0)  #
 
         if model_name == 'Bayes':
 
             p_switch_mu = pm.Uniform('p_switch_mu', lower=0, upper=1)
-            p_reward_mu = pm.Uniform('p_reward_mu', lower=0, upper=1)
-            # p_noisy_mu = pm.Uniform('p_noisy_mu', lower=0, upper=1)
-
-            p_switch_sd = T.as_tensor_variable(0.2)  #pm.HalfNormal('p_switch_sd', sd=0.3)  #
-            p_reward_sd = T.as_tensor_variable(0.2)  #pm.HalfNormal('p_reward_sd', sd=0.3)  #
-            # p_noisy_sd = T.as_tensor_variable(0.2)  #pm.HalfNormal('p_noisy_sd', sd=0.3)  #
-
+            p_switch_sd = pm.HalfNormal('p_switch_sd', sd=0.3)  #T.as_tensor_variable(0.2)  #
             p_switch_sl = T.as_tensor_variable(0)  # pm.Uniform('p_switch_sl', lower=-1, upper=1)
-            p_reward_sl = T.as_tensor_variable(0)  # pm.Uniform('p_reward_sl', lower=-1, upper=1)
-            # p_noisy_sl = T.as_tensor_variable(0)  # pm.Uniform('p_noisy_sl', lower=-1, upper=1)
+            p_switch = pm.Beta('p_switch', mu=p_switch_mu + ages * p_switch_sl, sd=p_switch_sd, shape=n_subj)
 
-            p_switch = pm.Bound(pm.Normal, lower=0, upper=1
-                                )('p_switch', mu=p_switch_mu + ages * p_switch_sl, sd=p_switch_sd, shape=n_subj)
-            p_reward = pm.Bound(pm.Normal, lower=0, upper=1
-                                )('p_reward', mu=p_reward_mu + ages * p_reward_sl, sd=p_reward_sd, shape=n_subj)
+            p_reward_mu = pm.Uniform('p_reward_mu', lower=0, upper=1)
+            p_reward_sd = pm.HalfNormal('p_reward_sd', sd=0.3)  #T.as_tensor_variable(0.2)  #
+            p_reward_sl = T.as_tensor_variable(0)  # pm.Uniform('p_reward_sl', lower=-1, upper=1)
+            p_reward = pm.Beta('p_reward', mu=p_reward_mu + ages * p_reward_sl, sd=p_reward_sd, shape=n_subj)
+
+            # p_noisy_mu = pm.Uniform('p_noisy_mu', lower=0, upper=1)
+            # p_noisy_sd = T.as_tensor_variable(0.2)  #pm.HalfNormal('p_noisy_sd', sd=0.3)  #
+            # p_noisy_sl = T.as_tensor_variable(0)  # pm.Uniform('p_noisy_sl', lower=-1, upper=1)
             # p_noisy = pm.Bound(pm.Normal, lower=0, upper=1
             #                     )('p_noisy', mu=p_noisy_mu + ages * p_noisy_sl, sd=p_noisy_sd, shape=n_subj)
             p_noisy = 1e-5 * T.ones(n_subj)
@@ -83,25 +84,29 @@ for model_name in model_names:
         elif model_name == 'RL':
 
             alpha_mu = pm.Uniform('alpha_mu', lower=0, upper=1)
-            nalpha_mu = pm.Uniform('nalpha_mu', lower=0, upper=1)
-            calpha_sc_mu = pm.Uniform('calpha_sc_mu', lower=0, upper=1)
-
-            alpha_sd = T.as_tensor_variable(0.2)  #pm.HalfNormal('alpha_sd', sd=0.3)  #
-            nalpha_sd = pm.HalfNormal('nalpha_sd', sd=0.3)  #T.as_tensor_variable(0.2)  #
-            calpha_sc_sd = pm.HalfNormal('calpha_sc_sd', sd=0.3)  #T.as_tensor_variable(0.2)  #
-
+            alpha_sd = pm.HalfNormal('alpha_sd', sd=0.3)  #T.as_tensor_variable(0.2)  #
             alpha_sl = T.as_tensor_variable(0)  # pm.Uniform('alpha_sl', lower=-1, upper=1)
-            nalpha_sl = T.as_tensor_variable(0)  # pm.Uniform('nalpha_sl', lower=-1, upper=1)
-            calpha_sc_sl = T.as_tensor_variable(0)  # pm.Uniform('calpha_sc_sl', lower=-1, upper=1)
+            alpha = pm.Beta('alpha', mu=alpha_mu + ages * alpha_sl, sd=alpha_sd, shape=n_subj)
 
-            alpha = pm.Bound(pm.Normal, lower=0, upper=1
-                             )('alpha', mu=alpha_mu + ages * alpha_sl, sd=alpha_sd, shape=n_subj)
-            nalpha = pm.Bound(pm.Normal, lower=0, upper=1
-                              )('nalpha', mu=nalpha_mu + ages * nalpha_sl, sd=nalpha_sd, shape=n_subj)
-            calpha_sc = pm.Bound(pm.Normal, lower=0, upper=1
-                                 )('calpha_sc', mu=calpha_sc_mu + ages * calpha_sc_sl, sd=calpha_sc_sd, shape=n_subj)
+            nalpha_mu = pm.Uniform('nalpha_mu', lower=0, upper=1)
+            nalpha_sd = pm.HalfNormal('nalpha_sd', sd=0.3)  #T.as_tensor_variable(0.2)  #
+            nalpha_sl = T.as_tensor_variable(0)  # pm.Uniform('nalpha_sl', lower=-1, upper=1)
+            # nalpha = pm.Deterministic('nalpha', alpha.copy())
+            nalpha = pm.Beta('nalpha', mu=nalpha_mu + ages * nalpha_sl, sd=nalpha_sd, shape=n_subj)
+
+            calpha_sc_mu = pm.Uniform('calpha_sc_mu', lower=0, upper=1)
+            calpha_sc_sd = pm.HalfNormal('calpha_sc_sd', sd=0.3)  #T.as_tensor_variable(0.2)  #
+            calpha_sc_sl = T.as_tensor_variable(0)  # pm.Uniform('calpha_sc_sl', lower=-1, upper=1)
+            # calpha_sc = pm.Deterministic('calpha_sc', T.as_tensor_variable(0))
+            calpha_sc = pm.Beta('calpha_sc', mu=calpha_sc_mu + ages * calpha_sc_sl, sd=calpha_sc_sd, shape=n_subj)
             calpha = pm.Deterministic('calpha', alpha * calpha_sc)
-            cnalpha = pm.Deterministic('cnalpha', nalpha * calpha_sc)
+
+            cnalpha_sc_mu = pm.Uniform('cnalpha_sc_mu', lower=0, upper=1)
+            cnalpha_sc_sd = pm.HalfNormal('cnalpha_sc_sd', sd=0.3)  #T.as_tensor_variable(0.2)  #
+            cnalpha_sc_sl = T.as_tensor_variable(0)  # pm.Uniform('cnalpha_sc_sl', lower=-1, upper=1)
+            # cnalpha_sc = pm.Deterministic('cnalpha_sc', T.as_tensor_variable(0))
+            cnalpha_sc = pm.Beta('cnalpha_sc', mu=cnalpha_sc_mu + ages * cnalpha_sc_sl, sd=cnalpha_sc_sd, shape=n_subj)
+            cnalpha = pm.Deterministic('cnalpha', nalpha * cnalpha_sc)
 
         # Run the model
         if model_name == 'Bayes':

@@ -11,7 +11,7 @@ verbose = True
 n_trials = 201
 max_n_subj = 2  # must be > 1
 learning_style = 'Bayes'  # 'Bayes' or 'RL'
-model_to_be_simulated = 'd715/Bayes_pswitch_preward_epsilon_2018_7_15_14_22_humans_n_samples2000Bayes'
+model_to_be_simulated = 'd715/Bayes_pswitch_preward_p_noisy_epsilon_2018_7_15_14_38_humans_n_samples2000Bayes'
 
 # Get save path
 save_dir = get_paths(False)['simulations']
@@ -27,7 +27,7 @@ with open(parameter_dir + model_to_be_simulated + '.pickle', 'rb') as handle:
     model = data['model']
 
 eps_idx = [idx for idx in model_summary.index if 'eps' in idx and '_mu' not in idx]
-eps = model_summary.loc[eps_idx[:max_n_subj], 'mean'].values
+eps = 0 * np.ones(len(eps_idx[:max_n_subj]))  # model_summary.loc[eps_idx[:max_n_subj], 'mean'].values
 
 beta_idx = [idx for idx in model_summary.index if 'beta' in idx and '_mu' not in idx]
 beta = model_summary.loc[beta_idx[:max_n_subj], 'mean'].values

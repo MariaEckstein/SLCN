@@ -13,16 +13,15 @@ from shared_modeling_simulation import *
 # Which models should be analyzed and compared?
 create_pairplot = False
 
-file_names = ['fitting_sd/RL_beta_sd_2018_7_15_16_48_humans_n_samples2000RL',
-              'fitting_sd/RL_eps_sd_2018_7_15_16_48_humans_n_samples2000RL',
-              'fitting_sd/RL_calpha_sd_2018_7_15_16_50_humans_n_samples2000RL',
-              'fitting_sd/RL_nalpha_sd_2018_7_15_16_50_humans_n_samples2000RL']
-model_names = ['beta', 'eps', 'calpha', 'nalpha']
-# file_names = ['final/RL_alpha_beta_epsilon_2018_7_15_13_52_humans_n_samples2000RL',
-#               'final/RL_alpha_calpha_beta_epsilon_2018_7_15_13_52_humans_n_samples2000RL',
-#               'final/RL_alpha_nalpha_beta_epsilon_2018_7_15_13_54_humans_n_samples2000RL',
-#               'final/RL_alpha_nalpha_calpha_beta_epsilon_2018_7_15_13_55_humans_n_samples2000RL']
-# model_names = ['abe', 'acbe', 'anbe', 'ancbe']
+# file_names = ['Beta_priors/swi_rew_Beta_priors_2018_7_20_9_42_humans_n_samples3000Bayes']
+# model_names = ['swi_rew']
+file_names = ['RL_indep_scalers/RL_alpha_nalpha_beta_2018_7_20_10_16_humans_n_samples3000RL',
+              'RL_indep_scalers/RL_alpha_calpha_beta_2018_7_20_11_24_humans_n_samples2000RL',
+              'RL_indep_scalers/RL_alpha_calpha_nalpha_beta_2018_7_20_11_30_humans_n_samples2000RL',
+              'RL_indep_scalers/RL_alpha_nalpha_beta_eps_2018_7_20_12_0_humans_n_samples2000RL',
+              'RL_indep_scalers/RL_alpha_beta_2018_7_20_11_2_humans_n_samples2000RL',
+              ]
+model_names = ['al_nal_bet', 'al_cal_bet', 'al_cal_nal_bet', 'al_nal_bet_eps', 'al_bet']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)
@@ -33,7 +32,7 @@ print("Loading models {0}.\n".format(file_names))
 model_dict = {}
 for file_name, model_name in zip(file_names, model_names):
     plt.close('all')
-    print('\tMODEL {0}'.format(model_name))
+    print('\n\tMODEL {0}'.format(model_name))
     with open(parameter_dir + file_name + '.pickle', 'rb') as handle:
         data = pickle.load(handle)
         trace = data['trace']
