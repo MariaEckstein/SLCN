@@ -13,15 +13,16 @@ from shared_modeling_simulation import *
 # Which models should be analyzed and compared?
 create_pairplot = False
 
-# file_names = ['Beta_priors/swi_rew_Beta_priors_2018_7_20_9_42_humans_n_samples3000Bayes']
-# model_names = ['swi_rew']
-file_names = ['RL_indep_scalers/RL_alpha_nalpha_beta_2018_7_20_10_16_humans_n_samples3000RL',
-              'RL_indep_scalers/RL_alpha_calpha_beta_2018_7_20_11_24_humans_n_samples2000RL',
-              'RL_indep_scalers/RL_alpha_calpha_nalpha_beta_2018_7_20_11_30_humans_n_samples2000RL',
-              'RL_indep_scalers/RL_alpha_nalpha_beta_eps_2018_7_20_12_0_humans_n_samples2000RL',
-              'RL_indep_scalers/RL_alpha_beta_2018_7_20_11_2_humans_n_samples2000RL',
-              ]
-model_names = ['al_nal_bet', 'al_cal_bet', 'al_cal_nal_bet', 'al_nal_bet_eps', 'al_bet']
+file_names = ['Bayes_groups/Bayes_switch_reward_group_test_2018_7_21_12_5_humans_n_samples1000Bayes',
+              'Bayes_beta_priors/Bayes_switch_reward_2018_7_21_11_16_humans_n_samples5000Bayes']
+model_names = ['sw_re_gr', 'sw_re']
+# file_names = ['RL_beta_priors/RL_alpha_beta_2018_7_20_17_29_humans_n_samples4000RL',
+#               'RL_beta_priors/RL_alpha_beta_eps_2018_7_20_17_28_humans_n_samples4000RL',
+#               'RL_beta_priors/RL_alpha_beta_nalpha_2018_7_20_17_34_humans_n_samples4000RL',
+#               'RL_beta_priors/RL_alpha_beta_calpha_2018_7_20_17_32_humans_n_samples4000RL',
+              # 'RL_indep_scalers/RL_alpha_beta_2018_7_20_11_2_humans_n_samples2000RL',
+              # ]
+# model_names = ['al_bet', 'al_bet_eps', 'al_bet_nal', 'al_bet_cal']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)
@@ -59,8 +60,6 @@ for file_name, model_name in zip(file_names, model_names):
     # display the total number and percentage of divergent
     divergent = trace['diverging']
     print('Number of Divergent %d' % divergent.nonzero()[0].size)
-    divperc = divergent.nonzero()[0].size / len(trace) * 100
-    print('Percentage of Divergent %.1f' % divperc)
 
     # Rhat should be close to one; number of effective samples > 200
     print('Saving summary of {0} model.'.format(model_name))

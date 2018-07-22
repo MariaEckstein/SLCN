@@ -10,61 +10,75 @@ from PStask import Task
 verbose = True
 n_trials = 201
 max_n_subj = 2  # must be > 1
-learning_style = 'Bayes'  # 'Bayes' or 'RL'
-model_to_be_simulated = 'd715/Bayes_pswitch_preward_p_noisy_epsilon_2018_7_15_14_38_humans_n_samples2000Bayes'
+learning_style = 'RL'  # 'Bayes' or 'RL'
+model_to_be_simulated = 'final/RL_alpha_nalpha_calpha_beta_epsilon_2018_7_15_13_55_humans_n_samples2000RL'
+# model_to_be_simulated = 'none'
 
 # Get save path
 save_dir = get_paths(False)['simulations']
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
+# Type in some parameters
+if model_to_be_simulated == 'none':
+    n_subj = max_n_subj
+    alpha = 0.8 * np.ones(n_subj)
+    eps = 0.01 * np.ones(n_subj)
+    beta = 4 * np.ones(n_subj)
+    nalpha = alpha.copy()
+    calpha_sc = 0 * np.ones(n_subj)
+    calpha = alpha * calpha_sc
+    cnalpha_sc = 0 * np.ones(n_subj)
+    cnalpha = nalpha *cnalpha_sc
+
 # Load fitted parameters
-parameter_dir = get_paths(run_on_cluster=False)['fitting results']
-print('Loading {0}{1}...\n'.format(parameter_dir, model_to_be_simulated))
-with open(parameter_dir + model_to_be_simulated + '.pickle', 'rb') as handle:
-    data = pickle.load(handle)
-    model_summary = data['summary']
-    model = data['model']
+else:
+    parameter_dir = get_paths(run_on_cluster=False)['fitting results']
+    print('Loading {0}{1}...\n'.format(parameter_dir, model_to_be_simulated))
+    with open(parameter_dir + model_to_be_simulated + '.pickle', 'rb') as handle:
+        data = pickle.load(handle)
+        model_summary = data['summary']
+        model = data['model']
 
-eps_idx = [idx for idx in model_summary.index if 'eps' in idx and '_mu' not in idx]
-eps = 0 * np.ones(len(eps_idx[:max_n_subj]))  # model_summary.loc[eps_idx[:max_n_subj], 'mean'].values
+    eps_idx = [idx for idx in model_summary.index if 'eps' in idx and '_mu' not in idx]
+    eps = 0 * np.ones(len(eps_idx[:max_n_subj]))  # model_summary.loc[eps_idx[:max_n_subj], 'mean'].values
 
-beta_idx = [idx for idx in model_summary.index if 'beta' in idx and '_mu' not in idx]
-beta = model_summary.loc[beta_idx[:max_n_subj], 'mean'].values
+    beta_idx = [idx for idx in model_summary.index if 'beta' in idx and '_mu' not in idx]
+    beta = model_summary.loc[beta_idx[:max_n_subj], 'mean'].values
 
-n_subj = len(eps)
+    n_subj = len(eps)
 
-# Get individual parameters
-if learning_style == 'RL':
+    # Get individual parameters
+    if learning_style == 'RL':
 
-    alpha_idx = [idx for idx in model_summary.index if
-                 'alpha' in idx and '_mu' not in idx and 'c' not in idx and 'n' not in idx]
-    alpha = model_summary.loc[alpha_idx[:n_subj], 'mean'].values
+        alpha_idx = [idx for idx in model_summary.index if
+                     'alpha' in idx and '_mu' not in idx and 'c' not in idx and 'n' not in idx]
+        alpha = model_summary.loc[alpha_idx[:n_subj], 'mean'].values
 
-    calpha_idx = [idx for idx in model_summary.index if
-                  'calpha' in idx and '_mu' not in idx and 'n' not in idx and 'sc' not in idx]
-    calpha = model_summary.loc[calpha_idx[:n_subj], 'mean'].values
+        calpha_idx = [idx for idx in model_summary.index if
+                      'calpha' in idx and '_mu' not in idx and 'n' not in idx and 'sc' not in idx]
+        calpha = model_summary.loc[calpha_idx[:n_subj], 'mean'].values
 
-    nalpha_idx = [idx for idx in model_summary.index if 'nalpha' in idx and '_mu' not in idx and 'c' not in idx]
-    nalpha = model_summary.loc[nalpha_idx[:n_subj], 'mean'].values
-    if len(nalpha) == 0:
-        nalpha = alpha.copy()
+        nalpha_idx = [idx for idx in model_summary.index if 'nalpha' in idx and '_mu' not in idx and 'c' not in idx]
+        nalpha = model_summary.loc[nalpha_idx[:n_subj], 'mean'].values
+        if len(nalpha) == 0:
+            nalpha = alpha.copy()
 
-    cnalpha_idx = [idx for idx in model_summary.index if 'cnalpha' in idx and '_mu' not in idx]
-    cnalpha = model_summary.loc[cnalpha_idx[:n_subj], 'mean'].values
+        cnalpha_idx = [idx for idx in model_summary.index if 'cnalpha' in idx and '_mu' not in idx]
+        cnalpha = model_summary.loc[cnalpha_idx[:n_subj], 'mean'].values
 
-elif learning_style == 'Bayes':
+    elif learning_style == 'Bayes':
 
-    p_switch_idx = [idx for idx in model_summary.index if 'p_switch' in idx and '_mu' not in idx]
-    p_switch = model_summary.loc[p_switch_idx[:n_subj], 'mean'].values
+        p_switch_idx = [idx for idx in model_summary.index if 'p_switch' in idx and '_mu' not in idx]
+        p_switch = model_summary.loc[p_switch_idx[:n_subj], 'mean'].values
 
-    p_reward_idx = [idx for idx in model_summary.index if 'p_reward' in idx and '_mu' not in idx]
-    p_reward = model_summary.loc[p_reward_idx[:n_subj], 'mean'].values
+        p_reward_idx = [idx for idx in model_summary.index if 'p_reward' in idx and '_mu' not in idx]
+        p_reward = model_summary.loc[p_reward_idx[:n_subj], 'mean'].values
 
-    if len(beta) == 0:
-        beta = np.full(n_subj, 999)
+        if len(beta) == 0:
+            beta = np.full(n_subj, 999)
 
-    p_noisy = 1e-5 * np.ones(n_subj)
+        p_noisy = 1e-5 * np.ones(n_subj)
 
 if verbose:
     print("Epsilons: {0}".format(eps.round(3)))

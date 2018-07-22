@@ -88,7 +88,7 @@ def post_from_lik(lik_cor, lik_inc, p_right, p_switch, eps, beta, verbose=False)
         print('p_right: {0} (after taking switch into account)'.format(p_right.round(3)))
 
     # Log-transform probabilities
-    p_right = 1 / (1 + np.exp(-beta * (p_right - (1 - p_right))))
+    # p_right = 1 / (1 + np.exp(-beta * (p_right - (1 - p_right))))
     if verbose:
         print('p_right: {0} (after sigmoid transform)'.format(p_right.round(3)))
 
