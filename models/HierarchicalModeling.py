@@ -9,7 +9,7 @@ from modeling_helpers import *
 
 # z-score age!!
 # Beta prior on p_switch & p_reward:
-# plt.hist(pm.Beta.dist(mu=0.3, sd=0.3).random(size=1e4))  => heavily skewed to the left
+# plt.hist(pm.Beta.dist(mu=0.3, sd=0.3).random(size=int(1e4)))  => heavily skewed to the left
 # plt.hist(pm.Beta.dist(mu=0.5, sd=0.1).random(size=1e4))  => looks like normal
 # plt.hist(pm.Beta.dist(mu=0.5, sd=0.29).random(size=1e4))  => looks like uniform
 
@@ -18,8 +18,8 @@ from modeling_helpers import *
 run_on_cluster = True
 verbose = False
 print_logps = False
-file_name_suff = 'Bayes_switch_reward_group_test2'
-model_names = ('Bayes', '')
+file_name_suff = 'RL_alpha_beta_nalpha_gamma_hyperpriors'
+model_names = ('RL', '')
 
 # Which data should be fitted?
 fitted_data_name = 'humans'  # 'humans', 'simulations'
@@ -27,8 +27,8 @@ kids_and_teens_only = False
 adults_only = False
 
 # Sampling details
-n_samples = 4000
-n_tune = 500
+n_samples = 5000
+n_tune = 1000
 if run_on_cluster:
     n_cores = 3
 else:
@@ -57,33 +57,33 @@ for model_name in model_names:
         # eps = pm.Beta('eps', alpha=eps_a, beta=eps_b, shape=n_subj)
         eps = T.as_tensor_variable(0)
 
-        # beta_a = pm.Uniform('beta_a', lower=0, upper=10)
-        # beta_b = pm.Uniform('beta_b', lower=0, upper=10)
-        # beta = pm.Gamma('beta', alpha=beta_a, beta=beta_b, shape=n_subj)
-        beta = T.as_tensor_variable(0)
+        beta_a = pm.Gamma('beta_a', alpha=0.25, beta=0.05)  # similar to pm.Uniform('beta_a', lower=0, upper=20)
+        beta_b = pm.Gamma('beta_b', alpha=0.25, beta=0.05)  # similar to pm.Uniform('beta_b', lower=0, upper=20)
+        beta = pm.Gamma('beta', alpha=beta_a, beta=beta_b, shape=n_subj)
+        # beta = T.as_tensor_variable(0)
 
         if model_name == 'Bayes':
 
-            p_switch_a_a = pm.Uniform('p_switch_a_a', lower=0, upper=1e4)
-            p_switch_a_b = pm.Uniform('p_switch_a_b', lower=0, upper=1e4)
-            p_switch_b_a = pm.Uniform('p_switch_b_a', lower=0, upper=1e4)
-            p_switch_b_b = pm.Uniform('p_switch_b_b', lower=0, upper=1e4)
+            p_switch_a_a = pm.Uniform('p_switch_a_a', lower=0, upper=10)
+            p_switch_a_b = pm.Uniform('p_switch_a_b', lower=0, upper=10)
+            p_switch_b_a = pm.Uniform('p_switch_b_a', lower=0, upper=10)
+            p_switch_b_b = pm.Uniform('p_switch_b_b', lower=0, upper=10)
             p_switch_a = pm.Gamma('p_switch_a', alpha=p_switch_a_a, beta=p_switch_a_b, shape=n_groups)
             p_switch_b = pm.Gamma('p_switch_b', alpha=p_switch_b_a, beta=p_switch_b_b, shape=n_groups)
-            p_switch = pm.Beta('p_switch', alpha=p_switch_a[group], beta=p_switch_b[group], shape=n_subj)
+            p_switch = pm.Beta('p_switch', alpha=p_switch_a[group], beta=p_switch_b[group])
 
-            p_reward_a_a = pm.Uniform('p_reward_a_a', lower=0, upper=1e4)
-            p_reward_a_b = pm.Uniform('p_reward_a_b', lower=0, upper=1e4)
-            p_reward_b_a = pm.Uniform('p_reward_b_a', lower=0, upper=1e4)
-            p_reward_b_b = pm.Uniform('p_reward_b_b', lower=0, upper=1e4)
+            p_reward_a_a = pm.Uniform('p_reward_a_a', lower=0, upper=10)
+            p_reward_a_b = pm.Uniform('p_reward_a_b', lower=0, upper=10)
+            p_reward_b_a = pm.Uniform('p_reward_b_a', lower=0, upper=10)
+            p_reward_b_b = pm.Uniform('p_reward_b_b', lower=0, upper=10)
             p_reward_a = pm.Gamma('p_reward_a', alpha=p_reward_a_a, beta=p_reward_a_b, shape=n_groups)
             p_reward_b = pm.Gamma('p_reward_b', alpha=p_reward_b_a, beta=p_reward_b_b, shape=n_groups)
-            p_reward = pm.Beta('p_reward', alpha=p_reward_a[group], beta=p_reward_b[group], shape=n_subj)
+            p_reward = pm.Beta('p_reward', alpha=p_reward_a[group], beta=p_reward_b[group])
 
-            # p_noisy_a_a = pm.Uniform('p_noisy_a_a', lower=0, upper=1e4)
-            # p_noisy_a_b = pm.Uniform('p_noisy_a_b', lower=0, upper=1e4)
-            # p_noisy_b_a = pm.Uniform('p_noisy_b_a', lower=0, upper=1e4)
-            # p_noisy_b_b = pm.Uniform('p_noisy_b_b', lower=0, upper=1e4)
+            # p_noisy_a_a = pm.Uniform('p_noisy_a_a', lower=0, upper=10)
+            # p_noisy_a_b = pm.Uniform('p_noisy_a_b', lower=0, upper=10)
+            # p_noisy_b_a = pm.Uniform('p_noisy_b_a', lower=0, upper=10)
+            # p_noisy_b_b = pm.Uniform('p_noisy_b_b', lower=0, upper=10)
             # p_noisy_a = pm.Gamma('p_noisy_a', alpha=p_noisy_a_a, beta=p_noisy_a_b, shape=n_groups)
             # p_noisy_b = pm.Gamma('p_noisy_b', alpha=p_noisy_b_a, beta=p_noisy_b_b, shape=n_groups)
             # p_noisy = pm.Beta('p_noisy', alpha=p_noisy_a[group], beta=p_noisy_b[group], shape=n_subj)
@@ -91,23 +91,24 @@ for model_name in model_names:
 
         elif model_name == 'RL':
 
-            alpha_a = pm.Uniform('alpha_a', lower=0, upper=1e4)
-            alpha_b = pm.Uniform('alpha_b', lower=0, upper=1e4)
+            
+            alpha_a = pm.Gamma('alpha_a', alpha=0.25, beta=0.05)  # pm.Uniform('alpha_a', lower=0, upper=20)
+            alpha_b = pm.Gamma('alpha_b', alpha=0.25, beta=0.05)  # pm.Uniform('alpha_b', lower=0, upper=20)
             alpha = pm.Beta('alpha', alpha=alpha_a, beta=alpha_b, shape=n_subj)
 
-            nalpha_a = pm.Uniform('nalpha_a', lower=0, upper=1e4)
-            nalpha_b = pm.Uniform('nalpha_b', lower=0, upper=1e4)
+            nalpha_a = pm.Gamma('nalpha_a', alpha=0.25, beta=0.05)  # pm.Uniform('nalpha_a', lower=0, upper=20)
+            nalpha_b = pm.Gamma('nalpha_b', alpha=0.25, beta=0.05)  # pm.Uniform('nalpha_b', lower=0, upper=20)
             # nalpha = pm.Deterministic('nalpha', alpha.copy())
             nalpha = pm.Beta('nalpha', alpha=nalpha_a, beta=nalpha_b, shape=n_subj)
 
-            # calpha_sc_a = pm.Uniform('calpha_sc_a', lower=0, upper=1e4)
-            # calpha_sc_b = pm.Uniform('calpha_sc_b', lower=0, upper=1e4)
+            # calpha_sc_a = pm.Gamma('calpha_sc_a', alpha=0.25, beta=0.05)  # pm.Uniform('calpha_sc_a', lower=0, upper=20)
+            # calpha_sc_b = pm.Gamma('calpha_sc_b', alpha=0.25, beta=0.05)  # pm.Uniform('calpha_sc_b', lower=0, upper=20)
             # calpha_sc = pm.Beta('calpha_sc', alpha=calpha_sc_a, beta=calpha_sc_b, shape=n_subj)
             calpha_sc = pm.Deterministic('calpha_sc', T.as_tensor_variable(0))
             calpha = pm.Deterministic('calpha', alpha * calpha_sc)
 
-            # cnalpha_sc_a = pm.Uniform('cnalpha_sc_a', lower=0, upper=1e4)
-            # cnalpha_sc_b = pm.Uniform('cnalpha_sc_b', lower=0, upper=1e4)
+            # cnalpha_sc_a = pm.Uniform('cnalpha_sc_a', lower=0, upper=20)
+            # cnalpha_sc_b = pm.Uniform('cnalpha_sc_b', lower=0, upper=20)
             # cnalpha_sc = pm.Beta('cnalpha_sc', alpha=cnalpha_sc_a, beta=cnalpha_sc_b, shape=n_subj)
             cnalpha_sc = pm.Deterministic('cnalpha_sc', calpha_sc.copy())
             cnalpha = pm.Deterministic('cnalpha', nalpha * cnalpha_sc)

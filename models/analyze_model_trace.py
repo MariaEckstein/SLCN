@@ -13,16 +13,16 @@ from shared_modeling_simulation import *
 # Which models should be analyzed and compared?
 create_pairplot = False
 
-file_names = ['Bayes_groups/Bayes_switch_reward_group_test_2018_7_21_12_5_humans_n_samples1000Bayes',
-              'Bayes_beta_priors/Bayes_switch_reward_2018_7_21_11_16_humans_n_samples5000Bayes']
-model_names = ['sw_re_gr', 'sw_re']
-# file_names = ['RL_beta_priors/RL_alpha_beta_2018_7_20_17_29_humans_n_samples4000RL',
-#               'RL_beta_priors/RL_alpha_beta_eps_2018_7_20_17_28_humans_n_samples4000RL',
-#               'RL_beta_priors/RL_alpha_beta_nalpha_2018_7_20_17_34_humans_n_samples4000RL',
-#               'RL_beta_priors/RL_alpha_beta_calpha_2018_7_20_17_32_humans_n_samples4000RL',
-              # 'RL_indep_scalers/RL_alpha_beta_2018_7_20_11_2_humans_n_samples2000RL',
-              # ]
-# model_names = ['al_bet', 'al_bet_eps', 'al_bet_nal', 'al_bet_cal']
+# file_names = ['Bayes_groups/Bayes_switch_reward_group_test2_2018_7_21_12_6_humans_n_samples4000Bayes',
+#               # 'Bayes_beta_priors/Bayes_switch_reward_2018_7_21_11_16_humans_n_samples5000Bayes'
+#               ]
+# model_names = ['sw_re_gr', 'sw_re']
+file_names = [
+    'RL_gamma_hyperpriors/RL_alpha_beta_gamma_hyperpriors_2018_7_23_14_24_humans_n_samples5000RL',
+    # 'RL_gamma_hyperpriors/RL_alpha_beta_calpha_gamma_hyperpriors_2018_7_23_14_26_humans_n_samples5000RL',
+    # 'RL_gamma_hyperprior/Bayes_switch_reward_group_test7_1group_nchains1_2018_7_23_13_25_humans_n_samples500Bayes'
+              ]
+model_names = ['al_be_nal', 'al_be_cal', '1gr_1ch']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)
