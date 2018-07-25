@@ -12,17 +12,19 @@ from shared_modeling_simulation import *
 
 # Which models should be analyzed and compared?
 create_pairplot = False
+compare_models = False
 
 # file_names = ['Bayes_groups/Bayes_switch_reward_group_test2_2018_7_21_12_6_humans_n_samples4000Bayes',
 #               # 'Bayes_beta_priors/Bayes_switch_reward_2018_7_21_11_16_humans_n_samples5000Bayes'
 #               ]
 # model_names = ['sw_re_gr', 'sw_re']
 file_names = [
-    'RL_gamma_hyperpriors/RL_alpha_beta_gamma_hyperpriors_2018_7_23_14_24_humans_n_samples5000RL',
+    'RL_3groups/alpha_beta_calpha_2018_7_24_14_15_humans_n_samples5000RL',
+    'RL_3groups/alpha_beta_2018_7_24_14_11_humans_n_samples5000RL'
     # 'RL_gamma_hyperpriors/RL_alpha_beta_calpha_gamma_hyperpriors_2018_7_23_14_26_humans_n_samples5000RL',
     # 'RL_gamma_hyperprior/Bayes_switch_reward_group_test7_1group_nchains1_2018_7_23_13_25_humans_n_samples500Bayes'
               ]
-model_names = ['al_be_nal', 'al_be_cal', '1gr_1ch']
+model_names = ['al_be_cal', 'al_be', '1gr_1ch']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)
@@ -88,9 +90,10 @@ for file_name, model_name in zip(file_names, model_names):
         plt.savefig(save_dir + file_name + '_pairplot.png')
 
 # Compare WAIC scores
-model_comparison_summary = pm.compare(model_dict)
-pd.DataFrame(model_comparison_summary).to_csv(save_dir + file_name + '_model_comparison_summary.csv')
+if compare_models:
+    model_comparison_summary = pm.compare(model_dict)
+    pd.DataFrame(model_comparison_summary).to_csv(save_dir + file_name + '_model_comparison_summary.csv')
 
-pm.compareplot(model_comparison_summary)
-plt.savefig(save_dir + file_name + 'compareplot_WAIC' + '_'.join(model_names) + '.png')
-print("Compared WAICs of {0} models; saved figure to {1}...\n".format(model_names, save_dir))
+    pm.compareplot(model_comparison_summary)
+    plt.savefig(save_dir + file_name + 'compareplot_WAIC' + '_'.join(model_names) + '.png')
+    print("Compared WAICs of {0} models; saved figure to {1}...\n".format(model_names, save_dir))

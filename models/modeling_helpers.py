@@ -31,7 +31,7 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
     assert len(filenames) > 0, "Error: There are no files with pattern {0} in {1}".format(file_name_pattern, data_dir)
     choices = np.zeros((n_trials, len(filenames)))
     rewards = np.zeros(choices.shape)
-    age = np.zeros(n_subj)
+    age = np.full(n_subj, np.nan)
 
     # Load data and bring in the right format
     SLCNinfo = pd.read_csv(paths['ages file name'])
@@ -63,9 +63,20 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
 
     # Get each participant's group assignment
     group = np.zeros(n_subj, dtype=int)
-    group[age > 13] = 1
-    group[age > 18] = 2
+    group[age > 12] = 1
+    group[age > 17] = 2
     n_groups = len(np.unique(group))
+
+    # z-score age
+    age = (age - np.nanmean(age)) / np.nanstd(age)
+
+    # Remove subjects that are missing age
+    keep = np.invert(np.isnan(age))
+    n_subj = np.sum(keep)
+    age = age[keep]
+    group = group[keep]
+    rewards = rewards[:, keep]
+    choices = choices[:, keep]
 
     # Look at data
     print("Loaded {0} datasets with pattern {1} from {2}...\n".format(n_subj, file_name_pattern, data_dir))
