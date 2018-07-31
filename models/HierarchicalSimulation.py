@@ -8,11 +8,11 @@ from PStask import Task
 
 # Switches for this script
 verbose = True
-n_trials = 201
-max_n_subj = 2  # must be > 1
+n_trials = 128  # humans: 128
+max_n_subj = 200  # must be > 1
 learning_style = 'RL'  # 'Bayes' or 'RL'
-model_to_be_simulated = 'final/RL_alpha_nalpha_calpha_beta_epsilon_2018_7_15_13_55_humans_n_samples2000RL'
-# model_to_be_simulated = 'none'
+# model_to_be_simulated = 'RL_3groups/100s/al_be_nal_cal100_2018_7_25_21_40_humans_n_samples5000RL'
+model_to_be_simulated = 'none'
 
 # Get save path
 save_dir = get_paths(False)['simulations']
