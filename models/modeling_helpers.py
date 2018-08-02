@@ -10,7 +10,7 @@ import theano.tensor as T
 from shared_modeling_simulation import get_paths, get_alien_paths
 
 
-def load_aliens_data(run_on_cluster, fitted_data_name, verbose):
+def load_aliens_data(run_on_cluster, fitted_data_name, n_subj, verbose):
 
     # Get data path and save path
     paths = get_alien_paths(run_on_cluster)
@@ -18,13 +18,11 @@ def load_aliens_data(run_on_cluster, fitted_data_name, verbose):
         data_dir = paths['human data']
         file_name_pattern = 'aliens*.csv'
         n_trials = 440  # nan trials will be excluded!
-        n_subj = 30
     else:
         learning_style = 'hierarchical'
         data_dir = paths['simulations']
         file_name_pattern = 'aliens' + learning_style + '*.csv'
         n_trials = 463
-        n_subj = 50
 
     # Prepare things for loading data
     filenames = glob.glob(data_dir + file_name_pattern)[:n_subj]
@@ -71,11 +69,7 @@ def load_aliens_data(run_on_cluster, fitted_data_name, verbose):
         print("Choices - shape: {0}\n{1}\n".format(actions.shape, actions))
         print("Rewards - shape: {0}\n{1}\n".format(rewards.shape, rewards))
 
-    return [n_subj,
-            T.as_tensor_variable(seasons),
-            T.as_tensor_variable(aliens),
-            T.as_tensor_variable(actions),
-            T.as_tensor_variable(rewards)]
+    return [n_subj, n_trials, seasons, aliens, actions, rewards]
 
 
 def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only, verbose):

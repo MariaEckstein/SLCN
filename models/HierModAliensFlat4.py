@@ -1,7 +1,8 @@
 import pickle
 
 import theano
-theano.exception_verbosity = 'high'
+import theano.tensor as T
+# theano.exception_verbosity = 'high'
 import matplotlib.pyplot as plt
 
 from shared_modeling_simulation import *
@@ -13,123 +14,127 @@ run_on_cluster = False
 verbose = False
 print_logps = False
 file_name_suff = 'test'
+use_fake_data = False
 
 # Which data should be fitted?
 fitted_data_name = 'humans'  # 'humans', 'simulations'
 
 # Sampling details
-n_samples = 1000
-n_tune = 100
+n_samples = 100
+n_tune = 10
 if run_on_cluster:
     n_cores = 3
 else:
     n_cores = 1
 n_chains = n_cores
 
-# Load to-be-fitted data
-n_subj, seasons, aliens, actions, rewards = load_aliens_data(run_on_cluster, fitted_data_name, verbose)
-subj_range = range(n_subj)
+# Get data
+n_seasons, n_aliens, n_actions = 3, 4, 3
+if use_fake_data:
+    n_subj, n_trials = 2, 10
+    seasons = np.ones([n_trials, n_subj], dtype=int)  # np.random.choice(range(n_seasons), size=[n_trials, n_subj])
+    aliens = np.ones([n_trials, n_subj], dtype=int)  # np.random.choice(range(n_aliens), size=[n_trials, n_subj])
+    actions = np.random.choice(range(n_actions), size=[n_trials, n_subj])
+    rewards = 10 * np.random.rand(n_trials * n_subj).reshape([n_trials, n_subj]).round(2)
+else:
+    n_subj, n_trials, seasons, aliens, actions, rewards = load_aliens_data(run_on_cluster, fitted_data_name, verbose)
 
-# Prepare things for saving
+# Print data
+print('seasons {0}'.format(seasons))
+print('aliens {0}'.format(aliens))
+print('actions {0}'.format(actions))
+print('rewards {0}'.format(rewards))
+
+# Convert data to tensor variables
+seasons = T.as_tensor_variable(seasons)
+aliens = T.as_tensor_variable(aliens)
+actions = T.as_tensor_variable(actions)
+rewards = T.as_tensor_variable(rewards)
+
+# Get save directory and identifier
 save_dir, save_id = get_save_dir_and_save_id(run_on_cluster, file_name_suff, fitted_data_name, n_samples)
 
 # Fit models
 model_dict = {}
 print("Compiling models for {0} with {1} samples and {2} tuning steps...\n".format(fitted_data_name, n_samples, n_tune))
-
-# Fake data
-# p = np.ones([n_trials, n_subj, n_stimuli, n_actions])
-# p[:, :, 0, :] = [1, 0, 0]  # all subj always choose action 0 for stimulus 0
-# p[:, :, 1, :] = [0, 1, 0]  # all subj always choose action 1 for stimulus 1
-# p[:, :, 2, :] = [0, 0, 1]  # all subj always choose action 2 for stimulus 2
-# p = T.as_tensor_variable(p)
-#
-# stim = np.ones([n_trials, n_subj], dtype=int)
-# stim.astype(int)
-# stim = T.as_tensor_variable(stim)
-
-n_trials, n_subj, n_stimuli, n_actions = 5, 2, 4, 3
-# actions = np.array([
-#     np.random.choice(range(n_actions), size=n_trials, p=[.1, .1, .8]),
-#     np.random.choice(range(n_actions), size=n_trials, p=[.1, .8, .1]),
-#     np.random.choice(range(n_actions), size=n_trials, p=[.8, .1, .1])
-#     ]).T
-# actions = T.as_tensor_variable(actions)
-stimuli = np.random.choice(range(n_stimuli), size=[n_trials, n_subj])
-actions = np.random.choice(range(n_actions), size=[n_trials, n_subj])
-rewards = 10 * np.random.rand(n_trials * n_subj).reshape([n_trials, n_subj]).round(2)
-print('actions {0}'.format(actions))
-print('stimuli {0}'.format(stimuli))
-print('rewards {0}'.format(rewards))
-actions = T.as_tensor_variable(actions)
-stimuli = T.as_tensor_variable(stimuli)
-rewards = T.as_tensor_variable(rewards)
-
 with pm.Model() as model:
 
-    # One alpha, one beta per subject
+    # Sample subject parameters
     alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj, testval=np.random.choice([0.1, 0.5], n_subj))
     beta = pm.HalfNormal('beta', sd=5, shape=n_subj, testval=5 * np.random.rand(n_subj).round(2))
     T.printing.Print('beta')(beta)
     T.printing.Print('alpha')(alpha)
 
     # Initialize Q-values
-    # Q = 10 * np.random.rand(n_subj * n_stimuli * n_actions).reshape([n_subj, n_stimuli, n_actions]).round(2)
-    # Q = T.as_tensor_variable(Q)
-    Q0 = alien_initial_Q * T.ones([n_subj, n_stimuli, n_actions])
-    # T.printing.Print('Q trial 0')(Q0)
+    Q0 = alien_initial_Q * T.ones([n_subj, n_seasons, n_aliens, n_actions])
+    if verbose:
+        T.printing.Print('Q trial 0')(Q0)
 
-    def update_Q(stimulus, action, reward, Q, alpha):
+    # Define function to update Q-values based on stimulus, action, and reward
+    def update_Q(season, alien, action, reward, Q, alpha):
         # Loop over trials: take data for all subjects, 1 single trial
         Q_new = Q.copy()
-        # T.printing.Print('Q inside update_Q')(Q_new)
-        # T.printing.Print('stimulus inside update_Q')(stimulus)
-        # T.printing.Print('action inside update_Q')(action)
-        # T.printing.Print('reward inside update_Q')(reward)
-        # T.printing.Print('Q[T.arange(n_subj), stimulus, action]')(Q[T.arange(n_subj), stimulus, action])
-        RPE = alpha * (reward - Q_new[T.arange(n_subj), stimulus, action])
-        # T.printing.Print('RPE')(RPE)
-        Q_new = T.set_subtensor(Q_new[T.arange(n_subj), stimulus, action], RPE)
-        # T.printing.Print('Q_new')(Q_new)
+        RPE = alpha * (reward - Q_new[T.arange(n_subj), season, alien, action])
+
+        if verbose:
+            T.printing.Print('Q inside update_Q')(Q_new)
+            T.printing.Print('alien inside update_Q')(alien)
+            T.printing.Print('action inside update_Q')(action)
+            T.printing.Print('reward inside update_Q')(reward)
+            T.printing.Print('Q[T.arange(n_subj), alien, action]')(Q[T.arange(n_subj), alien, action])
+            T.printing.Print('RPE')(RPE)
+        Q_new = T.set_subtensor(Q_new[T.arange(n_subj), season, alien, action],
+                                Q_new[T.arange(n_subj), season, alien, action] + RPE)
         return Q_new
 
+    # Get Q-values for the whole task (update each trial)
     Q, _ = theano.scan(fn=update_Q,
-                       sequences=[stimuli, actions, rewards],
+                       sequences=[seasons, aliens, actions, rewards],
                        outputs_info=[Q0],
                        non_sequences=[alpha])
-    Q = T.concatenate([[Q0], Q[:-1]], axis=0)  # Add first trial's Q-values, remove last trials Q-values
-    T.printing.Print('Q all subj, all trials')(Q)
 
-    # Transform Q into p
-    def softmax(Q, stimulus, beta):
+    Q = T.concatenate([[Q0], Q[:-1]], axis=0)  # Add first trial's Q-values, remove last trials Q-values
+    if verbose:
+        T.printing.Print('Q all subj, all trials')(Q)
+
+    # Define function to transform Q-values into action probabilities
+    def softmax(Q, season, alien, beta):
         # Loop over subjects within one trial
-        # T.printing.Print('Q inside softmax')(Q)
-        # T.printing.Print('stimulus inside softmax')(stimulus)
-        # T.printing.Print('beta inside softmax')(beta)
-        Q_stim = Q[stimulus]
-        # T.printing.Print('Q_stim')(Q_stim)
+        Q_stim = Q[season, alien]
         Q_exp = T.exp(beta * Q_stim)
-        # T.printing.Print('Q_exp')(Q_exp)
         p = Q_exp / T.sum(Q_exp)
+
+        if verbose:
+            T.printing.Print('Q inside softmax')(Q)
+            T.printing.Print('season inside softmax')(season)
+            T.printing.Print('alien inside softmax')(alien)
+            T.printing.Print('beta inside softmax')(beta)
+            T.printing.Print('Q_stim')(Q_stim)
+            T.printing.Print('Q_exp')(Q_exp)
+            T.printing.Print('p inside softmax')(p)
         return p
 
-    def softmax_wrapper(Q, stimulus, beta):
+    def softmax_trial_wrapper(Q, season, alien, beta):
         # Loop over trials
         p, _ = theano.scan(fn=softmax,
-                           sequences=[Q, stimulus, beta])
+                           sequences=[Q, season, alien, beta])
         # T.printing.Print('p for all subj, 1 trial')(p)
         return p
 
-    p, _ = theano.scan(fn=softmax_wrapper,
-                       sequences=[Q, stimuli],
+    # Transform Q-values into action probabilities for all subj, all trials
+    p, _ = theano.scan(fn=softmax_trial_wrapper,
+                       sequences=[Q, seasons, aliens],
                        non_sequences=[beta])
 
-    T.printing.Print('p all subj, all trials')(p)
     action_wise_p = p.flatten().reshape([n_trials * n_subj, n_actions])
-    T.printing.Print('action_wise_p')(action_wise_p)
-    T.printing.Print('flat actions')(actions.flatten())
 
-    actions = pm.Categorical('actions', p=action_wise_p, observed=actions.flatten())  #, observed=T.ones([3, 10])
+    if verbose:
+        T.printing.Print('p all subj, all trials')(p)
+        T.printing.Print('action_wise_p')(action_wise_p)
+        T.printing.Print('flat actions')(actions.flatten())
+
+    # Select actions
+    actions = pm.Categorical('actions', p=action_wise_p, observed=actions.flatten())
 
     # Check model logp and RV logps (will crash if they are nan or -inf)
     if verbose or print_logps:

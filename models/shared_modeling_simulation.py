@@ -2,7 +2,6 @@ import numpy as np
 
 import pymc3 as pm
 import theano
-import theano.tensor as T
 
 
 alien_initial_Q = 5 / 3
@@ -35,7 +34,7 @@ def get_alien_paths(run_on_cluster):
         base_path = '/home/bunge/maria/Desktop/'
         return {'human data': base_path + '/AlienshumanData/',
                 'fitting results': base_path + '/AliensPyMC3/fitting/',
-                'simulations': base_path + 'AliensPyMC3/PSsimulations/'}
+                'simulations': base_path + 'AliensPyMC3/Aliensimulations/'}
 
     else:
         base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
@@ -51,95 +50,6 @@ def p_from_Q(Q_left, Q_right, beta, eps):
 
     # add eps noise
     return eps * 0.5 + (1 - eps) * p_right
-
-
-# def p_from_Q_aliens(Q0, Q1, Q2, beta):
-
-    # # translate Q-values into probabilities using softmax
-    # Q0_exp = np.exp(beta * Q0)
-    # Q1_exp = np.exp(beta * Q1)
-    # Q2_exp = np.exp(beta * Q2)
-    #
-    # Qsum_exp = Q0_exp + Q1_exp + Q2_exp
-    #
-    # p0 = Q0_exp / Qsum_exp
-    # p1 = Q1_exp / Qsum_exp
-    # p2 = Q2_exp / Qsum_exp
-
-def TS_from_Q_high(Q, beta):
-
-    # Q_exp = np.exp(beta * Q[season, :])
-    # T.printing.Print('Q_exp')(Q_exp)
-
-    Q0_exp = np.exp(beta * Q[0])
-    Q1_exp = np.exp(beta * Q[1])
-    Q2_exp = np.exp(beta * Q[2])
-
-    # Qsum_exp = T.sum(Q_exp, axis=1)
-
-    Qsum_exp = Q0_exp + Q1_exp + Q2_exp
-
-    p0 = Q0_exp / Qsum_exp
-    p1 = Q1_exp / Qsum_exp
-    p2 = Q2_exp / Qsum_exp
-
-    p = T.as_tensor_variable([p0, p1, p2])
-
-    return pm.Categorical('TS', p=p)
-
-
-def action_from_Q_low(Q, beta, action):
-
-    # Q_exp = np.exp(beta * Q[season, :])
-    # T.printing.Print('Q_exp')(Q_exp)
-
-    T.printing.Print('Q_low')(Q)
-    T.printing.Print('beta')(beta)
-    T.printing.Print('action')(action)
-
-    Q0_exp = np.exp(beta * Q[0])
-    Q1_exp = np.exp(beta * Q[1])
-    Q2_exp = np.exp(beta * Q[2])
-
-    # Qsum_exp = T.sum(Q_exp, axis=1)
-
-    Qsum_exp = Q0_exp + Q1_exp + Q2_exp
-
-    p0 = Q0_exp / Qsum_exp
-    p1 = Q1_exp / Qsum_exp
-    p2 = Q2_exp / Qsum_exp
-
-    p = T.as_tensor_variable([p0, p1, p2])
-    T.printing.Print('p_low')(p)
-
-    return pm.Categorical('act', p=p, observed=action)
-
-
-def update_Q_aliens(season, alien, action, reward,  # sequences
-                    Q_low, Q_high,  # output-info
-                    alpha_low, alpha_high, beta_low, beta_high, n_subj  # non-sequences
-                    ):
-
-    # Select TS
-    TS, _ = theano.scan(fn=TS_from_Q_high,
-                        sequences=[Q_high[T.arange(n_subj), season], beta_high])
-
-    # Calculate RPEs at both levels
-    RPE_high = reward - Q_high[T.arange(n_subj), season, TS]
-    RPE_low = reward - Q_low[T.arange(n_subj), TS, alien, action]
-
-    # Update Q-values based on RPEs
-    T.set_subtensor(Q_high[T.arange(n_subj), season, TS],
-                    Q_high[T.arange(n_subj), season, TS] + alpha_high * RPE_high)
-    T.set_subtensor(Q_low[T.arange(n_subj), TS, alien, action],
-                    Q_low[T.arange(n_subj), TS, alien, action] + alpha_low * RPE_low)
-
-    T.printing.Print('RPE_high')(RPE_high)
-    T.printing.Print('RPE_low')(RPE_low)
-
-    # Select action based on Q_low
-    action, _ = theano.scan(fn=action_from_Q_low,
-                            sequences=[Q_low[T.arange(n_subj), TS, alien, :], beta_low, action])
 
 
 def update_Q(reward, choice, Q_left, Q_right, alpha, nalpha, calpha, cnalpha):
