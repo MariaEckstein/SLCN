@@ -5,7 +5,6 @@ import os
 import numpy as np
 import pandas as pd
 import pymc3 as pm
-import theano.tensor as T
 
 from shared_modeling_simulation import get_paths, get_alien_paths
 
