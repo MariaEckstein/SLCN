@@ -12,18 +12,18 @@ from shared_modeling_simulation import *
 
 # Which models should be analyzed and compared?
 create_pairplot = False
-analyze_indiv_models = False
-test_group_differences = True
-compare_models = False
+analyze_indiv_models = True
+test_group_differences = False
+compare_models = True
 
 # file_names = ['RL_3groups/TestGroupDifferences/albenalcal_2018_7_27_21_19_humans_n_samples5000RL',
               # 'Bayes_groups/rew_swi_eps20_2018_7_24_19_16_humans_n_samples5000Bayes'
               # ]
 # model_names = ['albenalcal', 'rew_swi_eps']
 file_names = [
-    # 'RL_3groups/TestGroupDifferences/albecal_2018_7_27_21_16_humans_n_samples5000RL',
-    'RL_3groups/TestGroupDifferences/albenalcal_2018_7_27_21_19_humans_n_samples5000RL',
-    # 'RL_3groups/TestGroupDifferences/albenalcal_2018_7_27_21_31_humans_n_samples5000RL',
+    'AliensFlat/flat_abf_2018_8_9_9_26_humans_n_samples2000aliens',
+    'AliensFlat/flat_s_2018_8_9_9_7_humans_n_samples2000aliens',
+    'AliensFlat/flat_2018_8_8_17_21_humans_n_samples200aliens',
     # 'RL_3groups/TestGroupDifferences/alpha_beta20_2018_7_24_19_4_humans_n_samples5000RL',
     # 'RL_3groups/100s/al_be_cal100_2018_7_25_21_40_humans_n_samples5000RL',
     # 'RL_3groups/100s/al_be_nal_cal100_2018_7_25_21_40_humans_n_samples5000RL',
@@ -33,7 +33,7 @@ file_names = [
 #     'RL_3groups/10s/alpha_beta_calpha_2018_7_24_14_15_humans_n_samples5000RL',
     # 'RL_3groups/10s/alpha_beta_nalpha_calpha_eps_2018_7_24_18_46_humans_n_samples5000RL'
               ]
-model_names = ['albecal', 'albenalcal', 'albenal20', 'albe20', 'albecal100', 'albenalcal100', 'albenal100', 'albe100', 'albe10', 'albecal10', 'albenalcaleps10']
+model_names = ['abf', 's', '...', 'albe20', 'albecal100', 'albenalcal100', 'albenal100', 'albe100', 'albe10', 'albecal10', 'albenalcaleps10']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)

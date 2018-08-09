@@ -1,16 +1,18 @@
 import pickle
 
+import theano
 import theano.tensor as T
 import matplotlib.pyplot as plt
 
 from shared_modeling_simulation import *
 from modeling_helpers import *
 
+
 # Switches for this script
 run_on_cluster = False
-verbose = True
+verbose = False
 print_logps = False
-file_name_suff = 'test_hier'
+file_name_suff = 'hier_abf'
 use_fake_data = False
 
 # Which data should be fitted?
@@ -19,13 +21,13 @@ fitted_data_name = 'humans'  # 'humans', 'simulations'
 # Sampling details
 n_samples = 200
 n_tune = 50
-max_n_subj = 2  # set > 31 to include all subjects
+max_n_subj = 100  # set > 31 to include all subjects
 upper = 10
 if run_on_cluster:
     n_cores = 2
 else:
     n_cores = 1
-n_chains = 1
+n_chains = n_cores
 
 # Get data
 n_seasons, n_TS, n_aliens, n_actions = 3, 3, 4, 3
@@ -36,7 +38,7 @@ if use_fake_data:
     actions = np.ones([n_trials, n_subj], dtype=int)  # np.random.choice(range(n_actions), size=[n_trials, n_subj])
     rewards = 10 * np.ones([n_trials, n_subj])  # np.random.rand(n_trials * n_subj).reshape([n_trials, n_subj]).round(2)
 else:
-    n_subj, n_trials, seasons, aliens, actions, rewards = \
+    n_subj, n_trials, seasons, aliens, actions, rewards =\
         load_aliens_data(run_on_cluster, fitted_data_name, max_n_subj, verbose)
 
 # Print data
@@ -63,90 +65,105 @@ save_dir, save_id = get_save_dir_and_save_id(run_on_cluster, file_name_suff, fit
 model_dict = {}
 print("Compiling models for {0} with {1} samples and {2} tuning steps...\n".format(fitted_data_name, n_samples, n_tune))
 with pm.Model() as model:
-    p = T.as_tensor_variable(np.arange(9).reshape([3, 3]))
+
+    # Priors (crashes if testvals are not specified!)
+    beta_mu_mu = pm.Uniform('beta_mu_mu', lower=0, upper=5, testval=1)
+    beta_mu_sd = pm.Uniform('beta_mu_sd', lower=0, upper=5, testval=0.5)
+    beta_sd_mu = pm.Uniform('beta_sd_mu', lower=0, upper=5, testval=1)
+    beta_sd_sd = pm.Uniform('beta_sd_sd', lower=0, upper=5, testval=0.5)
+    beta_mu = pm.Gamma('beta_mu', mu=beta_mu_mu, sd=beta_mu_sd, testval=1)
+    beta_sd = pm.Gamma('beta_sd', mu=beta_sd_mu, sd=beta_sd_sd, testval=0.5)
+
+    alpha_mu_mu = pm.Uniform('alpha_mu_mu', lower=0, upper=1, testval=0.2)
+    alpha_mu_sd = pm.Uniform('alpha_mu_sd', lower=0, upper=1, testval=0.1)
+    alpha_sd_mu = pm.Uniform('alpha_sd_mu', lower=0, upper=1, testval=0.2)
+    alpha_sd_sd = pm.Uniform('alpha_sd_sd', lower=0, upper=1, testval=0.1)
+    alpha_mu = pm.Beta('alpha_mu', mu=alpha_mu_mu, sd=alpha_mu_sd, testval=0.2)
+    alpha_sd = pm.Beta('alpha_sd', mu=alpha_sd_mu, sd=alpha_sd_sd, testval=0.1)
+
+    forget_mu_mu = pm.Uniform('forget_mu_mu', lower=0, upper=1, testval=0.2)
+    forget_mu_sd = pm.Uniform('forget_mu_sd', lower=0, upper=1, testval=0.1)
+    forget_sd_mu = pm.Uniform('forget_sd_mu', lower=0, upper=1, testval=0.2)
+    forget_sd_sd = pm.Uniform('forget_sd_sd', lower=0, upper=1, testval=0.1)
+    forget_mu = pm.Beta('forget_mu', mu=forget_mu_mu, sd=forget_mu_sd, testval=0.2)
+    forget_sd = pm.Beta('forget_sd', mu=forget_sd_mu, sd=forget_sd_sd, testval=0.1)
 
     # Sample subject parameters
-    alpha_a_a = pm.Uniform('alpha_a_a', lower=0, upper=upper)
-    alpha_a_b = pm.Uniform('alpha_a_b', lower=0, upper=upper)
-    alpha_b_a = pm.Uniform('alpha_b_a', lower=0, upper=upper)
-    alpha_b_b = pm.Uniform('alpha_b_b', lower=0, upper=upper)
-    alpha_a = pm.Gamma('alpha_a', alpha=alpha_a_a, beta=alpha_a_b)
-    alpha_b = pm.Gamma('alpha_b', alpha=alpha_b_a, beta=alpha_b_b)
-    alpha = pm.Beta('alpha', alpha=alpha_a, beta=alpha_b, shape=n_subj, testval=np.random.choice([0.1, 0.5], n_subj))
-
-    beta_a_a = pm.Uniform('beta_a_a', lower=0, upper=upper)
-    beta_a_b = pm.Uniform('beta_a_b', lower=0, upper=upper)
-    beta_b_a = pm.Uniform('beta_b_a', lower=0, upper=upper)
-    beta_b_b = pm.Uniform('beta_b_b', lower=0, upper=upper)
-    beta_a = pm.Gamma('beta_a', alpha=beta_a_a, beta=beta_a_b)
-    beta_b = pm.Gamma('beta_b', alpha=beta_b_a, beta=beta_b_b)
-    beta = pm.Gamma('beta', alpha=beta_a, beta=beta_b, shape=n_subj, testval=5 * np.random.rand(n_subj).round(2))
-    # Bring beta in the same shape as Q _sub([n_trials, n_subj, n_actions])
-    betas = T.tile(T.repeat(beta, n_actions), n_trials).reshape([n_trials, n_subj, n_actions])
-
+    beta = pm.Gamma('beta', mu=beta_mu, sd=beta_sd, shape=n_subj, testval=np.random.choice([0.8, 1.2], n_subj))
     beta_high = beta.copy()
-    # Bring beta_high in the same shape as Q_high_sub ([n_subj, n_actions])
-    beta_highs = T.repeat(beta_high, n_TS).reshape([n_subj, n_TS])
+    alpha = pm.Beta('alpha', mu=alpha_mu, sd=alpha_sd, shape=n_subj, testval=np.random.choice([0.1, 0.5], n_subj))
+    alpha_high = alpha.copy()
+    forget = pm.Beta('forget', mu=forget_mu, sd=forget_sd, shape=n_subj, testval=np.random.choice([0.1, 0.5], n_subj))
+    # forget = T.zeros_like(alpha)
+    forget_high = forget.copy()
 
-    forget_a_a = pm.Uniform('forget_a_a', lower=0, upper=upper)
-    forget_a_b = pm.Uniform('forget_a_b', lower=0, upper=upper)
-    forget_b_a = pm.Uniform('forget_b_a', lower=0, upper=upper)
-    forget_b_b = pm.Uniform('forget_b_b', lower=0, upper=upper)
-    forget_a = pm.Gamma('forget_a', alpha=forget_a_a, beta=forget_a_b)
-    forget_b = pm.Gamma('forget_b', alpha=forget_b_a, beta=forget_b_b)
-    forget = pm.Beta('forget', alpha=forget_a, beta=forget_b, shape=n_subj,
-                     testval=np.random.choice([0.1, 0.5], n_subj))
-    # Bring forget in the same shape as Q_low for 1 trial ([n_subj, n_TS, n_aliens, n_actions])
-    forgets = T.repeat(forget, n_TS * n_aliens * n_actions).reshape([n_subj, n_TS, n_aliens, n_actions])
+    # Adjust shapes for manipulations later-on
+    beta_lows = T.tile(T.repeat(beta, n_actions), n_trials).reshape([n_trials, n_subj, n_actions])    # Q_sub.shape
+    beta_highs = T.repeat(beta_high, n_TS).reshape([n_subj, n_TS])  # Q_high_sub.shape
+
+    forget_lows = T.repeat(forget, n_TS * n_aliens * n_actions).reshape([n_subj, n_TS, n_aliens, n_actions])  # Q_low for 1 trial
+    forget_highs = T.repeat(forget_high, n_seasons * n_TS).reshape([n_subj, n_seasons, n_TS])  # Q_high for 1 trial
 
     if verbose:
         T.printing.Print('beta')(beta)
         T.printing.Print('alpha')(alpha)
         T.printing.Print('forget')(forget)
+        T.printing.Print('beta_high')(beta_high)
+        T.printing.Print('alpha_high')(alpha_high)
+        T.printing.Print('forget_high')(forget_high)
 
     # Initialize Q-values
     Q_low0 = alien_initial_Q * T.ones([n_subj, n_TS, n_aliens, n_actions])
-    Q_high0 = alien_initial_Q * T.ones([n_subj, n_TS, n_aliens, n_actions])
+    Q_high0 = alien_initial_Q * T.ones([n_subj, n_seasons, n_TS])
     if verbose:
         T.printing.Print('Q_low trial 0')(Q_low0)
         T.printing.Print('Q_high trial 0')(Q_high0)
 
-
     # Define function to update Q-values based on stimulus, action, and reward
-    def update_Q_low(season, alien, action, reward, Q_low, Q_high, alpha, forget):
+    def update_Qs(season, alien, action, reward, Q_low, Q_high, alpha_low, alpha_high, beta_high, forget_low, forget_high):
         # Loop over trials: take data for all subjects, 1 single trial
-        Q_high_sub = Q_high[T.arange(n_subj), season]  # TODO: add forget_high
-        T.printing.Print('Q_high_sub.shape')(Q_high_sub.shape)
-        T.printing.Print('Q_high_sub')(Q_high_sub)
 
+        # Select TS
+        Q_high_sub = Q_high[T.arange(n_subj), season]
         p_high = T.exp(beta_high * Q_high_sub)
-        T.printing.Print('p_high.shape')(p_high.shape)
-        T.printing.Print('p_high')(p_high)
+        TS = p_high.argmax(axis=1)  # Select TS deterministically
+        # TS = pm.Categorical('TS', p=p_high, shape=n_subj, testval=np.ones(n_subj), observed=np.random.choice(n_subj))  # Select probabilistically
 
-        TS = pm.Categorical('TS', p=[p_high])  # TODO: Why is it only drawing ONE TS??
-        T.printing.Print('TS')(TS)
+        # Forget Q-values a little bit
+        Q_low_new = (1 - forget_low) * Q_low
+        Q_high_new = (1 - forget_high) * Q_high
 
-        Q_low_new = (1 - forget) * Q_low
-        RPE_low = alpha * (reward - Q_low_new[T.arange(n_subj), season, alien, action])  # TODO: replace season by TS
+        # Calculate RPEs & update Q-values
+        RPE_low = alpha_low * (reward - Q_low_new[T.arange(n_subj), TS, alien, action])
+        Q_low_new = T.set_subtensor(Q_low_new[T.arange(n_subj), TS, alien, action],
+                                    Q_low_new[T.arange(n_subj), TS, alien, action] + RPE_low)
+
+        RPE_high = alpha_high * (reward - Q_high_new[T.arange(n_subj), season, TS])
+        Q_high_new = T.set_subtensor(Q_high_new[T.arange(n_subj), season, TS],
+                                     Q_high_new[T.arange(n_subj), season, TS] + RPE_high)
 
         if verbose:
             T.printing.Print('Q_low.shape')(Q_low.shape)
             T.printing.Print('forget.shape')(forget.shape)
-            T.printing.Print('Q_low inside update_Q_low')(Q_low_new)
-            T.printing.Print('alien inside update_Q_low')(alien)
-            T.printing.Print('action inside update_Q_low')(action)
-            T.printing.Print('reward inside update_Q_low')(reward)
+            T.printing.Print('Q_low inside update_Qs')(Q_low_new)
+            T.printing.Print('alien inside update_Qs')(alien)
+            T.printing.Print('action inside update_Qs')(action)
+            T.printing.Print('reward inside update_Qs')(reward)
             T.printing.Print('RPE_low')(RPE_low)
-        Q_low_new = T.set_subtensor(Q_low_new[T.arange(n_subj), season, alien, action],
-                                    Q_low_new[T.arange(n_subj), season, alien, action] + RPE_low)
-        return Q_low_new, Q_high0
+            T.printing.Print('TS')(TS)
+            T.printing.Print('Q_high_sub.shape')(Q_high_sub.shape)
+            T.printing.Print('Q_high_sub')(Q_high_sub)
+            T.printing.Print('beta_high.shape')(beta_high.shape)
+            T.printing.Print('p_high.shape')(p_high.shape)
+            T.printing.Print('p_high')(p_high)
 
+        return [Q_low_new, Q_high_new]
 
     # Get Q-values for the whole task (update each trial)
-    [Q_low, Q_high], _ = theano.scan(fn=update_Q_low,
+    [Q_low, Q_high], _ = theano.scan(fn=update_Qs,
                                      sequences=[seasons, aliens, actions, rewards],
                                      outputs_info=[Q_low0, Q_high0],
-                                     non_sequences=[alpha, forgets])
+                                     non_sequences=[alpha, alpha_high, beta_highs, forget_lows, forget_highs])
 
     Q_low = T.concatenate([[Q_low0], Q_low[:-1]], axis=0)  # Add first trial's Q-values, remove last trials Q-values
     if verbose:
@@ -157,11 +174,11 @@ with pm.Model() as model:
     if verbose:
         T.printing.Print('Q_subj.shape')(Q_sub.shape)
         T.printing.Print('Q_subj')(Q_sub)
-        T.printing.Print('betas * Q_sub')(betas * Q_sub)
-        T.printing.Print('(betas * Q_sub).shape')((betas * Q_sub).shape)
+        T.printing.Print('beta_lows * Q_sub')(beta_lows * Q_sub)
+        T.printing.Print('(beta_lows * Q_sub).shape')((beta_lows * Q_sub).shape)
 
     # First step to translate into probabilities: apply exp
-    p = T.exp(betas * Q_sub)
+    p = T.exp(beta_lows * Q_sub)
     if verbose:
         T.printing.Print('p')(p)
         T.printing.Print('p.shape')(p.shape)

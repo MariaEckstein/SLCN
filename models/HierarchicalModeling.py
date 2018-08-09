@@ -2,6 +2,7 @@ import pickle
 
 import theano
 from theano.printing import pydotprint
+import theano.tensor as T
 import matplotlib.pyplot as plt
 
 from shared_modeling_simulation import *
