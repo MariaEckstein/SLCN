@@ -12,7 +12,7 @@ from modeling_helpers import *
 run_on_cluster = False
 verbose = True
 print_logps = False
-file_name_suff = 'flat_s'  # e.g., 'flat_abe', 'flat_ab', 'flat_s'
+file_name_suff = 'flat_tilde'  # e.g., 'flat_abe', 'flat_ab', 'flat_s'
 use_fake_data = False
 
 # Which data should be fitted?
@@ -71,32 +71,21 @@ print("Compiling models for {0} with {1} samples and {2} tuning steps...\n".form
 with pm.Model() as model:
 
     # Priors (crashes if testvals are not specified!)
-    beta_mu_mu = pm.Uniform('beta_mu_mu', lower=0, upper=5, testval=1)
-    beta_mu_sd = pm.Uniform('beta_mu_sd', lower=0, upper=5, testval=0.5)
-    beta_sd_mu = pm.Uniform('beta_sd_mu', lower=0, upper=5, testval=1)
-    beta_sd_sd = pm.Uniform('beta_sd_sd', lower=0, upper=5, testval=0.5)
-    beta_mu = pm.Gamma('beta_mu', mu=beta_mu_mu, sd=beta_mu_sd, testval=1)
-    beta_sd = pm.Gamma('beta_sd', mu=beta_sd_mu, sd=beta_sd_sd, testval=0.5)
+    beta_mu = pm.Uniform('beta_mu', lower=0, upper=5, testval=0.1)
+    beta_sd = pm.Uniform('beta_sd', lower=0, upper=5, testval=0.1)
+    beta_matt = pm.Normal('beta_matt', mu=0, sd=1, shape=n_subj, testval=np.random.choice([0.9, 1.1], n_subj))
+    beta = pm.Deterministic('beta', beta_mu + beta_sd * beta_matt)
 
-    alpha_mu_mu = pm.Uniform('alpha_mu_mu', lower=0, upper=1, testval=0.2)
-    alpha_mu_sd = pm.Uniform('alpha_mu_sd', lower=0, upper=1, testval=0.1)
-    alpha_sd_mu = pm.Uniform('alpha_sd_mu', lower=0, upper=1, testval=0.2)
-    alpha_sd_sd = pm.Uniform('alpha_sd_sd', lower=0, upper=1, testval=0.1)
-    alpha_mu = pm.Beta('alpha_mu', mu=alpha_mu_mu, sd=alpha_mu_sd, testval=0.2)
-    alpha_sd = pm.Beta('alpha_sd', mu=alpha_sd_mu, sd=alpha_sd_sd, testval=0.1)
+    alpha_mu = pm.Uniform('alpha_mu', lower=0, upper=1, testval=0.1)
+    alpha_sd = pm.Uniform('alpha_sd', lower=0, upper=1, testval=0.1)
+    alpha_matt = pm.Normal('alpha_matt', mu=0, sd=1, shape=n_subj, testval=np.random.choice([-0.1, 0, 0.1], n_subj))
+    alpha = pm.Deterministic('alpha', alpha_mu + alpha_sd * alpha_matt)
 
-    # forget_mu_mu = pm.Uniform('forget_mu_mu', lower=0, upper=1, testval=0.2)
-    # forget_mu_sd = pm.Uniform('forget_mu_sd', lower=0, upper=1, testval=0.1)
-    # forget_sd_mu = pm.Uniform('forget_sd_mu', lower=0, upper=1, testval=0.2)
-    # forget_sd_sd = pm.Uniform('forget_sd_sd', lower=0, upper=1, testval=0.1)
-    # forget_mu = pm.Beta('forget_mu', mu=forget_mu_mu, sd=forget_mu_sd, testval=0.2)
-    # forget_sd = pm.Beta('forget_sd', mu=forget_sd_mu, sd=forget_sd_sd, testval=0.1)
-
-    # Subject parameters
-    beta = pm.Gamma('beta', mu=beta_mu, sd=beta_sd, shape=n_subj, testval=np.random.choice([0.8, 1.2], n_subj))
-    alpha = pm.Beta('alpha', mu=alpha_mu, sd=alpha_sd, shape=n_subj, testval=np.random.choice([0.1, 0.5], n_subj))
-    # forget = pm.Beta('forget', mu=forget_mu, sd=forget_sd, shape=n_subj, testval=np.random.choice([0.1, 0.5], n_subj))
-    forget = T.zeros_like(alpha)
+    forget_mu = pm.Uniform('forget_mu', lower=0, upper=1, testval=0.1)
+    forget_sd = pm.Uniform('forget_sd', lower=0, upper=1, testval=0.1)
+    forget_matt = pm.Normal('forget_matt', mu=0, sd=1, shape=n_subj, testval=np.random.choice([-0.1, 0, 0.1], n_subj))
+    forget = pm.Deterministic('forget', forget_mu + forget_sd * forget_matt)
+    # forget = T.zeros_like(alpha)
 
     # Adjust shapes for manipulations later-on
     betas = T.tile(T.repeat(beta, n_actions), n_trials).reshape([n_trials, n_subj, n_actions])  # for Q_sub
