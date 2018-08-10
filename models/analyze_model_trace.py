@@ -14,16 +14,16 @@ from shared_modeling_simulation import *
 create_pairplot = False
 analyze_indiv_models = True
 test_group_differences = False
-compare_models = True
+compare_models = False
 
 # file_names = ['RL_3groups/TestGroupDifferences/albenalcal_2018_7_27_21_19_humans_n_samples5000RL',
               # 'Bayes_groups/rew_swi_eps20_2018_7_24_19_16_humans_n_samples5000Bayes'
               # ]
 # model_names = ['albenalcal', 'rew_swi_eps']
 file_names = [
-    'AliensFlat/flat_abf_2018_8_9_9_26_humans_n_samples2000aliens',
-    'AliensFlat/flat_s_2018_8_9_9_7_humans_n_samples2000aliens',
-    'AliensFlat/flat_2018_8_8_17_21_humans_n_samples200aliens',
+    'AliensFlat/flat_abf_2018_8_9_16_1_humans_n_samples2000aliens',
+    'AliensFlat/flat_ab_2018_8_9_16_19_humans_n_samples200aliens',
+    # 'AliensFlat/flat_2018_8_8_17_21_humans_n_samples200aliens',
     # 'RL_3groups/TestGroupDifferences/alpha_beta20_2018_7_24_19_4_humans_n_samples5000RL',
     # 'RL_3groups/100s/al_be_cal100_2018_7_25_21_40_humans_n_samples5000RL',
     # 'RL_3groups/100s/al_be_nal_cal100_2018_7_25_21_40_humans_n_samples5000RL',
@@ -61,17 +61,17 @@ for file_name, model_name in zip(file_names, model_names):
         # Graph (does not seem to exist any more in PyMC3)
         # pydotprint(model.logpt)
 
-        # Plot cumulative means of all parameters
-        for par_name in par_names:
-            param_trace = trace[par_name]
-            mparam_trace = [np.mean(param_trace[:i]) for i in np.arange(1, len(param_trace))]
-            plt.close('all')
-            plt.figure()
-            plt.plot(mparam_trace, lw=2.5)
-            plt.xlabel('Iteration')
-            plt.ylabel('MCMC mean of {0}'.format(par_name))
-            plt.title(model_name)
-            plt.savefig(save_dir + file_name + '_' + par_name + '_cumsumplot.png')
+        # # Plot cumulative means of all parameters
+        # for par_name in par_names:
+        #     param_trace = trace[par_name]
+        #     mparam_trace = [np.mean(param_trace[:i]) for i in np.arange(1, len(param_trace))]
+        #     plt.close('all')
+        #     plt.figure()
+        #     plt.plot(mparam_trace, lw=2.5)
+        #     plt.xlabel('Iteration')
+        #     plt.ylabel('MCMC mean of {0}'.format(par_name))
+        #     plt.title(model_name)
+        #     plt.savefig(save_dir + file_name + '_' + par_name + '_cumsumplot.png')
 
         # display the total number and percentage of divergent
         divergent = trace['diverging']
@@ -80,6 +80,12 @@ for file_name, model_name in zip(file_names, model_names):
         # Rhat should be close to one; number of effective samples > 200
         print('Saving summary of {0} model.'.format(model_name))
         pd.DataFrame(model_summary).to_csv(save_dir + file_name + 'model_summary.csv')
+
+        #
+        # print(model.basic_RVs)
+        pm.pairplot(trace, sub_varnames=['alpha_sd_sd', 'beta_sd_sd'], divergences=True, color='C3',
+                    kwargs_divergence={'color': 'C2'})
+        plt.savefig(save_dir + file_name + '_diagnostic_pairplot')
 
         # Plot traces and parameter estimates
         pm.traceplot(trace)
