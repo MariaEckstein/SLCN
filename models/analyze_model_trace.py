@@ -14,26 +14,30 @@ from shared_modeling_simulation import *
 create_pairplot = False
 analyze_indiv_models = True
 test_group_differences = False
-compare_models = False
+compare_models = True
+calculate_waic = False
 
 # file_names = ['RL_3groups/TestGroupDifferences/albenalcal_2018_7_27_21_19_humans_n_samples5000RL',
               # 'Bayes_groups/rew_swi_eps20_2018_7_24_19_16_humans_n_samples5000Bayes'
               # ]
 # model_names = ['albenalcal', 'rew_swi_eps']
 file_names = [
-    'AliensFlat/flat_abf_2018_8_9_16_1_humans_n_samples2000aliens',
-    'AliensFlat/flat_ab_2018_8_9_16_19_humans_n_samples200aliens',
-    # 'AliensFlat/flat_2018_8_8_17_21_humans_n_samples200aliens',
-    # 'RL_3groups/TestGroupDifferences/alpha_beta20_2018_7_24_19_4_humans_n_samples5000RL',
-    # 'RL_3groups/100s/al_be_cal100_2018_7_25_21_40_humans_n_samples5000RL',
-    # 'RL_3groups/100s/al_be_nal_cal100_2018_7_25_21_40_humans_n_samples5000RL',
+    # 'AliensFlat/flat_s_2018_8_9_16_2_humans_n_samples2000aliens',
+    'AliensFlat/fs_ab_2018_8_11_13_12_humans_n_samples500aliens',
+    'AliensFlat/fs_abf_2018_8_11_13_27_humans_n_samples500aliens',
+    # 'AliensFlat/flat_tilde_ta99_abf_2018_8_10_14_58_humans_n_samples300aliens',
+    # 'AliensFlat/hier_ab_2018_8_9_16_26_humans_n_samples200aliens',
+    # 'AliensFlat/hier_abf_2018_8_9_16_26_humans_n_samples200aliens',
+    # 'AliensFlat/test_flat_long_2018_8_2_1_1_humans_n_samples1000aliens',
+    # 'AliensFlat/test_hier_2018_8_2_9_25_humans_n_samples100aliens',
+    # 'AliensFlat/test_hier_2018_8_2_10_11_humans_n_samples200aliens'
 #     'RL_3groups/100s/al_be_nal100_2018_7_25_21_38_humans_n_samples5000RL',
 #     'RL_3groups/100s/alpha_beta100_2018_7_25_21_20_humans_n_samples5000RL',
 #     'RL_3groups/10s/alpha_beta_2018_7_24_14_11_humans_n_samples5000RL',
 #     'RL_3groups/10s/alpha_beta_calpha_2018_7_24_14_15_humans_n_samples5000RL',
     # 'RL_3groups/10s/alpha_beta_nalpha_calpha_eps_2018_7_24_18_46_humans_n_samples5000RL'
               ]
-model_names = ['abf', 's', '...', 'albe20', 'albecal100', 'albenalcal100', 'albenal100', 'albe100', 'albe10', 'albecal10', 'albenalcaleps10']
+model_names = ['fs', 'fabf', 'fabf', 'fabf', 'hab', 'habf', 'f', 'h', 'h', 'albecal10', 'albenalcaleps10']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)
@@ -83,9 +87,9 @@ for file_name, model_name in zip(file_names, model_names):
 
         #
         # print(model.basic_RVs)
-        pm.pairplot(trace, sub_varnames=['alpha_sd_sd', 'beta_sd_sd'], divergences=True, color='C3',
-                    kwargs_divergence={'color': 'C2'})
-        plt.savefig(save_dir + file_name + '_diagnostic_pairplot')
+        # pm.pairplot(trace, sub_varnames=['alpha_sd', 'beta_sd'], divergences=True, color='C3',
+        #             kwargs_divergence={'color': 'C2'})
+        # plt.savefig(save_dir + file_name + '_diagnostic_pairplot')
 
         # Plot traces and parameter estimates
         pm.traceplot(trace)
@@ -95,8 +99,9 @@ for file_name, model_name in zip(file_names, model_names):
         print("Saved traces for {0} model to {1}{2}.".format(model_name, save_dir, file_name))
 
         # Get model WAICs
-        waic = pm.waic(trace, model)
-        print("WAIC of {0} model: {1}".format(model_name, waic.WAIC))
+        if calculate_waic:
+            waic = pm.waic(trace, model)
+            print("WAIC of {0} model: {1}".format(model_name, waic.WAIC))
 
     # Plot divergent samples to identify problematic neighborhoods in parameter space
     if create_pairplot:

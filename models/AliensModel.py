@@ -12,7 +12,7 @@ from modeling_helpers import *
 # Switches for this script
 run_on_cluster = False
 print_logps = False
-file_name_suff = 'hier_tilde_ta80_ab'  # flat vs hier models: use update_Q_low vs update_Qs inside theano.scan
+file_name_suff = 'fs_ab'  # flat vs hier models: use update_Q_low vs update_Qs inside theano.scan
 use_fake_data = False
 
 # Which data should be fitted?
@@ -39,6 +39,9 @@ if use_fake_data:
 else:
     n_subj, n_trials, seasons, aliens, actions, rewards =\
         load_aliens_data(run_on_cluster, fitted_data_name, max_n_subj, verbose)
+
+if 'fs' in file_name_suff:
+    seasons = np.zeros(seasons.shape, dtype=int)
 
 # Convert data to tensor variables
 seasons = T.as_tensor_variable(seasons)
@@ -80,10 +83,10 @@ with pm.Model() as model:
     forget_high = forget.copy()
 
     # Adjust shapes for manipulations later-on
-    beta_lows = T.tile(T.repeat(beta, n_actions), n_trials).reshape([n_trials, n_subj, n_actions])    # Q_sub.shape
+    betas = T.tile(T.repeat(beta, n_actions), n_trials).reshape([n_trials, n_subj, n_actions])    # Q_sub.shape
     beta_highs = T.repeat(beta_high, n_TS).reshape([n_subj, n_TS])  # Q_high_sub.shape
 
-    forget_lows = T.repeat(forget, n_TS * n_aliens * n_actions).reshape([n_subj, n_TS, n_aliens, n_actions])  # Q_low for 1 trial
+    forgets = T.repeat(forget, n_TS * n_aliens * n_actions).reshape([n_subj, n_TS, n_aliens, n_actions])  # Q_low for 1 trial
     forget_highs = T.repeat(forget_high, n_seasons * n_TS).reshape([n_subj, n_seasons, n_TS])  # Q_high for 1 trial
 
     # Initialize Q-values
@@ -94,7 +97,7 @@ with pm.Model() as model:
     [Q_low, Q_high], _ = theano.scan(fn=update_Q_low,  # hierarchical model -> update_Qs; flat -> update_Q_low
                                      sequences=[seasons, aliens, actions, rewards],
                                      outputs_info=[Q_low0, Q_high0],
-                                     non_sequences=[alpha, alpha_high, beta_highs, forget_lows, forget_highs, n_subj])
+                                     non_sequences=[alpha, alpha_high, beta_highs, forgets, forget_highs, n_subj])
 
     Q_low = T.concatenate([[Q_low0], Q_low[:-1]], axis=0)  # Add first trial's Q-values, remove last trials Q-values
     T.printing.Print("Q_low")(Q_low)
@@ -103,7 +106,7 @@ with pm.Model() as model:
     Q_sub = Q_low[trials, subj, seasons, aliens]
 
     # First step to translate into probabilities: apply exp
-    p = T.exp(beta_lows * Q_sub)
+    p = T.exp(betas * Q_sub)
 
     # Bring p in the correct shape for pm.Categorical: 2-d array of trials
     action_wise_p = p.reshape([n_trials * n_subj, n_actions])

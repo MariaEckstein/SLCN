@@ -24,23 +24,37 @@ class Task(object):
                              [1, 3, 1],
                              [2, 1, 1]]])
 
-    def get_trial_sequence(self, file_path):
+    def get_trial_sequence(self, file_paths):
 
-        agent_data = pd.read_csv(file_path)
+        for file_path in file_paths:
+            agent_data = pd.read_csv(file_path)
 
-        # Remove all rows that do not contain 1InitialLearning data (-> jsPysch format)
-        agent_data = agent_data.rename(columns={'TS': 'context'})  # rename "TS" column to "context"
-        context_names = [str(TS) for TS in range(3)]
-        item_names = range(4)
-        phases = ["1InitialLearning", "Refresher2", "Refresher3"]
-        agent_data = agent_data.loc[(agent_data['context'].isin(context_names)) &
-                                    (agent_data['item_chosen'].isin(item_names)) &
-                                    (agent_data['phase'].isin(phases))]
+            # Remove all rows that do not contain 1InitialLearning data (-> jsPysch format)
+            agent_data = agent_data.rename(columns={'TS': 'context'})  # rename "TS" column to "context"
+            context_names = [str(TS) for TS in range(3)]
+            phases = ["1InitialLearning", "Refresher2", "Refresher3"]
+            agent_data = agent_data.loc[(agent_data['context'].isin(context_names)) &
+                                        (agent_data['phase'].isin(phases))]
+
+            # Read out sequence of seasons and aliens
+            try:
+                seasons = np.hstack([seasons, agent_data["context"]])
+                aliens = np.hstack([aliens, agent_data["sad_alien"]])
+                phase = np.hstack([phase, agent_data["phase"]])
+            except:
+                seasons = agent_data["context"]
+                aliens = agent_data["sad_alien"]
+                phase = agent_data["phase"]
+
+        # Bring into right shape
         n_trials = agent_data.shape[0]
+        seasons = seasons.reshape([len(file_paths), n_trials]).T
+        aliens = aliens.reshape([len(file_paths), n_trials]).T
 
         # Read out sequence of seasons and aliens
-        self.seasons = np.tile(agent_data["context"], self.n_subj).reshape([self.n_subj, n_trials]).astype(int).T
-        self.aliens = np.tile(agent_data["sad_alien"], self.n_subj).reshape([self.n_subj, n_trials]).astype(int).T
+        replic = int(np.ceil(self.n_subj / len(file_paths)))
+        self.seasons = np.tile(seasons, replic).astype(int)
+        self.aliens = np.tile(aliens, replic).astype(int)
         self.phase = agent_data["phase"]
 
         return n_trials
@@ -48,8 +62,8 @@ class Task(object):
     def present_stimulus(self, trial):
 
         # Look up alien and context for current trial
-        self.alien = self.aliens[trial, :]
-        self.season = self.seasons[trial, :]
+        self.alien = self.aliens[trial, :self.n_subj]
+        self.season = self.seasons[trial, :self.n_subj]
 
         # Look up alien and season for current trial
         return self.season, self.alien
