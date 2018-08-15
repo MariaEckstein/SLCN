@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import glob
+import os
 
 
 class Task(object):
@@ -24,37 +26,40 @@ class Task(object):
                              [1, 3, 1],
                              [2, 1, 1]]])
 
-    def get_trial_sequence(self, file_paths):
+    def get_trial_sequence(self, file_path, n_subj):
+        '''
+        Get trial sequences of human participants.
+        Read in datafiles of all participants, select InitialLearning, Refresher2, and Refresher3,
+        and get seasons and aliens in each trial.
+        :param file_path: path to human datafiles
+        :param n_subj: number of files to be red in
+        :return: n_trials: number of trials in each file
+        '''
 
-        for file_path in file_paths:
-            agent_data = pd.read_csv(file_path)
+        filenames = glob.glob(os.path.join(file_path, '*.csv'))
+        for filename in filenames[:n_subj]:
+            agent_data = pd.read_csv(filename)
 
             # Remove all rows that do not contain 1InitialLearning data (-> jsPysch format)
-            agent_data = agent_data.rename(columns={'TS': 'context'})  # rename "TS" column to "context"
-            context_names = [str(TS) for TS in range(3)]
+            TS_names = [str(TS) for TS in range(3)]
             phases = ["1InitialLearning", "Refresher2", "Refresher3"]
-            agent_data = agent_data.loc[(agent_data['context'].isin(context_names)) &
+            agent_data = agent_data.loc[(agent_data['TS'].isin(TS_names)) &
                                         (agent_data['phase'].isin(phases))]
 
             # Read out sequence of seasons and aliens
             try:
-                seasons = np.hstack([seasons, agent_data["context"]])
+                seasons = np.hstack([seasons, agent_data["TS"]])
                 aliens = np.hstack([aliens, agent_data["sad_alien"]])
                 phase = np.hstack([phase, agent_data["phase"]])
-            except:
-                seasons = agent_data["context"]
+            except NameError:
+                seasons = agent_data["TS"]
                 aliens = agent_data["sad_alien"]
                 phase = agent_data["phase"]
 
         # Bring into right shape
         n_trials = agent_data.shape[0]
-        seasons = seasons.reshape([len(file_paths), n_trials]).T
-        aliens = aliens.reshape([len(file_paths), n_trials]).T
-
-        # Read out sequence of seasons and aliens
-        replic = int(np.ceil(self.n_subj / len(file_paths)))
-        self.seasons = np.tile(seasons, replic).astype(int)
-        self.aliens = np.tile(aliens, replic).astype(int)
+        self.seasons = seasons.reshape([n_subj, n_trials]).astype(int).T
+        self.aliens = aliens.reshape([n_subj, n_trials]).astype(int).T
         self.phase = agent_data["phase"]
 
         return n_trials
