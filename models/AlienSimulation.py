@@ -8,10 +8,10 @@ from shared_aliens import *
 from AlienTask import Task
 
 # Switches for this script
-model_name = "flat_abfhigh0"
+model_name = "hier_abf_randTS"
 verbose = False
 max_n_subj = 20  # must be > 1
-# model_to_be_simulated = 'AliensFlat/flat_2018_8_8_17_36_humans_n_samples200aliens'
+# model_to_be_simulated = 'AliensFlat/flat_tilde_ta80_abf_2018_8_10_13_52_humans_n_samples300aliens'
 model_to_be_simulated = 'none'
 
 # Get save path
@@ -24,8 +24,8 @@ if model_to_be_simulated == 'none':
     n_subj = max_n_subj
     alpha = 0.2 * np.ones(n_subj)
     beta = 5 * np.ones(n_subj)
-    forget = 0.05 * np.ones(n_subj)
-    forget_high = np.zeros(n_subj)  # forget.copy()  #
+    forget = 0.05 * np.ones(n_subj)  # np.zeros(n_subj)  #
+    forget_high = 0.05 * np.ones(n_subj)  # forget.copy()  # np.zeros(n_subj)  #
 
 # Load fitted parameters
 else:
@@ -36,17 +36,23 @@ else:
         model_summary = data['summary']
         model = data['model']
 
-    alpha_idx = [idx for idx in model_summary.index if 'alpha' in idx and '_mu' not in idx and 'high' not in idx]
+    alpha_idx = [idx for idx in model_summary.index if 'alpha' in idx
+                 and '_mu' not in idx and 'sd' not in idx and 'high' not in idx and 'matt' not in idx]
     alpha = model_summary.loc[alpha_idx[:max_n_subj], 'mean'].values
 
-    beta_idx = [idx for idx in model_summary.index if 'beta' in idx and '_mu' not in idx and 'high' not in idx]
+    beta_idx = [idx for idx in model_summary.index if 'beta' in idx
+                 and '_mu' not in idx and 'sd' not in idx and 'high' not in idx and 'matt' not in idx]
     beta = model_summary.loc[beta_idx[:max_n_subj], 'mean'].values
 
-    forget_idx = [idx for idx in model_summary.index if 'forget' in idx and '_mu' not in idx and 'high' not in idx]
+    forget_idx = [idx for idx in model_summary.index if 'forget' in idx
+                 and '_mu' not in idx and 'sd' not in idx and 'high' not in idx and 'matt' not in idx]
     forget = model_summary.loc[forget_idx[:max_n_subj], 'mean'].values
 
-    forget_high_idx = [idx for idx in model_summary.index if 'forget_high' in idx and '_mu' not in idx]
+    forget_high_idx = [idx for idx in model_summary.index if 'forget_high' in idx
+                       and '_mu' not in idx and '_sd' not in idx and 'matt' not in idx]
     forget_high = model_summary.loc[forget_high_idx[:max_n_subj], 'mean'].values
+    if not forget_high:
+        forget_high = forget.copy()
 
 alpha_high = alpha.copy()
 beta_high = beta.copy()
@@ -65,19 +71,7 @@ n_season_repetitions = np.array([3, 2, 2])  # InitialLearning, Refresher2, Refre
 
 # Initialize task
 task = Task(n_subj)
-n_trials = task.get_trial_sequence(["C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens134.csv",
-                                    "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens135.csv",
-                                    "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens136.csv",
-                                    "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens137.csv",
-                                    "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens138.csv",
-                                    "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens139.csv",
-                                    "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens140.csv",
-                                    "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens141.csv",
-                                    "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens142.csv",
-                                    "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens143.csv",
-                                    "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens144.csv",
-                                    "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens145.csv",
-                                    "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/aliens164.csv"])
+n_trials = task.get_trial_sequence("C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/", n_subj)
 
 # For saving data
 seasons = np.zeros([n_trials, n_subj], dtype=int)
@@ -120,8 +114,8 @@ for trial in range(np.sum(n_trials)):
     reward, correct = task.produce_reward(action)
 
     # Update Q-values
-    [Q_low, Q_high] = update_Q_low_sim(season, alien, action, reward, Q_low, Q_high, alpha,
-                                       alpha_high, beta_highs, forgets, forget_highs, n_subj,
+    [Q_low, Q_high] = update_Qs_sim(season, alien, action, reward, Q_low, Q_high, alpha,
+                                    alpha_high, beta_highs, forgets, forget_highs, n_subj,
                                     verbose=verbose)
 
     if verbose:
