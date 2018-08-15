@@ -21,7 +21,7 @@ from modeling_helpers import *
 run_on_cluster = False
 verbose = False
 print_logps = False
-file_name_suff = 'albenalcal_matt'
+file_name_suff = 'abn'
 model_names = ('RL', '')
 
 # Which data should be fitted?
@@ -31,7 +31,7 @@ adults_only = False
 
 # Sampling details
 n_samples = 100
-n_tune = 100
+n_tune = 10
 n_cores = 1
 n_chains = 1
 
@@ -52,15 +52,16 @@ for model_name in model_names:
     with pm.Model() as model:
 
         # Get population-level and individual parameters
-        # eps_a_a = pm.Uniform('eps_a_a', lower=0, upper=upper)
-        # eps_a_sd = pm.Uniform('eps_a_sd', lower=0, upper=upper)
-        # eps_sd_a = pm.Uniform('eps_sd_a', lower=0, upper=upper)
-        # eps_sd_sd = pm.Uniform('eps_sd_sd', lower=0, upper=upper)
-        # eps_a = pm.Gamma('eps_a', alpha=eps_a_a, sd=eps_a_sd, shape=n_groups)
-        # eps_sd = pm.Gamma('eps_sd', alpha=eps_sd_a, sd=eps_sd_sd, shape=n_groups)
-        # eps = pm.Beta('eps', alpha=eps_a[group], sd=eps_sd[group], shape=n_subj)
-        eps = T.as_tensor_variable(0)
-        #
+        # beta_mu_mu = pm.Uniform('beta_mu_mu', lower=0, upper=20, testval=5)
+        # beta_mu_sd = pm.Uniform('beta_mu_sd', lower=0, upper=20, testval=5)
+        # beta_sd_mu = pm.Uniform('beta_sd_mu', lower=0, upper=20, testval=5)
+        # beta_sd_sd = pm.Uniform('beta_sd_sd', lower=0, upper=20, testval=5)
+        # beta_mu_matt = pm.Normal('beta_mu_matt', mu=0, sd=1, shape=n_groups, testval=T.zeros(n_groups))
+        # beta_sd_matt = pm.Normal('beta_sd_matt', mu=0, sd=1, shape=n_groups, testval=T.zeros(n_groups))
+        # beta_matt = pm.Normal('beta_matt', mu=0, sd=1, shape=n_subj, testval=T.zeros(n_subj))
+        # beta_mu = pm.Deterministic('beta_mu', beta_mu_mu + beta_mu_matt * beta_mu_sd)
+        # beta_sd = pm.Deterministic('beta_sd', beta_sd_mu + beta_sd_matt * beta_sd_sd)
+        # beta = pm.Deterministic('beta', beta_mu[group] + beta_matt * beta_sd[group])
         beta_mu_mu = pm.Uniform('beta_mu_mu', lower=0, upper=20, testval=5)
         beta_mu_sd = pm.Uniform('beta_mu_sd', lower=0, upper=20, testval=5)
         beta_sd_mu = pm.Uniform('beta_sd_mu', lower=0, upper=20, testval=5)
@@ -68,13 +69,11 @@ for model_name in model_names:
         beta_mu = pm.Gamma('beta_mu', mu=beta_mu_mu, sd=beta_mu_sd, shape=n_groups, testval=5 * T.ones(n_groups))
         beta_sd = pm.Gamma('beta_sd', mu=beta_sd_mu, sd=beta_sd_sd, shape=n_groups, testval=2 * T.ones(n_groups))
         beta = pm.Gamma('beta', mu=beta_mu[group], sd=beta_sd[group], shape=n_subj, testval=5 * T.ones(n_subj))
-        # beta_matt = pm.Normal('beta_matt', mu=0, sd=1, shape=n_subj, testval=np.random.choice([-0.5, 0.5]))
-        # beta = pm.Deterministic('beta', beta_mu[group] + beta_matt * beta_sd[group])
-        # beta = T.as_tensor_variable(0)
 
         # beta_mu_diff01 = pm.Deterministic('beta_mu_diff01', beta_mu[0] - beta_mu[1])
         # beta_mu_diff02 = pm.Deterministic('beta_mu_diff02', beta_mu[0] - beta_mu[2])
         # beta_mu_diff12 = pm.Deterministic('beta_mu_diff12', beta_mu[1] - beta_mu[2])
+        eps = T.as_tensor_variable(0)
 
         if model_name == 'Bayes':
 
