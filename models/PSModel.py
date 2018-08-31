@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 from shared_modeling_simulation import *
 from modeling_helpers import *
+import pymc3 as pm
 
 # par_a_a ~ U[0,20] instead of U[0,10]?
 # sigmoid: tt.nnet.sigmoid(est)/11
@@ -17,13 +18,13 @@ from modeling_helpers import *
 
 
 # Switches for this script
-run_on_cluster = True
+run_on_cluster = False
 verbose = False
 print_logps = False
-file_name_suff = 'albenalcal'
+file_name_suff = 'albenal'
 model_names = ('RL', '')
 
-upper = 100
+upper = 1000
 
 # Which data should be fitted?
 fitted_data_name = 'humans'  # 'humans', 'simulations'
@@ -31,16 +32,13 @@ kids_and_teens_only = False
 adults_only = False
 
 # Sampling details
-n_samples = 5000
-n_tune = 1000
-if run_on_cluster:
-    n_cores = 3
-else:
-    n_cores = 1
-n_chains = n_cores
+n_samples = 50
+n_tune = 10
+n_cores = 1
+n_chains = 1
 
 # Load to-be-fitted data
-n_subj, rewards, choices, age, group, n_groups = load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only, verbose)
+n_subj, rewards, choices, group, n_groups = load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only, verbose)
 
 # Prepare things for saving
 save_dir, save_id = get_save_dir_and_save_id(run_on_cluster, file_name_suff, fitted_data_name, n_samples)
@@ -56,15 +54,6 @@ for model_name in model_names:
     with pm.Model() as model:
 
         # Get population-level and individual parameters
-        # eps_a_a = pm.Uniform('eps_a_a', lower=0, upper=upper)
-        # eps_a_b = pm.Uniform('eps_a_b', lower=0, upper=upper)
-        # eps_b_a = pm.Uniform('eps_b_a', lower=0, upper=upper)
-        # eps_b_b = pm.Uniform('eps_b_b', lower=0, upper=upper)
-        # eps_a = pm.Gamma('eps_a', alpha=eps_a_a, beta=eps_a_b, shape=n_groups)
-        # eps_b = pm.Gamma('eps_b', alpha=eps_b_a, beta=eps_b_b, shape=n_groups)
-        # eps = pm.Beta('eps', alpha=eps_a[group], beta=eps_b[group], shape=n_subj)
-        eps = T.as_tensor_variable(0)
-        #
         beta_a_a = pm.Uniform('beta_a_a', lower=0, upper=upper)
         beta_a_b = pm.Uniform('beta_a_b', lower=0, upper=upper)
         beta_b_a = pm.Uniform('beta_b_a', lower=0, upper=upper)
@@ -73,13 +62,16 @@ for model_name in model_names:
         beta_b = pm.Gamma('beta_b', alpha=beta_b_a, beta=beta_b_b, shape=n_groups)
         beta = pm.Gamma('beta', alpha=beta_a[group], beta=beta_b[group], shape=n_subj)
         # beta = T.as_tensor_variable(0)
+        eps = T.as_tensor_variable(0)
 
-        beta_a_diff01 = pm.Deterministic('beta_a_diff01', beta_a[0] - beta_a[1])
-        beta_a_diff02 = pm.Deterministic('beta_a_diff02', beta_a[0] - beta_a[2])
-        beta_a_diff12 = pm.Deterministic('beta_a_diff12', beta_a[1] - beta_a[2])
-        beta_b_diff01 = pm.Deterministic('beta_b_diff01', beta_b[0] - beta_b[1])
-        beta_b_diff02 = pm.Deterministic('beta_b_diff02', beta_b[0] - beta_b[2])
-        beta_b_diff12 = pm.Deterministic('beta_b_diff12', beta_b[1] - beta_b[2])
+        # Beta mu and var and group differences
+        beta_mu = pm.Deterministic(
+            'beta_mu', beta_a / beta_b)
+        beta_var = pm.Deterministic(
+            'beta_var', beta_a / np.square(beta_b))
+        beta_mu_diff01 = pm.Deterministic('beta_mu_diff01', beta_a[0] - beta_a[1])
+        beta_mu_diff02 = pm.Deterministic('beta_mu_diff02', beta_a[0] - beta_a[2])
+        beta_mu_diff12 = pm.Deterministic('beta_mu_diff12', beta_a[1] - beta_a[2])
 
         if model_name == 'Bayes':
 
@@ -147,34 +139,40 @@ for model_name in model_names:
             cnalpha_sc = pm.Deterministic('cnalpha_sc', calpha_sc.copy())
             cnalpha = pm.Deterministic('cnalpha', nalpha * cnalpha_sc)
 
+            # Get parameter means and variances
+            alpha_mu = pm.Deterministic(
+                'alpha_mu', 1 / (1 + alpha_b / alpha_a))
+            alpha_var = pm.Deterministic(
+                'alpha_var', (alpha_a * alpha_b) / (np.square(alpha_a + alpha_b) * (alpha_a + alpha_b + 1)))
+            nalpha_mu = pm.Deterministic(
+                'nalpha_mu', 1 / (1 + nalpha_b / nalpha_a))
+            nalpha_var = pm.Deterministic(
+                'nalpha_var', (nalpha_a * nalpha_b) / (np.square(nalpha_a + nalpha_b) * (nalpha_a + nalpha_b + 1)))
+            # calpha_sc_mu = pm.Deterministic(
+            #     'calpha_sc_mu', 1 / (1 + calpha_sc_b / calpha_sc_a))
+            # calpha_sc_var = pm.Deterministic(
+            #     'calpha_sc_var', (calpha_sc_a * calpha_sc_b) / (np.square(calpha_sc_a + calpha_sc_b) * (calpha_sc_a + calpha_sc_b + 1)))
+            # cnalpha_sc_mu = pm.Deterministic(
+            #     'cnalpha_sc_mu', 1 / (1 + cnalpha_sc_b / cnalpha_sc_a))
+            # cnalpha_sc_var = pm.Deterministic(
+            #     'cnalpha_sc_var', (cnalpha_sc_a * cnalpha_sc_b) / (np.square(cnalpha_sc_a + cnalpha_sc_b) * (cnalpha_sc_a + cnalpha_sc_b + 1)))
+
             # Group differences?
-            alpha_a_diff01 = pm.Deterministic('alpha_a_diff01', alpha_a[0] - alpha_a[1])
-            alpha_a_diff02 = pm.Deterministic('alpha_a_diff02', alpha_a[0] - alpha_a[2])
-            alpha_a_diff12 = pm.Deterministic('alpha_a_diff12', alpha_a[1] - alpha_a[2])
-            alpha_b_diff01 = pm.Deterministic('alpha_b_diff01', alpha_b[0] - alpha_b[1])
-            alpha_b_diff02 = pm.Deterministic('alpha_b_diff02', alpha_b[0] - alpha_b[2])
-            alpha_b_diff12 = pm.Deterministic('alpha_b_diff12', alpha_b[1] - alpha_b[2])
+            alpha_mu_diff01 = pm.Deterministic('alpha_mu_diff01', alpha_a[0] - alpha_a[1])
+            alpha_mu_diff02 = pm.Deterministic('alpha_mu_diff02', alpha_a[0] - alpha_a[2])
+            alpha_mu_diff12 = pm.Deterministic('alpha_mu_diff12', alpha_a[1] - alpha_a[2])
 
-            nalpha_a_diff01 = pm.Deterministic('nalpha_a_diff01', nalpha_a[0] - nalpha_a[1])
-            nalpha_a_diff02 = pm.Deterministic('nalpha_a_diff02', nalpha_a[0] - nalpha_a[2])
-            nalpha_a_diff12 = pm.Deterministic('nalpha_a_diff12', nalpha_a[1] - nalpha_a[2])
-            nalpha_b_diff01 = pm.Deterministic('nalpha_b_diff01', nalpha_b[0] - nalpha_b[1])
-            nalpha_b_diff02 = pm.Deterministic('nalpha_b_diff02', nalpha_b[0] - nalpha_b[2])
-            nalpha_b_diff12 = pm.Deterministic('nalpha_b_diff12', nalpha_b[1] - nalpha_b[2])
+            nalpha_mu_diff01 = pm.Deterministic('nalpha_mu_diff01', nalpha_a[0] - nalpha_a[1])
+            nalpha_mu_diff02 = pm.Deterministic('nalpha_mu_diff02', nalpha_a[0] - nalpha_a[2])
+            nalpha_mu_diff12 = pm.Deterministic('nalpha_mu_diff12', nalpha_a[1] - nalpha_a[2])
 
-            # calpha_sc_a_diff01 = pm.Deterministic('calpha_sc_a_diff01', calpha_sc_a[0] - calpha_sc_a[1])
-            # calpha_sc_a_diff02 = pm.Deterministic('calpha_sc_a_diff02', calpha_sc_a[0] - calpha_sc_a[2])
-            # calpha_sc_a_diff12 = pm.Deterministic('calpha_sc_a_diff12', calpha_sc_a[1] - calpha_sc_a[2])
-            # calpha_sc_b_diff01 = pm.Deterministic('calpha_sc_b_diff01', calpha_sc_b[0] - calpha_sc_b[1])
-            # calpha_sc_b_diff02 = pm.Deterministic('calpha_sc_b_diff02', calpha_sc_b[0] - calpha_sc_b[2])
-            # calpha_sc_b_diff12 = pm.Deterministic('calpha_sc_b_diff12', calpha_sc_b[1] - calpha_sc_b[2])
+            # calpha_sc_mu_diff01 = pm.Deterministic('calpha_sc_mu_diff01', calpha_sc_a[0] - calpha_sc_a[1])
+            # calpha_sc_mu_diff02 = pm.Deterministic('calpha_sc_mu_diff02', calpha_sc_a[0] - calpha_sc_a[2])
+            # calpha_sc_mu_diff12 = pm.Deterministic('calpha_sc_mu_diff12', calpha_sc_a[1] - calpha_sc_a[2])
             #
-            # cnalpha_sc_a_diff01 = pm.Deterministic('cnalpha_sc_a_diff01', cnalpha_sc_a[0] - cnalpha_sc_a[1])
-            # cnalpha_sc_a_diff02 = pm.Deterministic('cnalpha_sc_a_diff02', cnalpha_sc_a[0] - cnalpha_sc_a[2])
-            # cnalpha_sc_a_diff12 = pm.Deterministic('cnalpha_sc_a_diff12', cnalpha_sc_a[1] - cnalpha_sc_a[2])
-            # cnalpha_sc_b_diff01 = pm.Deterministic('cnalpha_sc_b_diff01', cnalpha_sc_b[0] - cnalpha_sc_b[1])
-            # cnalpha_sc_b_diff02 = pm.Deterministic('cnalpha_sc_b_diff02', cnalpha_sc_b[0] - cnalpha_sc_b[2])
-            # cnalpha_sc_b_diff12 = pm.Deterministic('cnalpha_sc_b_diff12', cnalpha_sc_b[1] - cnalpha_sc_b[2])
+            # cnalpha_sc_mu_diff01 = pm.Deterministic('cnalpha_sc_mu_diff01', cnalpha_sc_a[0] - cnalpha_sc_a[1])
+            # cnalpha_sc_mu_diff02 = pm.Deterministic('cnalpha_sc_mu_diff02', cnalpha_sc_a[0] - cnalpha_sc_a[2])
+            # cnalpha_sc_mu_diff12 = pm.Deterministic('cnalpha_sc_mu_diff12', cnalpha_sc_a[1] - cnalpha_sc_a[2])
 
         # Run the model
         if model_name == 'Bayes':

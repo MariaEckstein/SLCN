@@ -40,7 +40,7 @@ if (data %in% c("human", "fitted_human")) {
   colnames(ages)[colnames(ages) == "ID"] = "sID"
   ages
 } else {
-  ages = read.csv("C:/Users/maria/MEGAsync/SLCNdata/ages.csv")
+  ages = read.csv("C:/Users/maria/MEGAsync/SLCN/models/ages.csv")
   colnames(ages) = c("sID", "PreciseYrs")
   ages$age_group = "Adults"
   ages$age_group[ages$PreciseYrs < 18] = "Teens"
@@ -53,7 +53,7 @@ if (data %in% c("human", "fitted_human")) {
 ```{r Read in data}
 all_files = data.frame()
 
-filenames = list.files(data_dir, pattern = ifelse(data == "human", "*.mat", "*[0-9]*.csv"))
+filenames = list.files(data_dir, pattern = ifelse(data == "human", "*.mat", "PS*"))
 filename = filenames[1]  # debugging
 
 for(filename in filenames) {
@@ -152,6 +152,8 @@ all_files$age_group = as.character(all_files$age_group)
 all_files$age_group[is.na(all_files$age_group)] = "None"
 assertthat::assert_that(nrow(all_files) == old_nrows)
 summary(all_files)
+
+unique(subset(all_files, is.na(PreciseYrs))$sID)
 ```
 
 # Analyze behavior

@@ -14,7 +14,7 @@ from shared_modeling_simulation import *
 create_pairplot = False
 analyze_indiv_models = True
 test_group_differences = False
-compare_models = True
+compare_models = False
 calculate_waic = False
 
 # file_names = ['RL_3groups/TestGroupDifferences/albenalcal_2018_7_27_21_19_humans_n_samples5000RL',
@@ -22,9 +22,10 @@ calculate_waic = False
               # ]
 # model_names = ['albenalcal', 'rew_swi_eps']
 file_names = [
-    # 'AliensFlat/flat_s_2018_8_9_16_2_humans_n_samples2000aliens',
-    'AliensFlat/fs_ab_2018_8_11_13_12_humans_n_samples500aliens',
-    'AliensFlat/fs_abf_2018_8_11_13_27_humans_n_samples500aliens',
+    'hier_abf_fixed_priors_2018_8_30_12_36_humans_n_samples200aliens',
+    'flat_abf_fixed_priors_2018_8_30_12_36_humans_n_samples200aliens',
+    # 'AliensFlat/fs_ab_2018_8_11_13_12_humans_n_samples500aliens',
+    # 'AliensFlat/fs_abf_2018_8_11_13_27_humans_n_samples500aliens',
     # 'AliensFlat/flat_tilde_ta99_abf_2018_8_10_14_58_humans_n_samples300aliens',
     # 'AliensFlat/hier_ab_2018_8_9_16_26_humans_n_samples200aliens',
     # 'AliensFlat/hier_abf_2018_8_9_16_26_humans_n_samples200aliens',

@@ -7,12 +7,12 @@ from shared_modeling_simulation import *
 from PStask import Task
 
 # Switches for this script
-verbose = True
+verbose = False
 n_trials = 128  # humans: 128
-max_n_subj = 200  # must be > 1
+max_n_subj = 227  # must be > 1  # TODO figure out if 227 or 231
 learning_style = 'RL'  # 'Bayes' or 'RL'
-# model_to_be_simulated = 'RL_3groups/100s/al_be_nal_cal100_2018_7_25_21_40_humans_n_samples5000RL'
-model_to_be_simulated = 'none'
+model_to_be_simulated = 'abn_2018_8_14_23_36_humans_n_samples200RL'
+# model_to_be_simulated = 'none'
 
 # Get save path
 save_dir = get_paths(False)['simulations']
@@ -23,7 +23,7 @@ if not os.path.exists(save_dir):
 if model_to_be_simulated == 'none':
     n_subj = max_n_subj
     alpha = 0.8 * np.ones(n_subj)
-    eps = 0.01 * np.ones(n_subj)
+    eps = 0 * np.ones(n_subj)
     beta = 4 * np.ones(n_subj)
     nalpha = alpha.copy()
     calpha_sc = 0 * np.ones(n_subj)
@@ -40,13 +40,11 @@ else:
         model_summary = data['summary']
         model = data['model']
 
-    eps_idx = [idx for idx in model_summary.index if 'eps' in idx and '_mu' not in idx]
-    eps = 0 * np.ones(len(eps_idx[:max_n_subj]))  # model_summary.loc[eps_idx[:max_n_subj], 'mean'].values
-
     beta_idx = [idx for idx in model_summary.index if 'beta' in idx and '_mu' not in idx]
     beta = model_summary.loc[beta_idx[:max_n_subj], 'mean'].values
 
-    n_subj = len(eps)
+    n_subj = len(beta)
+    eps = np.zeros(n_subj)
 
     # Get individual parameters
     if learning_style == 'RL':
@@ -66,6 +64,8 @@ else:
 
         cnalpha_idx = [idx for idx in model_summary.index if 'cnalpha' in idx and '_mu' not in idx]
         cnalpha = model_summary.loc[cnalpha_idx[:n_subj], 'mean'].values
+        if len(cnalpha) == 0:
+            cnalpha = nalpha.copy()
 
     elif learning_style == 'Bayes':
 
