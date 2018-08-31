@@ -37,11 +37,13 @@ def load_aliens_data(run_on_cluster, fitted_data_name, n_subj, verbose):
         if agent_data.shape[0] > n_trials:
 
             # Remove all rows that do not contain 1InitialLearning data (-> jsPysch format)
-            agent_data = agent_data.rename(columns={'TS': 'context'})  # rename "TS" column to "context"
+            agent_data = agent_data.rename(columns={'TS': 'context'})
             context_names = [str(TS) for TS in range(3)]
             item_names = range(3)
             agent_data = agent_data.loc[
-                (agent_data['context'].isin(context_names)) & (agent_data['item_chosen'].isin(item_names)) &
+                (agent_data['context'].isin(context_names)) &
+                # TODO: remove following line; take care of missing data elegantly using masked numpy arrays
+                (agent_data['item_chosen'].isin(item_names)) &
                 (agent_data['phase'] == '1InitialLearning')]
             agent_data.index = range(agent_data.shape[0])
 
@@ -50,11 +52,17 @@ def load_aliens_data(run_on_cluster, fitted_data_name, n_subj, verbose):
             aliens[:, file_idx] = np.array(agent_data['sad_alien'])[:n_trials]
             aliens = aliens.astype(int)
             actions[:, file_idx] = np.array(agent_data['item_chosen'])[:n_trials]
+            # actions[np.isnan(actions)] = -999
+            # actions_masked = np.ma.masked_values(actions, value=-999)
             actions = actions.astype(int)
+            # actions_masked = actions_masked.astype(int)
             rewards[:, file_idx] = agent_data['reward'].tolist()[:n_trials]
-            sID = filename[-7:-4]
+            rewards = (rewards - rewards.mean(axis=0, keepdims=True)) / rewards.std(axis=0, keepdims=True)  # TODO: subjwise z-scores
+            # rewards[actions == -999] = -999
+            # rewards_masked = np.ma.masked_values(rewards, value=999)
+            # sID = filename[-7:-4]
 
-    # Remove excess columns
+    # Remove excess columns (participants)
     seasons = np.delete(seasons, range(file_idx + 1, n_subj), 1)
     aliens = np.delete(aliens, range(file_idx + 1, n_subj), 1)
     rewards = np.delete(rewards, range(file_idx + 1, n_subj), 1)
@@ -128,9 +136,6 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
     group[age > 17] = 2
     n_groups = len(np.unique(group))
 
-    # z-score age
-    age = (age - np.nanmean(age)) / np.nanstd(age)
-
     # Remove subjects that are missing age
     keep = np.invert(np.isnan(age))
     n_subj = np.sum(keep)
@@ -138,6 +143,11 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
     group = group[keep]
     rewards = rewards[:, keep]
     choices = choices[:, keep]
+
+    # z-score age
+    pd.DataFrame(age).to_csv("ages.csv")
+    print('saved!')
+    # age = (age - np.nanmean(age)) / np.nanstd(age)
 
     # Look at data
     print("Loaded {0} datasets with pattern {1} from {2}...\n".format(n_subj, file_name_pattern, data_dir))
@@ -148,7 +158,6 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
     return [n_subj,
             T.as_tensor_variable(rewards),
             T.as_tensor_variable(choices),
-            T.as_tensor_variable(age),
             T.as_tensor_variable(group),
             n_groups]
 
