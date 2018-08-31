@@ -9,7 +9,7 @@ def get_paths(run_on_cluster):
         base_path = '/home/bunge/maria/Desktop/'
         return {'human data': base_path + '/PShumanData/',
                 'fitting results': base_path + '/PSPyMC3/fitting/',
-                'ages file name': base_path + '/PSPyMC3/SLCNinfo.csv',
+                'ages file name': base_path + '/PSPyMC3/SLCNinfo.csv',  # TODO: update SLCNinfo.csv!
                 'simulations': base_path + 'PSPyMC3/PSsimulations/',
                 'old simulations': base_path + '/PShumanData/fit_par/',
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}

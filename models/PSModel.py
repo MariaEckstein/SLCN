@@ -4,7 +4,6 @@ import theano
 from theano.printing import pydotprint
 import theano.tensor as T
 import matplotlib.pyplot as plt
-import pymc3 as pm
 
 from shared_modeling_simulation import *
 from modeling_helpers import *
@@ -18,11 +17,13 @@ from modeling_helpers import *
 
 
 # Switches for this script
-run_on_cluster = False
+run_on_cluster = True
 verbose = False
 print_logps = False
-file_name_suff = 'abn'
+file_name_suff = 'albenalcal'
 model_names = ('RL', '')
+
+upper = 100
 
 # Which data should be fitted?
 fitted_data_name = 'humans'  # 'humans', 'simulations'
@@ -30,10 +31,13 @@ kids_and_teens_only = False
 adults_only = False
 
 # Sampling details
-n_samples = 100
-n_tune = 10
-n_cores = 1
-n_chains = 1
+n_samples = 5000
+n_tune = 1000
+if run_on_cluster:
+    n_cores = 3
+else:
+    n_cores = 1
+n_chains = n_cores
 
 # Load to-be-fitted data
 n_subj, rewards, choices, age, group, n_groups = load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only, verbose)
@@ -52,117 +56,125 @@ for model_name in model_names:
     with pm.Model() as model:
 
         # Get population-level and individual parameters
-        # beta_mu_mu = pm.Uniform('beta_mu_mu', lower=0, upper=20, testval=5)
-        # beta_mu_sd = pm.Uniform('beta_mu_sd', lower=0, upper=20, testval=5)
-        # beta_sd_mu = pm.Uniform('beta_sd_mu', lower=0, upper=20, testval=5)
-        # beta_sd_sd = pm.Uniform('beta_sd_sd', lower=0, upper=20, testval=5)
-        # beta_mu_matt = pm.Normal('beta_mu_matt', mu=0, sd=1, shape=n_groups, testval=T.zeros(n_groups))
-        # beta_sd_matt = pm.Normal('beta_sd_matt', mu=0, sd=1, shape=n_groups, testval=T.zeros(n_groups))
-        # beta_matt = pm.Normal('beta_matt', mu=0, sd=1, shape=n_subj, testval=T.zeros(n_subj))
-        # beta_mu = pm.Deterministic('beta_mu', beta_mu_mu + beta_mu_matt * beta_mu_sd)
-        # beta_sd = pm.Deterministic('beta_sd', beta_sd_mu + beta_sd_matt * beta_sd_sd)
-        # beta = pm.Deterministic('beta', beta_mu[group] + beta_matt * beta_sd[group])
-        beta_mu_mu = pm.Uniform('beta_mu_mu', lower=0, upper=20, testval=5)
-        beta_mu_sd = pm.Uniform('beta_mu_sd', lower=0, upper=20, testval=5)
-        beta_sd_mu = pm.Uniform('beta_sd_mu', lower=0, upper=20, testval=5)
-        beta_sd_sd = pm.Uniform('beta_sd_sd', lower=0, upper=20, testval=5)
-        beta_mu = pm.Gamma('beta_mu', mu=beta_mu_mu, sd=beta_mu_sd, shape=n_groups, testval=5 * T.ones(n_groups))
-        beta_sd = pm.Gamma('beta_sd', mu=beta_sd_mu, sd=beta_sd_sd, shape=n_groups, testval=2 * T.ones(n_groups))
-        beta = pm.Gamma('beta', mu=beta_mu[group], sd=beta_sd[group], shape=n_subj, testval=5 * T.ones(n_subj))
-
-        # beta_mu_diff01 = pm.Deterministic('beta_mu_diff01', beta_mu[0] - beta_mu[1])
-        # beta_mu_diff02 = pm.Deterministic('beta_mu_diff02', beta_mu[0] - beta_mu[2])
-        # beta_mu_diff12 = pm.Deterministic('beta_mu_diff12', beta_mu[1] - beta_mu[2])
+        # eps_a_a = pm.Uniform('eps_a_a', lower=0, upper=upper)
+        # eps_a_b = pm.Uniform('eps_a_b', lower=0, upper=upper)
+        # eps_b_a = pm.Uniform('eps_b_a', lower=0, upper=upper)
+        # eps_b_b = pm.Uniform('eps_b_b', lower=0, upper=upper)
+        # eps_a = pm.Gamma('eps_a', alpha=eps_a_a, beta=eps_a_b, shape=n_groups)
+        # eps_b = pm.Gamma('eps_b', alpha=eps_b_a, beta=eps_b_b, shape=n_groups)
+        # eps = pm.Beta('eps', alpha=eps_a[group], beta=eps_b[group], shape=n_subj)
         eps = T.as_tensor_variable(0)
+        #
+        beta_a_a = pm.Uniform('beta_a_a', lower=0, upper=upper)
+        beta_a_b = pm.Uniform('beta_a_b', lower=0, upper=upper)
+        beta_b_a = pm.Uniform('beta_b_a', lower=0, upper=upper)
+        beta_b_b = pm.Uniform('beta_b_b', lower=0, upper=upper)
+        beta_a = pm.Gamma('beta_a', alpha=beta_a_a, beta=beta_a_b, shape=n_groups)
+        beta_b = pm.Gamma('beta_b', alpha=beta_b_a, beta=beta_b_b, shape=n_groups)
+        beta = pm.Gamma('beta', alpha=beta_a[group], beta=beta_b[group], shape=n_subj)
+        # beta = T.as_tensor_variable(0)
+
+        beta_a_diff01 = pm.Deterministic('beta_a_diff01', beta_a[0] - beta_a[1])
+        beta_a_diff02 = pm.Deterministic('beta_a_diff02', beta_a[0] - beta_a[2])
+        beta_a_diff12 = pm.Deterministic('beta_a_diff12', beta_a[1] - beta_a[2])
+        beta_b_diff01 = pm.Deterministic('beta_b_diff01', beta_b[0] - beta_b[1])
+        beta_b_diff02 = pm.Deterministic('beta_b_diff02', beta_b[0] - beta_b[2])
+        beta_b_diff12 = pm.Deterministic('beta_b_diff12', beta_b[1] - beta_b[2])
 
         if model_name == 'Bayes':
 
-            p_switch_mu_mu = pm.Uniform('p_switch_mu_mu', lower=0, upper=1, testval=0.02)
-            p_switch_mu_sd = pm.Uniform('p_switch_mu_sd', lower=0, upper=1, testval=0.02)
-            p_switch_sd_mu = pm.Uniform('p_switch_sd_mu', lower=0, upper=1, testval=0.02)
-            p_switch_sd_sd = pm.Uniform('p_switch_sd_sd', lower=0, upper=1, testval=0.02)
-            p_switch_mu = pm.Beta('p_switch_mu', mu=p_switch_mu_mu, sd=p_switch_mu_sd, shape=n_groups, testval=0.02 * T.ones(n_groups))
-            p_switch_sd = pm.Beta('p_switch_sd', mu=p_switch_sd_mu, sd=p_switch_sd_sd, shape=n_groups, testval=0.02 * T.ones(n_groups))
-            p_switch = pm.Beta('p_switch', mu=p_switch_mu[group], sd=p_switch_sd[group], shape=n_subj, testval=0.02 * T.ones(n_subj))
+            p_switch_a_a = pm.Uniform('p_switch_a_a', lower=0, upper=upper)
+            p_switch_a_b = pm.Uniform('p_switch_a_b', lower=0, upper=upper)
+            p_switch_b_a = pm.Uniform('p_switch_b_a', lower=0, upper=upper)
+            p_switch_b_b = pm.Uniform('p_switch_b_b', lower=0, upper=upper)
+            p_switch_a = pm.Gamma('p_switch_a', alpha=p_switch_a_a, beta=p_switch_a_b, shape=n_groups)
+            p_switch_b = pm.Gamma('p_switch_b', alpha=p_switch_b_a, beta=p_switch_b_b, shape=n_groups)
+            p_switch = pm.Beta('p_switch', alpha=p_switch_a[group], beta=p_switch_b[group], shape=n_subj)
 
-            p_reward_mu_mu = pm.Uniform('p_reward_mu_mu', lower=0, upper=1, testval=0.02)
-            p_reward_mu_sd = pm.Uniform('p_reward_mu_sd', lower=0, upper=1, testval=0.02)
-            p_reward_sd_mu = pm.Uniform('p_reward_sd_mu', lower=0, upper=1, testval=0.02)
-            p_reward_sd_sd = pm.Uniform('p_reward_sd_sd', lower=0, upper=1, testval=0.02)
-            p_reward_mu = pm.Beta('p_reward_mu', mu=p_reward_mu_mu, sd=p_reward_mu_sd, shape=n_groups, testval=0.02 * T.ones(n_groups))
-            p_reward_sd = pm.Beta('p_reward_sd', mu=p_reward_sd_mu, sd=p_reward_sd_sd, shape=n_groups, testval=0.02 * T.ones(n_groups))
-            p_reward = pm.Beta('p_reward', mu=p_reward_mu[group], sd=p_reward_sd[group], shape=n_subj, testval=0.02 * T.ones(n_subj))
+            p_reward_a_a = pm.Uniform('p_reward_a_a', lower=0, upper=upper)
+            p_reward_a_b = pm.Uniform('p_reward_a_b', lower=0, upper=upper)
+            p_reward_b_a = pm.Uniform('p_reward_b_a', lower=0, upper=upper)
+            p_reward_b_b = pm.Uniform('p_reward_b_b', lower=0, upper=upper)
+            p_reward_a = pm.Gamma('p_reward_a', alpha=p_reward_a_a, beta=p_reward_a_b, shape=n_groups)
+            p_reward_b = pm.Gamma('p_reward_b', alpha=p_reward_b_a, beta=p_reward_b_b, shape=n_groups)
+            p_reward = pm.Beta('p_reward', alpha=p_reward_a[group], beta=p_reward_b[group], shape=n_subj)
 
-            # p_noisy_mu_mu = pm.Uniform('p_noisy_mu_mu', lower=0, upper=1)
-            # p_noisy_mu_sd = pm.Uniform('p_noisy_mu_sd', lower=0, upper=1)
-            # p_noisy_sd_mu = pm.Uniform('p_noisy_sd_mu', lower=0, upper=1)
-            # p_noisy_sd_sd = pm.Uniform('p_noisy_sd_sd', lower=0, upper=1)
-            # p_noisy_mu = pm.Beta('p_noisy_mu', mu=p_noisy_mu_mu, sd=p_noisy_mu_sd, shape=n_groups)
-            # p_noisy_sd = pm.Beta('p_noisy_sd', mu=p_noisy_sd_mu, sd=p_noisy_sd_sd, shape=n_groups)
-            # p_noisy = pm.Beta('p_noisy', mu=p_noisy_mu[group], sd=p_noisy_sd[group], shape=n_subj)
+            # p_noisy_a_a = pm.Uniform('p_noisy_a_a', lower=0, upper=upper)
+            # p_noisy_a_b = pm.Uniform('p_noisy_a_b', lower=0, upper=upper)
+            # p_noisy_b_a = pm.Uniform('p_noisy_b_a', lower=0, upper=upper)
+            # p_noisy_b_b = pm.Uniform('p_noisy_b_b', lower=0, upper=upper)
+            # p_noisy_a = pm.Gamma('p_noisy_a', alpha=p_noisy_a_a, beta=p_noisy_a_b, shape=n_groups)
+            # p_noisy_b = pm.Gamma('p_noisy_b', alpha=p_noisy_b_a, beta=p_noisy_b_b, shape=n_groups)
+            # p_noisy = pm.Beta('p_noisy', alpha=p_noisy_a[group], beta=p_noisy_b[group], shape=n_subj)
             p_noisy = 1e-5 * T.ones(n_subj)
 
         elif model_name == 'RL':
 
-            alpha_mu_mu = pm.Uniform('alpha_mu_mu', lower=0, upper=1, testval=0.02)
-            alpha_mu_sd = pm.Uniform('alpha_mu_sd', lower=0, upper=1, testval=0.02)
-            alpha_sd_mu = pm.Uniform('alpha_sd_mu', lower=0, upper=1, testval=0.02)
-            alpha_sd_sd = pm.Uniform('alpha_sd_sd', lower=0, upper=1, testval=0.02)
-            alpha_mu = pm.Beta('alpha_mu', mu=alpha_mu_mu, sd=alpha_mu_sd, shape=n_groups, testval=0.02 * T.ones(n_groups))
-            alpha_sd = pm.Beta('alpha_sd', mu=alpha_sd_mu, sd=alpha_sd_sd, shape=n_groups, testval=0.02 * T.ones(n_groups))
-            alpha = pm.Beta('alpha', mu=alpha_mu[group], sd=alpha_sd[group], shape=n_subj, testval=0.02 * T.ones(n_subj))
-            # alpha_matt = pm.Normal('alpha_matt', mu=0, sd=1, shape=n_subj, testval=np.zeros(n_subj))
-            # alpha = pm.Deterministic('alpha', alpha_mu[group] + alpha_matt * alpha_sd[group])
+            alpha_a_a = pm.Uniform('alpha_a_a', lower=0, upper=upper)
+            alpha_a_b = pm.Uniform('alpha_a_b', lower=0, upper=upper)
+            alpha_b_a = pm.Uniform('alpha_b_a', lower=0, upper=upper)
+            alpha_b_b = pm.Uniform('alpha_b_b', lower=0, upper=upper)
+            alpha_a = pm.Gamma('alpha_a', alpha=alpha_a_a, beta=alpha_a_b, shape=n_groups)
+            alpha_b = pm.Gamma('alpha_b', alpha=alpha_b_a, beta=alpha_b_b, shape=n_groups)
+            alpha = pm.Beta('alpha', alpha=alpha_a[group], beta=alpha_b[group], shape=n_subj)
 
-            # alpha_mu_diff01 = pm.Deterministic('alpha_mu_diff01', alpha_mu[0] - alpha_mu[1])
-            # alpha_mu_diff02 = pm.Deterministic('alpha_mu_diff02', alpha_mu[0] - alpha_mu[2])
-            # alpha_mu_diff12 = pm.Deterministic('alpha_mu_diff12', alpha_mu[1] - alpha_mu[2])
-
-            nalpha_mu_mu = pm.Uniform('nalpha_mu_mu', lower=0, upper=1, testval=0.02)
-            nalpha_mu_sd = pm.Uniform('nalpha_mu_sd', lower=0, upper=1, testval=0.02)
-            nalpha_sd_mu = pm.Uniform('nalpha_sd_mu', lower=0, upper=1, testval=0.02)
-            nalpha_sd_sd = pm.Uniform('nalpha_sd_sd', lower=0, upper=1, testval=0.02)
-            nalpha_mu = pm.Beta('nalpha_mu', mu=nalpha_mu_mu, sd=nalpha_mu_sd, shape=n_groups, testval=0.02 * T.ones(n_groups))
-            nalpha_sd = pm.Beta('nalpha_sd', mu=nalpha_sd_mu, sd=nalpha_sd_sd, shape=n_groups, testval=0.02 * T.ones(n_groups))
-            nalpha = pm.Beta('nalpha', mu=nalpha_mu[group], sd=nalpha_sd[group], shape=n_subj, testval=0.02 * T.ones(n_subj))
-            # nalpha_matt = pm.Normal('nalpha_matt', mu=0, sd=1, shape=n_subj, testval=np.zeros(n_subj))
-            # nalpha = pm.Deterministic('nalpha', nalpha_mu[group] + nalpha_matt * nalpha_sd[group])
+            nalpha_a_a = pm.Uniform('nalpha_a_a', lower=0, upper=upper)
+            nalpha_a_b = pm.Uniform('nalpha_a_b', lower=0, upper=upper)
+            nalpha_b_a = pm.Uniform('nalpha_b_a', lower=0, upper=upper)
+            nalpha_b_b = pm.Uniform('nalpha_b_b', lower=0, upper=upper)
+            nalpha_a = pm.Gamma('nalpha_a', alpha=nalpha_a_a, beta=nalpha_a_b, shape=n_groups)
+            nalpha_b = pm.Gamma('nalpha_b', alpha=nalpha_b_a, beta=nalpha_b_b, shape=n_groups)
+            nalpha = pm.Beta('nalpha', alpha=nalpha_a[group], beta=nalpha_b[group], shape=n_subj)
             # nalpha = pm.Deterministic('nalpha', alpha.copy())
 
-            # nalpha_mu_diff01 = pm.Deterministic('nalpha_mu_diff01', nalpha_mu[0] - nalpha_mu[1])
-            # nalpha_mu_diff02 = pm.Deterministic('nalpha_mu_diff02', nalpha_mu[0] - nalpha_mu[2])
-            # nalpha_mu_diff12 = pm.Deterministic('nalpha_mu_diff12', nalpha_mu[1] - nalpha_mu[2])
-
-            # calpha_sc_mu_mu = pm.Uniform('calpha_sc_mu_mu', lower=0, upper=1)
-            # calpha_sc_mu_sd = pm.Uniform('calpha_sc_mu_sd', lower=0, upper=1)
-            # calpha_sc_sd_mu = pm.Uniform('calpha_sc_sd_mu', lower=0, upper=1)
-            # calpha_sc_sd_sd = pm.Uniform('calpha_sc_sd_sd', lower=0, upper=1)
-            # calpha_sc_mu = pm.Beta('calpha_sc_mu', mu=calpha_sc_mu_mu, sd=calpha_sc_mu_sd, shape=n_groups, testval=0.8 * np.ones(n_groups))
-            # calpha_sc_sd = pm.Beta('calpha_sc_sd', mu=calpha_sc_sd_mu, sd=calpha_sc_sd_sd, shape=n_groups, testval=0.1 * np.ones(n_groups))
-            # # calpha_sc = pm.Beta('calpha_sc', mu=calpha_sc_mu[group], sd=calpha_sc_sd[group], shape=n_subj)
-            # calpha_sc_matt = pm.Normal('calpha_sc_matt', mu=0, sd=1, shape=n_subj, testval=np.zeros(n_subj))
-            # calpha_sc = pm.Deterministic('calpha_sc', calpha_sc_mu[group] + calpha_sc_matt * calpha_sc_sd[group])
+            # calpha_sc_a_a = pm.Uniform('calpha_sc_a_a', lower=0, upper=upper)
+            # calpha_sc_a_b = pm.Uniform('calpha_sc_a_b', lower=0, upper=upper)
+            # calpha_sc_b_a = pm.Uniform('calpha_sc_b_a', lower=0, upper=upper)
+            # calpha_sc_b_b = pm.Uniform('calpha_sc_b_b', lower=0, upper=upper)
+            # calpha_sc_a = pm.Gamma('calpha_sc_a', alpha=calpha_sc_a_a, beta=calpha_sc_a_b, shape=n_groups)
+            # calpha_sc_b = pm.Gamma('calpha_sc_b', alpha=calpha_sc_b_a, beta=calpha_sc_b_b, shape=n_groups)
+            # calpha_sc = pm.Beta('calpha_sc', alpha=calpha_sc_a[group], beta=calpha_sc_b[group], shape=n_subj)
             calpha_sc = pm.Deterministic('calpha_sc', T.as_tensor_variable(0))
             calpha = pm.Deterministic('calpha', alpha * calpha_sc)
 
-            # calpha_sc_mu_diff01 = pm.Deterministic('calpha_sc_mu_diff01', calpha_sc_mu[0] - calpha_sc_mu[1])
-            # calpha_sc_mu_diff02 = pm.Deterministic('calpha_sc_mu_diff02', calpha_sc_mu[0] - calpha_sc_mu[2])
-            # calpha_sc_mu_diff12 = pm.Deterministic('calpha_sc_mu_diff12', calpha_sc_mu[1] - calpha_sc_mu[2])
-            #
-            # cnalpha_sc_mu_mu = pm.Uniform('cnalpha_sc_mu_mu', lower=0, upper=1)
-            # cnalpha_sc_mu_sd = pm.Uniform('cnalpha_sc_mu_sd', lower=0, upper=1)
-            # cnalpha_sc_sd_mu = pm.Uniform('cnalpha_sc_sd_mu', lower=0, upper=1)
-            # cnalpha_sc_sd_sd = pm.Uniform('cnalpha_sc_sd_sd', lower=0, upper=1)
-            # cnalpha_sc_mu = pm.Beta('cnalpha_sc_mu', mu=cnalpha_sc_mu_mu, sd=cnalpha_sc_mu_sd, shape=n_groups, testval=0.8 * np.ones(n_groups))
-            # cnalpha_sc_sd = pm.Beta('cnalpha_sc_sd', mu=cnalpha_sc_sd_mu, sd=cnalpha_sc_sd_sd, shape=n_groups, testval=0.1 * np.ones(n_groups))
-            # cnalpha_sc_matt = pm.Normal('cnalpha_sc_matt', mu=0, sd=1, shape=n_subj, testval=np.zeros(n_subj))
-            # cnalpha_sc = pm.Deterministic('cnalpha_sc', cnalpha_sc_mu[group] + cnalpha_sc_matt * cnalpha_sc_sd[group])
+            # cnalpha_sc_a_a = pm.Uniform('cnalpha_sc_a_a', lower=0, upper=upper)
+            # cnalpha_sc_a_b = pm.Uniform('cnalpha_sc_a_b', lower=0, upper=upper)
+            # cnalpha_sc_b_a = pm.Uniform('cnalpha_sc_b_a', lower=0, upper=upper)
+            # cnalpha_sc_b_b = pm.Uniform('cnalpha_sc_b_b', lower=0, upper=upper)
+            # cnalpha_sc_a = pm.Gamma('cnalpha_sc_a', alpha=cnalpha_sc_a_a, beta=cnalpha_sc_a_b, shape=n_groups)
+            # cnalpha_sc_b = pm.Gamma('cnalpha_sc_b', alpha=cnalpha_sc_b_a, beta=cnalpha_sc_b_b, shape=n_groups)
+            # cnalpha_sc = pm.Beta('cnalpha_sc', alpha=cnalpha_sc_a[group], beta=cnalpha_sc_b[group], shape=n_subj)
             cnalpha_sc = pm.Deterministic('cnalpha_sc', calpha_sc.copy())
             cnalpha = pm.Deterministic('cnalpha', nalpha * cnalpha_sc)
 
-            # cnalpha_sc_mu_diff01 = pm.Deterministic('cnalpha_sc_mu_diff01', cnalpha_sc_mu[0] - cnalpha_sc_mu[1])
-            # cnalpha_sc_mu_diff02 = pm.Deterministic('cnalpha_sc_mu_diff02', cnalpha_sc_mu[0] - cnalpha_sc_mu[2])
-            # cnalpha_sc_mu_diff12 = pm.Deterministic('cnalpha_sc_mu_diff12', cnalpha_sc_mu[1] - cnalpha_sc_mu[2])
+            # Group differences?
+            alpha_a_diff01 = pm.Deterministic('alpha_a_diff01', alpha_a[0] - alpha_a[1])
+            alpha_a_diff02 = pm.Deterministic('alpha_a_diff02', alpha_a[0] - alpha_a[2])
+            alpha_a_diff12 = pm.Deterministic('alpha_a_diff12', alpha_a[1] - alpha_a[2])
+            alpha_b_diff01 = pm.Deterministic('alpha_b_diff01', alpha_b[0] - alpha_b[1])
+            alpha_b_diff02 = pm.Deterministic('alpha_b_diff02', alpha_b[0] - alpha_b[2])
+            alpha_b_diff12 = pm.Deterministic('alpha_b_diff12', alpha_b[1] - alpha_b[2])
+
+            nalpha_a_diff01 = pm.Deterministic('nalpha_a_diff01', nalpha_a[0] - nalpha_a[1])
+            nalpha_a_diff02 = pm.Deterministic('nalpha_a_diff02', nalpha_a[0] - nalpha_a[2])
+            nalpha_a_diff12 = pm.Deterministic('nalpha_a_diff12', nalpha_a[1] - nalpha_a[2])
+            nalpha_b_diff01 = pm.Deterministic('nalpha_b_diff01', nalpha_b[0] - nalpha_b[1])
+            nalpha_b_diff02 = pm.Deterministic('nalpha_b_diff02', nalpha_b[0] - nalpha_b[2])
+            nalpha_b_diff12 = pm.Deterministic('nalpha_b_diff12', nalpha_b[1] - nalpha_b[2])
+
+            # calpha_sc_a_diff01 = pm.Deterministic('calpha_sc_a_diff01', calpha_sc_a[0] - calpha_sc_a[1])
+            # calpha_sc_a_diff02 = pm.Deterministic('calpha_sc_a_diff02', calpha_sc_a[0] - calpha_sc_a[2])
+            # calpha_sc_a_diff12 = pm.Deterministic('calpha_sc_a_diff12', calpha_sc_a[1] - calpha_sc_a[2])
+            # calpha_sc_b_diff01 = pm.Deterministic('calpha_sc_b_diff01', calpha_sc_b[0] - calpha_sc_b[1])
+            # calpha_sc_b_diff02 = pm.Deterministic('calpha_sc_b_diff02', calpha_sc_b[0] - calpha_sc_b[2])
+            # calpha_sc_b_diff12 = pm.Deterministic('calpha_sc_b_diff12', calpha_sc_b[1] - calpha_sc_b[2])
+            #
+            # cnalpha_sc_a_diff01 = pm.Deterministic('cnalpha_sc_a_diff01', cnalpha_sc_a[0] - cnalpha_sc_a[1])
+            # cnalpha_sc_a_diff02 = pm.Deterministic('cnalpha_sc_a_diff02', cnalpha_sc_a[0] - cnalpha_sc_a[2])
+            # cnalpha_sc_a_diff12 = pm.Deterministic('cnalpha_sc_a_diff12', cnalpha_sc_a[1] - cnalpha_sc_a[2])
+            # cnalpha_sc_b_diff01 = pm.Deterministic('cnalpha_sc_b_diff01', cnalpha_sc_b[0] - cnalpha_sc_b[1])
+            # cnalpha_sc_b_diff02 = pm.Deterministic('cnalpha_sc_b_diff02', cnalpha_sc_b[0] - cnalpha_sc_b[2])
+            # cnalpha_sc_b_diff12 = pm.Deterministic('cnalpha_sc_b_diff12', cnalpha_sc_b[1] - cnalpha_sc_b[2])
 
         # Run the model
         if model_name == 'Bayes':
