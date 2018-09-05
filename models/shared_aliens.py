@@ -8,18 +8,20 @@ rs = RandomStreams()
 
 
 # Initial Q-value for actions and TS
-alien_initial_Q = 1.2  # rewards are z-scored!
+alien_initial_Q = 1.2  # Are rewards z-scored?
 
 # Function to update Q-values based on stimulus, action, and reward
-def update_Qs(season, alien, action, reward, Q_low, Q_high, beta_high, alpha, alpha_high, forget, forget_high, n_subj):
+def update_Qs(season, next_season, alien, next_alien, action, reward,
+              Q_low, Q_low_sub, Q_high,
+              beta_high, alpha, alpha_high, forget, forget_high, n_subj):
 
     # Loop over trials: take data for all subjects, 1 single trial
 
     # Select TS
     Q_high_sub = Q_high[T.arange(n_subj), season]
     p_high = T.nnet.softmax(beta_high * Q_high_sub)
-    T.printing.Print('Q_high_sub')(Q_high_sub)
-    T.printing.Print('p_high')(p_high)
+    # T.printing.Print('Q_high_sub')(Q_high_sub)
+    # T.printing.Print('p_high')(p_high)
     # TS = season  # Flat
     TS = p_high.argmax(axis=1)  # Hierarchical deterministic
 
@@ -44,6 +46,7 @@ def update_Qs(season, alien, action, reward, Q_low, Q_high, beta_high, alpha, al
     T.printing.Print('Q_low_old')(Q_low_new[T.arange(n_subj), TS, alien, action])
     Q_low_new = T.set_subtensor(Q_low_new[T.arange(n_subj), TS, alien, action],
                                 Q_low_new[T.arange(n_subj), TS, alien, action] + alpha * RPE_low)
+    Q_low_sub = Q_low_new[T.arange(n_subj), next_season, next_alien]
     T.printing.Print('reward')(reward)
     T.printing.Print('RPE_low')(RPE_low)
     T.printing.Print('Q_low_new')(Q_low_new[T.arange(n_subj), TS, alien, action])
@@ -52,7 +55,7 @@ def update_Qs(season, alien, action, reward, Q_low, Q_high, beta_high, alpha, al
     Q_high_new = T.set_subtensor(Q_high_new[T.arange(n_subj), season, TS],
                                  Q_high_new[T.arange(n_subj), season, TS] + alpha_high * RPE_high)
 
-    return [Q_low_new, Q_high_new]
+    return [Q_low_new, Q_low_sub, Q_high_new]
 
 # Same, but without theano
 def update_Qs_sim(season, alien, action, reward, Q_low, Q_high, alpha, alpha_high, beta_high, forget, forget_high, n_subj, verbose=False):
