@@ -55,31 +55,65 @@ def update_Qs(season, alien, action, reward, Q_low, Q_high, beta_high, alpha, al
     return [Q_low_new, Q_high_new]
 
 # Same, but without theano
-def update_Qs_sim(season, alien, action, reward, Q_low, Q_high, alpha, alpha_high, beta_high, forget, forget_high, n_subj, verbose=False):
+def update_Qs_sim(season, TS, alien, action, reward, Q_low, Q_high, alpha, alpha_high, beta_high, forget, forget_high, n_subj, verbose=False):
     # Loop over trials: take data for all subjects, 1 single trial
 
-    # Select TS
-    Q_high_sub = Q_high[np.arange(n_subj), season]
-    p_high = np.exp(beta_high * Q_high_sub)
-    # TS = season  # Flat model
-    # TS = p_high.argmax(axis=1)  # Select TS deterministically
-    # TS = pm.Categorical('TS', p=p_high, shape=n_subj, testval=np.ones(n_subj), observed=np.random.choice(n_subj))  # Select probabilistically
-    TS = np.array([np.random.choice(a=3, p=p_high_subj / np.sum(p_high_subj)) for p_high_subj in p_high])  # numpy.random.choice(a, size=None, replace=True, p=None)¶
-
     # Forget Q-values a little bit
-    Q_low_new = (1 - forget) * Q_low + forget * alien_initial_Q * np.ones(Q_low.shape)
-    Q_high_new = (1 - forget_high) * Q_high + forget_high * alien_initial_Q * np.ones(Q_high.shape)
+    Q_low = (1 - forget) * Q_low + forget * alien_initial_Q
+    Q_high = (1 - forget_high) * Q_high + forget_high * alien_initial_Q
 
     # Calculate RPEs & update Q-values
-    RPE_low = reward - Q_low_new[np.arange(n_subj), TS, alien, action]
-    Q_low_new[np.arange(n_subj), TS, alien, action] += alpha * RPE_low
+    current_trial_high = np.arange(n_subj), season, TS
+    RPE_high = reward - Q_high[current_trial_high]
+    Q_high[current_trial_high] += alpha_high * RPE_high
 
-    RPE_high = reward - Q_high_new[np.arange(n_subj), season, TS]
-    Q_high_new[np.arange(n_subj), season, TS] += alpha_high * RPE_high
+    current_trial_low = np.arange(n_subj), TS, alien, action
+    RPE_low = reward - Q_low[current_trial_low]
+    Q_low[current_trial_low] += alpha * RPE_low
 
     if verbose:
         print("TS:", TS)
         print("RPE_low:", RPE_low)
         print("RPE_high:", RPE_high)
 
-    return [Q_low_new, Q_high_new]
+    return [Q_low, Q_high]
+
+def softmax(X, axis=None):
+    """
+    Compute the softmax of each element along an axis of X.
+
+    Parameters
+    ----------
+    X: ND-Array. Probably should be floats.
+    theta (optional): float parameter, used as a multiplier
+        prior to exponentiation. Default = 1.0
+    axis (optional): axis to compute values along. Default is the
+        first non-singleton axis.
+
+    Returns an array the same size as X. The result will sum to 1
+    along the specified axis.
+    """
+
+    # make X at least 2d
+    y = np.atleast_2d(X)
+
+    # find axis
+    if axis is None:
+        axis = next(j[0] for j in enumerate(y.shape) if j[1] > 1)
+
+    # subtract the max for numerical stability
+    y = y - np.expand_dims(np.max(y, axis=axis), axis)
+
+    # exponentiate y
+    y = np.exp(y)
+
+    # take the sum along the specified axis
+    ax_sum = np.expand_dims(np.sum(y, axis=axis), axis)
+
+    # finally: divide elementwise
+    p = y / ax_sum
+
+    # flatten if X was 1D
+    if len(X.shape) == 1: p = p.flatten()
+
+    return p
