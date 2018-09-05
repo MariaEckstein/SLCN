@@ -22,8 +22,8 @@ calculate_waic = False
               # ]
 # model_names = ['albenalcal', 'rew_swi_eps']
 file_names = [
-    'hier_abf_fixed_priors_2018_8_30_12_36_humans_n_samples200aliens',
-    'flat_abf_fixed_priors_2018_8_30_12_36_humans_n_samples200aliens',
+    'h_abf_efficient_2018_9_3_19_0_humans_n_samples100aliens',
+    # 'f_abf_efficient_2018_8_31_16_35_humans_n_samples300aliens',
     # 'AliensFlat/fs_ab_2018_8_11_13_12_humans_n_samples500aliens',
     # 'AliensFlat/fs_abf_2018_8_11_13_27_humans_n_samples500aliens',
     # 'AliensFlat/flat_tilde_ta99_abf_2018_8_10_14_58_humans_n_samples300aliens',

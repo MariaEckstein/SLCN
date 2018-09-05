@@ -18,10 +18,10 @@ def update_Qs(season, alien, action, reward, Q_low, Q_high, beta_high, alpha, al
     # Select TS
     Q_high_sub = Q_high[T.arange(n_subj), season]
     p_high = T.nnet.softmax(beta_high * Q_high_sub)
-    T.printing.Print('Q_high_sub')(Q_high_sub)  # TODO: doesn't print!
+    T.printing.Print('Q_high_sub')(Q_high_sub)
     T.printing.Print('p_high')(p_high)
-    TS = season  # Flat
-    # TS = p_high.argmax(axis=1)  # Hierarchical deterministic
+    # TS = season  # Flat
+    TS = p_high.argmax(axis=1)  # Hierarchical deterministic
 
     # def twodchoice(p, a):
     #     return np.random.choice(a=a, p=p / T.sum(p))
@@ -36,8 +36,8 @@ def update_Qs(season, alien, action, reward, Q_low, Q_high, beta_high, alpha, al
     T.printing.Print('action')(action)
 
     # Forget Q-values a little bit
-    Q_low_new = (1 - forget) * Q_low + forget * alien_initial_Q * T.ones_like(Q_low)
-    Q_high_new = (1 - forget_high) * Q_high + forget_high * alien_initial_Q * T.ones_like(Q_high)
+    Q_low_new = (1 - forget) * Q_low + forget * alien_initial_Q
+    Q_high_new = (1 - forget_high) * Q_high + forget_high * alien_initial_Q
 
     # Calculate RPEs & update Q-values
     RPE_low = reward - Q_low_new[T.arange(n_subj), TS, alien, action]
@@ -51,7 +51,6 @@ def update_Qs(season, alien, action, reward, Q_low, Q_high, beta_high, alpha, al
     RPE_high = reward - Q_high_new[T.arange(n_subj), season, TS]
     Q_high_new = T.set_subtensor(Q_high_new[T.arange(n_subj), season, TS],
                                  Q_high_new[T.arange(n_subj), season, TS] + alpha_high * RPE_high)
-
 
     return [Q_low_new, Q_high_new]
 

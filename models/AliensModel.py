@@ -12,7 +12,7 @@ from modeling_helpers import *
 # Switches for this script
 run_on_cluster = False
 print_logps = False
-file_name_suff = 'hier_abf_fixed_priors'
+file_name_suff = 'h_abf_efficient'
 use_fake_data = False
 
 # Which data should be fitted?
@@ -21,7 +21,7 @@ fitted_data_name = 'humans'  # 'humans', 'simulations'
 # Sampling details
 n_samples = 50
 n_tune = 50
-max_n_subj = 40  # set > 31 to include all subjects
+max_n_subj = 2  # set > 31 to include all subjects
 n_cores = 1
 n_chains = 1
 

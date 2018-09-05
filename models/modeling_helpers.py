@@ -57,7 +57,7 @@ def load_aliens_data(run_on_cluster, fitted_data_name, n_subj, verbose):
             actions = actions.astype(int)
             # actions_masked = actions_masked.astype(int)
             rewards[:, file_idx] = agent_data['reward'].tolist()[:n_trials]
-            rewards = (rewards - rewards.mean(axis=0, keepdims=True)) / rewards.std(axis=0, keepdims=True)  # TODO: subjwise z-scores
+            # rewards = (rewards - rewards.mean(axis=0, keepdims=True)) / rewards.std(axis=0, keepdims=True)  # TODO: subjwise z-scores
             # rewards[actions == -999] = -999
             # rewards_masked = np.ma.masked_values(rewards, value=999)
             # sID = filename[-7:-4]
