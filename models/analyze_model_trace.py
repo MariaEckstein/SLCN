@@ -22,9 +22,9 @@ calculate_waic = False
               # ]
 # model_names = ['albenalcal', 'rew_swi_eps']
 file_names = [
-    'h_abf_efficient_2018_9_3_19_0_humans_n_samples100aliens',
-    # 'f_abf_efficient_2018_8_31_16_35_humans_n_samples300aliens',
-    # 'AliensFlat/fs_ab_2018_8_11_13_12_humans_n_samples500aliens',
+    'h_bugfix_2018_9_5_14_24_humans_n_samples200aliens',
+    # 'f_bugfix_2018_9_5_14_25_humans_n_samples300aliens',
+    # 'h_bugfix_2018_9_5_14_23_humans_n_samples100aliens',
     # 'AliensFlat/fs_abf_2018_8_11_13_27_humans_n_samples500aliens',
     # 'AliensFlat/flat_tilde_ta99_abf_2018_8_10_14_58_humans_n_samples300aliens',
     # 'AliensFlat/hier_ab_2018_8_9_16_26_humans_n_samples200aliens',

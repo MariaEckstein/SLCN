@@ -10,53 +10,61 @@ rs = RandomStreams()
 # Initial Q-value for actions and TS
 alien_initial_Q = 1.2  # rewards are z-scored!
 
-# Function to update Q-values based on stimulus, action, and reward
-def update_Qs(season, alien, action, reward, Q_low, Q_high, beta_high, alpha, alpha_high, forget, forget_high, n_subj):
 
-    # Loop over trials: take data for all subjects, 1 single trial
+# Function to update Q-values based on stimulus, action, and reward
+def update_Qs(season, alien, action, reward,
+              Q_low, Q_high,
+              beta_high, alpha, alpha_high, forget, forget_high, n_subj):
 
     # Select TS
     Q_high_sub = Q_high[T.arange(n_subj), season]
     p_high = T.nnet.softmax(beta_high * Q_high_sub)
     T.printing.Print('Q_high_sub')(Q_high_sub)
     T.printing.Print('p_high')(p_high)
-    # TS = season  # Flat
-    TS = p_high.argmax(axis=1)  # Hierarchical deterministic
+    TS = season  # Flat
+    # TS = p_high.argmax(axis=1)  # Hierarchical deterministic
 
-    # def twodchoice(p, a):
-    #     return np.random.choice(a=a, p=p / T.sum(p))
-    #
-    # TS, _ = theano.scan(fn=twodchoice,  # TypeError: shape must be a vector or list of scalar, got 'TensorConstant{1}'
-    #                     sequences=p_high,
-    #                     non_sequences=3)
-    # TS = rs.choice(a=3, size=[31], p=p_high)  # choice(self, size=(), a=2, replace=True, p=None, ndim=None, dtype='int64')
-
-    T.printing.Print('TS')(TS)
-    T.printing.Print('alien')(alien)
-    T.printing.Print('action')(action)
+    # Participant selects action based on TS and observes a reward
 
     # Forget Q-values a little bit
-    Q_low_new = (1 - forget) * Q_low + forget * alien_initial_Q
-    Q_high_new = (1 - forget_high) * Q_high + forget_high * alien_initial_Q
+    Q_low = (1 - forget) * Q_low + forget * alien_initial_Q
+    Q_high = (1 - forget_high) * Q_high + forget_high * alien_initial_Q  # TODO THIS IS WHERE THE NANS ARE INTRODUCED
 
     # Calculate RPEs & update Q-values
-    RPE_low = reward - Q_low_new[T.arange(n_subj), TS, alien, action]
-    T.printing.Print('Q_low_old')(Q_low_new[T.arange(n_subj), TS, alien, action])
-    Q_low_new = T.set_subtensor(Q_low_new[T.arange(n_subj), TS, alien, action],
-                                Q_low_new[T.arange(n_subj), TS, alien, action] + alpha * RPE_low)
+    current_trial_high = T.arange(n_subj), season, TS
+    T.printing.Print('season')(season)
+    T.printing.Print('TS')(TS)
     T.printing.Print('reward')(reward)
-    T.printing.Print('RPE_low')(RPE_low)
-    T.printing.Print('Q_low_new')(Q_low_new[T.arange(n_subj), TS, alien, action])
+    RPE_high = reward - Q_high[current_trial_high]
+    Q_high = T.set_subtensor(Q_high[current_trial_high],
+                             Q_high[current_trial_high] + alpha_high * RPE_high)
 
-    RPE_high = reward - Q_high_new[T.arange(n_subj), season, TS]
-    Q_high_new = T.set_subtensor(Q_high_new[T.arange(n_subj), season, TS],
-                                 Q_high_new[T.arange(n_subj), season, TS] + alpha_high * RPE_high)
+    current_trial_low = T.arange(n_subj), TS, alien, action
+    RPE_low = reward - Q_low[current_trial_low]
+    Q_low = T.set_subtensor(Q_low[current_trial_low],
+                            Q_low[current_trial_low] + alpha * RPE_low)
 
-    return [Q_low_new, Q_high_new]
+    return [Q_low, Q_high, TS]
+
 
 # Same, but without theano
-def update_Qs_sim(season, TS, alien, action, reward, Q_low, Q_high, alpha, alpha_high, beta_high, forget, forget_high, n_subj, verbose=False):
-    # Loop over trials: take data for all subjects, 1 single trial
+def update_Qs_sim(season, alien,
+                  Q_low, Q_high,
+                  beta, beta_high, alpha, alpha_high, forget, forget_high,
+                  n_subj, n_actions, task, verbose=False):
+
+    # Select TS
+    Q_high_sub = Q_high[np.arange(n_subj), season]
+    p_high = softmax(beta_high * Q_high_sub, axis=1)
+    TS = season  # Flat
+    # TS = p_high.argmax(axis=1)  # Hierarchical deterministic
+    # TS = np.array([np.random.choice(a=3, p=p_high_subj) for p_high_subj in p_high])  # Hierarchical softmax
+
+    # Select action based on TS
+    Q_low_sub = Q_low[np.arange(n_subj), TS, alien]
+    p_low = softmax(beta * Q_low_sub, axis=1)
+    action = [np.random.choice(range(n_actions), p=p_low_subj) for p_low_subj in p_low]
+    reward, correct = task.produce_reward(action)
 
     # Forget Q-values a little bit
     Q_low = (1 - forget) * Q_low + forget * alien_initial_Q
@@ -72,11 +80,19 @@ def update_Qs_sim(season, TS, alien, action, reward, Q_low, Q_high, alpha, alpha
     Q_low[current_trial_low] += alpha * RPE_low
 
     if verbose:
+        print("Q_high_sub:", Q_high_sub.round(3))
+        print("p_high:", p_high.round(3))
         print("TS:", TS)
-        print("RPE_low:", RPE_low)
-        print("RPE_high:", RPE_high)
+        print("Q_low_sub:", Q_low_sub.round(3))
+        print("p_low:", p_low.round(3))
+        print("action:", action)
+        print("reward:", reward)
+        print("RPE_low:", RPE_low.round(3))
+        print("RPE_high:", RPE_high.round(3))
+        print("new Q_high_sub:", Q_high[np.arange(n_subj), season].round(3))
+        print("new Q_low_sub:", Q_low[np.arange(n_subj), TS, alien].round(3))
 
-    return [Q_low, Q_high]
+    return [Q_low, Q_high, TS, action, correct, reward, p_low]
 
 def softmax(X, axis=None):
     """

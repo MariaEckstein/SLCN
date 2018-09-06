@@ -62,9 +62,12 @@ else:
         forget_high = forget.copy()
 
 if verbose:
-    print("Alphas: {0}".format(alpha.round(3)))
-    print("Betas: {0}\n".format(beta.round(3)))
-    print("Forgets: {0}".format(forget.round(3)))
+    print("Alpha: {0}".format(alpha.round(3)))
+    print("Alpha_high: {0}".format(alpha_high.round(3)))
+    print("Beta: {0}".format(beta.round(3)))
+    print("Beta_high: {0}".format(beta_high.round(3)))
+    print("Forget: {0}".format(forget.round(3)))
+    print("Forget_high: {0}".format(forget_high.round(3)))
 
 # Get numbers of things
 n_subj = len(alpha)
@@ -93,8 +96,6 @@ forgets = np.repeat(forget, n_TS * n_aliens * n_actions).reshape([n_subj, n_TS, 
 forget_highs = np.repeat(forget_high, n_seasons * n_TS).reshape([n_subj, n_seasons, n_TS])  # Q_high for 1 trial
 
 print('Simulating {0} agents on {1} trials.\n'.format(n_subj, n_trials))
-action = np.full(n_subj, np.nan)
-reward = np.full(n_subj, np.nan)
 
 Q_low = alien_initial_Q * np.ones([n_subj, n_TS, n_aliens, n_actions])
 Q_high = alien_initial_Q * np.ones([n_subj, n_seasons, n_TS])
@@ -110,31 +111,13 @@ for trial in range(np.sum(n_trials)):
         print("season:", season)
         print("alien:", alien)
 
-    # Select TS
-    Q_high_sub = Q_high[np.arange(n_subj), season]
-    p_high = softmax(beta_highs * Q_high_sub, axis=1)
-    TS = season  # Flat model
-    # TS = p_high.argmax(axis=1)  # Select TS deterministically
-    # TS = np.array([np.random.choice(a=3, p=p_high_subj) for p_high_subj in p_high])  # numpy.random.choice(a, size=None, replace=True, p=None)¶
-
-    # Select action based on TS
-    Q_sub = Q_low[np.arange(n_subj), TS, alien]
-    p_low = softmax(betas * Q_sub, axis=1)
-    action = [np.random.choice(range(n_actions), p=p_low_subj) for p_low_subj in p_low]
-    reward, correct = task.produce_reward(action)
-
     # Update Q-values
-    [Q_low, Q_high] = update_Qs_sim(season, TS, alien, action, reward,
-                                    Q_low, Q_high,
-                                    alpha, alpha_high, beta_highs, forgets, forget_highs, n_subj,
-                                    verbose=verbose)
-
-    if verbose:
-        print("p_norm:", p_low.round(3))
-        print("action:", action)
-        print("reward:", reward)
-        print("Q_low:", Q_low.round(3))
-        print("Q_high:", Q_high.round(3))
+    [Q_low, Q_high, TS, action, correct, reward, p_low] =\
+        update_Qs_sim(season, alien,
+                      Q_low, Q_high,
+                      betas, beta_highs, alpha, alpha_high, forgets, forget_highs,
+                      n_subj, n_actions, task,
+                      verbose=verbose)
 
     # Store trial data
     seasons[trial] = season
@@ -166,6 +149,6 @@ for sID in range(n_subj):
     # subj_data["Q_low"] = Q_lows[:, sID]
 
     # Save to disc
-    file_name = save_dir + "alien_" + model_name + str(sID) + ".csv"
+    file_name = save_dir + "aliens_" + model_name + str(sID) + ".csv"
     print('Saving file {0}'.format(file_name))
     subj_data.to_csv(file_name)
