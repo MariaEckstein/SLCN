@@ -176,7 +176,7 @@ with pm.Model() as model:
     T.printing.Print('action_wise_p')(action_wise_p)
 
     # Check logps and draw samples
-    print_logp_info(model)
+    # print_logp_info(model)
     trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores, nuts_kwargs=dict(target_accept=.80))
 
 if verbose:

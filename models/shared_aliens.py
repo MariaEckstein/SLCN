@@ -2,14 +2,14 @@ verbose = False
 import numpy as np
 import theano.tensor as T
 import theano
+import pymc3 as pm
 
 from theano.tensor.shared_randomstreams import RandomStreams
 rs = RandomStreams()
 
 
 # Initial Q-value for actions and TS
-alien_initial_Q = 1.2  # rewards are z-scored!
-
+alien_initial_Q = 1  # rewards are z-scored!
 
 # Function to update Q-values based on stimulus, action, and reward
 def update_Qs(season, alien, action, reward,
@@ -21,8 +21,12 @@ def update_Qs(season, alien, action, reward,
     p_high = T.nnet.softmax(beta_high * Q_high_sub)
     T.printing.Print('Q_high_sub')(Q_high_sub)
     T.printing.Print('p_high')(p_high)
-    TS = season  # Flat
-    # TS = p_high.argmax(axis=1)  # Hierarchical deterministic
+    # TS = season  # Flat
+    TS = T.argmax(p_high, axis=1)  # Hierarchical deterministic
+    # TS = pm.Categorical('TS', p=p_high, shape=20)
+    # TS = theano.sandbox.rng_mrg.MRG_RandomStreams().choice(p=p_high, replace=False)  # Hierarchical stochastic
+    # TS.dimshuffle(0)
+    # TS = TS.flatten(ndim=1)
 
     # Participant selects action based on TS and observes a reward
 
