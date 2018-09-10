@@ -15,7 +15,7 @@ def get_paths(run_on_cluster):
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
     else:
-        base_path = 'C:/Users/maria/MEGAsync/SLCN'
+        base_path = '~/repos-other/SLCN'
         return {'human data': base_path + '/PShumanData/',
                 'fitting results': base_path + '/PShumanData/fitting/',
                 'ages file name': base_path + 'data/SLCNinfo.csv',

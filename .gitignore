@@ -16,3 +16,5 @@ butterflytask/Cogent2000v1.32
 *.xlsx
 *.csv
 *.idea
+*/__pycache__
+*.DS_Store

@@ -37,19 +37,19 @@ if use_fake_data:
     actions = np.ones([n_trials, n_subj], dtype=int)  # np.random.choice(range(n_actions), size=[n_trials, n_subj])
     rewards = 10 * np.ones([n_trials, n_subj])  # np.random.rand(n_trials * n_subj).reshape([n_trials, n_subj]).round(2)
 else:
-    n_subj, n_trials, seasons, aliens, actions, rewards =\
-        load_aliens_data(run_on_cluster, fitted_data_name, max_n_subj, verbose)
+    # n_subj, n_trials, seasons, aliens, actions, rewards =\
+    #     load_aliens_data(run_on_cluster, fitted_data_name, max_n_subj, verbose)
 
-    pd.DataFrame(seasons).to_csv("seasons.csv", index=False)
-    pd.DataFrame(aliens).to_csv("aliens.csv", index=False)
-    pd.DataFrame(actions).to_csv("actions.csv", index=False)
-    pd.DataFrame(rewards).to_csv("rewards.csv", index=False)
-    # seasons = pd.read_csv("seasons.csv")
-    # aliens = pd.read_csv("aliens.csv")
-    # actions = pd.read_csv("actions.csv")
-    # rewards = pd.read_csv("rewards.csv")
-    # n_trials = seasons.shape[0]
-    # n_subj = seasons.shape[1]
+    # pd.DataFrame(seasons).to_csv("seasons.csv", index=False)
+    # pd.DataFrame(aliens).to_csv("aliens.csv", index=False)
+    # pd.DataFrame(actions).to_csv("actions.csv", index=False)
+    # pd.DataFrame(rewards).to_csv("rewards.csv", index=False)
+    seasons = pd.read_csv("../notebooks/1735_data/seasons.csv")
+    aliens = pd.read_csv("../notebooks/1735_data/aliens.csv")
+    actions = pd.read_csv("../notebooks/1735_data/actions.csv")
+    rewards = pd.read_csv("../notebooks/1735_data/rewards.csv")
+    n_trials = seasons.shape[0]
+    n_subj = seasons.shape[1]
 
 if 'fs' in file_name_suff:
     seasons = np.zeros(seasons.shape, dtype=int)
