@@ -18,7 +18,7 @@ def load_aliens_data(run_on_cluster, fitted_data_name, n_subj, verbose):
         file_name_pattern = 'aliens*.csv'
         n_trials = 440  # nan trials will be excluded!
     else:
-        learning_style = 'hierarchical'
+        learning_style = '_f'
         data_dir = paths['simulations']
         file_name_pattern = 'aliens' + learning_style + '*.csv'
         n_trials = 463

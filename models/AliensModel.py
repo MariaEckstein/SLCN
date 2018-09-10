@@ -8,11 +8,23 @@ import matplotlib.pyplot as plt
 from shared_aliens import *
 from modeling_helpers import *
 
+# TODO
+# sample TS rather than argmax
+# independent low & high parameters
+# more efficient?!?
+# respond to pymc3discourse
+# simulate
+# figure out which model makes good simulations and implement this one
+#
+# backend = pymc3.backends.sqlite.SQLite('aliens_trace')
+# sample from posterior predictive distribution
+# simulation = pm.sample_ppc(trace, samples=500)
+
 
 # Switches for this script
 run_on_cluster = False
 print_logps = False
-file_name_suff = 'f_abf_efficient'
+file_name_suff = 'f'
 use_fake_data = False
 
 # Which data should be fitted?
@@ -21,7 +33,7 @@ fitted_data_name = 'humans'  # 'humans', 'simulations'
 # Sampling details
 n_samples = 50
 n_tune = 50
-max_n_subj = 40  # set > 31 to include all subjects
+max_n_subj = 20  # set > 31 to include all subjects
 if run_on_cluster:
     n_cores = 4
 else:
@@ -54,8 +66,11 @@ else:
 if 'fs' in file_name_suff:
     seasons = np.zeros(seasons.shape, dtype=int)
 
-next_seasons = np.concatenate([seasons[:-1], np.ones((1, n_subj), dtype=int)])
-next_aliens = np.concatenate([aliens[:-1], np.ones((1, n_subj), dtype=int)])
+# Convert data to tensor variables
+seasons = T.as_tensor_variable(seasons)
+aliens = T.as_tensor_variable(aliens)
+actions = T.as_tensor_variable(actions)
+rewards = T.as_tensor_variable(rewards)
 
 trials, subj = np.meshgrid(range(n_trials), range(n_subj))
 trials = T.as_tensor_variable(trials.T)
@@ -69,75 +84,100 @@ model_dict = {}
 print("Compiling models for {0} with {1} samples and {2} tuning steps...\n".format(fitted_data_name, n_samples, n_tune))
 with pm.Model() as model:
 
-    # RL parameters: softmax temperature beta; learning rate alpha; forgetting of Q-values
+    ## RL parameters: softmax temperature beta; learning rate alpha; forgetting of Q-values
+    # Parameter shapes
     beta_shape = (1, n_subj, 1)  # Q_sub.shape -> [n_trials, n_subj, n_actions]
-    beta_mu = pm.Gamma('beta_mu', mu=1, sd=2, testval=1.25)
-    beta_sd = pm.HalfNormal('beta_sd', sd=0.5, testval=0.1)
+    forget_shape = (n_subj, 1, 1, 1)  # Q_low[0].shape -> [n_subj, n_TS, n_aliens, n_actions]
+    beta_high_shape = (n_subj, 1)  # -> [n_subj, n_TS]
+    forget_high_shape = (n_subj, 1, 1)  # -> [n_subj, n_seasons, n_TS]
+
+    # Parameter means
+    beta_mu = pm.Gamma('beta_mu', mu=1, sd=2, testval=1.5)
+    alpha_mu = pm.Uniform('alpha_mu', lower=0, upper=1, testval=0.2)
+    forget_mu = pm.Uniform('forget_mu', lower=0, upper=1, testval=0.1)
+    # alpha_mu = pm.Bound(pm.HalfNormal, upper=1)('alpha_mu', sd=0.5, testval=0.2)
+    # forget_mu = pm.Bound(pm.HalfNormal, upper=1)('forget_mu', sd=0.5, testval=0.1)
+    beta_high_mu = pm.Gamma('beta_high_mu', mu=1, sd=2, testval=1.5)
+    alpha_high_mu = pm.Bound(pm.HalfNormal, upper=1)('alpha_high_mu', sd=0.5, testval=0.2)
+    forget_high_mu = pm.Bound(pm.HalfNormal, upper=1)('forget_high_mu', sd=0.5, testval=0.1)
+
+    # Parameter sds
+    beta_sd = pm.HalfNormal('beta_sd', sd=1, testval=0.1)
+    alpha_sd = pm.HalfNormal('alpha_sd', sd=0.2, testval=0.1)
+    forget_sd = pm.HalfNormal('forget_sd', sd=0.2, testval=0.1)
+    beta_high_sd = pm.HalfNormal('beta_high_sd', sd=1, testval=0.1)
+    alpha_high_sd = pm.HalfNormal('alpha_high_sd', sd=0.2, testval=0.1)
+    forget_high_sd = pm.HalfNormal('forget_high_sd', sd=0.2, testval=0.1)
+
+    # Individual differences
     beta_matt = pm.Bound(pm.Normal, lower=-beta_mu / beta_sd)(
         'beta_matt', mu=0, sd=1,
         shape=beta_shape, testval=np.random.choice([-1, 0, 1], n_subj).reshape(beta_shape))
-    beta = pm.Deterministic('beta', beta_mu + beta_sd * beta_matt)
-    T.printing.Print('beta')(beta)
-
-    alpha_mu = pm.Bound(pm.Normal, lower=0, upper=1)('alpha_mu', mu=0.15, sd=1, testval=0.15)
-    alpha_sd = pm.HalfNormal('alpha_sd', sd=0.1, testval=0.05)
     alpha_matt = pm.Bound(pm.Normal, lower=-alpha_mu / alpha_sd, upper=(1 - alpha_mu) / alpha_sd)(
         'alpha_matt', mu=0, sd=1,
         shape=n_subj, testval=np.random.choice([-1, 0, 1], n_subj))
-    alpha = pm.Deterministic('alpha', alpha_mu + alpha_sd * alpha_matt)
-    T.printing.Print('alpha')(alpha)
-
-    forget_shape = (n_subj, 1, 1, 1)  # Q_low[0].shape -> [n_subj, n_TS, n_aliens, n_actions]
-    forget_mu = pm.Bound(pm.Normal, lower=0, upper=1)('forget_mu', mu=0.03, sd=0.1, testval=0.03)
-    forget_sd = pm.HalfNormal('forget_sd', sd=0.1, testval=0.01)
     forget_matt = pm.Bound(pm.Normal, lower=-forget_mu / forget_sd, upper=(1 - forget_mu) / forget_sd)(
         'forget_matt', mu=0, sd=1,
-        shape=forget_shape, testval=np.random.choice([-1, 0, 1], n_subj).reshape(forget_shape))
+        shape=forget_shape, testval=np.random.choice([0, 1], n_subj).reshape(forget_shape))
+    beta_high_matt = pm.Bound(pm.Normal, lower=-beta_high_mu / beta_high_sd)(
+        'beta_high_matt', mu=0, sd=1,
+        shape=beta_high_shape, testval=np.random.choice([-1, 0, 1], n_subj).reshape(beta_high_shape))
+    alpha_high_matt = pm.Bound(pm.Normal, lower=-alpha_high_mu / alpha_high_sd, upper=(1 - alpha_high_mu) / alpha_high_sd)(
+        'alpha_high_matt', mu=0, sd=1,
+        shape=n_subj, testval=np.random.choice([-1, 0, 1], n_subj))
+    forget_high_matt = pm.Bound(pm.Normal, lower=-forget_high_mu / forget_high_sd, upper=(1 - forget_high_mu) / forget_high_sd)(
+        'forget_high_matt', mu=0, sd=1,
+        shape=forget_high_shape, testval=np.random.choice([0, 1], n_subj).reshape(forget_high_shape))
+
+    # Put parameters together
+    beta = pm.Deterministic('beta', beta_mu + beta_sd * beta_matt)
+    alpha = pm.Deterministic('alpha', alpha_mu + alpha_sd * alpha_matt)
     forget = pm.Deterministic('forget', forget_mu + forget_sd * forget_matt)
-    # forget = T.zeros(forget_shape)
+    beta_high = pm.Deterministic('beta_high', beta_high_mu + beta_high_sd * beta_high_matt)
+    alpha_high = pm.Deterministic('alpha_high', alpha_high_mu + alpha_high_sd * alpha_high_matt)
+    forget_high = pm.Deterministic('forget_high', forget_high_mu + forget_high_sd * forget_high_matt)
+    # beta_high = beta.dimshuffle(1, 2)  # [n_trials, n_subj, n_actions] -> [n_subj, n_TS]
+    # alpha_high = alpha.copy()  # [n_subj]
+    # forget_high = forget.dimshuffle(0, 2, 3)  # [n_subj, n_TS, n_aliens, n_actions] -> [n_subj, n_seasons, n_TS]
+
+    # Print resulting parameters
+    T.printing.Print('beta')(beta)
+    T.printing.Print('alpha')(alpha)
     T.printing.Print('forget')(forget)
+    T.printing.Print('beta_high')(beta_high)
+    T.printing.Print('alpha_high')(alpha_high)
+    T.printing.Print('forget_high')(forget_high)
 
-    beta_high = beta.dimshuffle(1, 2)  # [n_trials, n_subj, n_actions] -> [n_subj, n_TS]
-    alpha_high = alpha.copy()  # [n_subj]
-    forget_high = forget.dimshuffle(0, 2, 3)  # [n_subj, n_TS, n_aliens, n_actions] -> [n_subj, n_seasons, n_TS]
-
+    ## Select action based on Q-values
     # Initialize Q-values
     Q_low0 = alien_initial_Q * T.ones([n_subj, n_TS, n_aliens, n_actions])
     Q_high0 = alien_initial_Q * T.ones([n_subj, n_seasons, n_TS])
 
-    # Get Q-values for the whole task (update each trial)
-    [_, Q_low_sub, _], _ = theano.scan(fn=update_Qs,  # hierarchical: TS = p_high.argmax(axis=1); flat: TS = season
-                                       sequences=[theano.shared(seasons), theano.shared(next_seasons),
-                                                  theano.shared(aliens), theano.shared(next_aliens),
-                                                  theano.shared(actions),
-                                                  theano.shared(rewards)],
-                                       outputs_info=[Q_low0, T.ones((n_subj, n_actions)), Q_high0],
-                                       non_sequences=[beta_high, alpha, alpha_high, forget, forget_high, n_subj],
-                                       strict=True)
+    # Calculate Q-values (update in each trial)
+    [Q_low, Q_high, TS], _ = theano.scan(fn=update_Qs,
+                                         sequences=[seasons, aliens, actions, rewards],
+                                         outputs_info=[Q_low0, Q_high0, None],
+                                         non_sequences=[beta_high, alpha, alpha_high, forget, forget_high, n_subj])
 
-    # Q_low = T.concatenate([[Q_low0], Q_low[:-1]], axis=0)  # Add first trial's Q-values, remove last trials Q-values
-    Q_sub = T.concatenate([[Q_low0[T.arange(n_subj), 0, 0]], Q_low_sub[:-1]], axis=0)  # Add first trial's Q-values, remove last trials Q-values
-    # Q_high = T.concatenate([[Q_high0], Q_high[:-1]], axis=0)  # Won't be used - just for printing
-    # T.printing.Print("Q_low")(Q_low)
-    # T.printing.Print("Q_high")(Q_high)
+    Q_low = T.concatenate([[Q_low0], Q_low[:-1]], axis=0)  # Add first trial's Q-values, remove last trials Q-values
+    Q_high = T.concatenate([[Q_high0], Q_high[:-1]], axis=0)  # Won't be used - just for printing
+    T.printing.Print("Q_low")(Q_low)
+    T.printing.Print("Q_high")(Q_high)
 
-    # Select the right Q-values for each trial & apply softmax
-    # Q_sub = beta * Q_low[trials, subj, seasons, aliens]  # Q_sub.shape -> [n_trials, n_subj, n_actions]
-    Q_sub *= beta
+    # Select Q-values for each trial & translate into probabilities
+    Q_sub = beta * Q_low[trials, subj, TS, aliens]  # Q_sub.shape -> [n_trials, n_subj, n_actions]
     action_wise_Q = Q_sub.reshape([n_trials * n_subj, n_actions])
     action_wise_p = T.nnet.softmax(action_wise_Q)
 
-    # Select action based on Q-values
+    # Select actions based on Q-values
     action_wise_actions = actions.flatten()
     actions = pm.Categorical('actions', p=action_wise_p, observed=action_wise_actions)
     T.printing.Print('action_wise_Q')(action_wise_Q)
     T.printing.Print('action_wise_p')(action_wise_p)
 
-    # Sample the model
-    # TODO: backend = pymc3.backends.sqlite.SQLite('aliens_trace')
+    # Check logps and draw samples
+    # print_logp_info(model)
     trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores, nuts_kwargs=dict(target_accept=.80))
-    # TODO: sample from posterior predictive distribution
-    # simulation = pm.sample_ppc(trace, samples=500)
 
 if verbose:
     plt.hist(trace['alpha'])

@@ -37,7 +37,7 @@ def get_alien_paths(run_on_cluster):
         base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
         return {'human data': base_path + '/Data/version3.1/',
                 'fitting results': base_path + '/Data/version3.1/fitting/',
-                'simulations': base_path + '/Data/simulations/'}
+                'simulations': 'C:/Users/maria/MEGAsync/SLCN/PSsimulations/'}
 
 
 def p_from_Q(Q_left, Q_right, beta, eps):
