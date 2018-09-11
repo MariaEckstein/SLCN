@@ -22,7 +22,7 @@ calculate_waic = False
               # ]
 # model_names = ['albenalcal', 'rew_swi_eps']
 file_names = [
-    'h_bugfix_2018_9_5_14_24_humans_n_samples200aliens',
+    'albenal_2018_8_13_23_57_humans_n_samples1000RL',
     # 'f_bugfix_2018_9_5_14_25_humans_n_samples300aliens',
     # 'h_bugfix_2018_9_5_14_23_humans_n_samples100aliens',
     # 'AliensFlat/fs_abf_2018_8_11_13_27_humans_n_samples500aliens',

@@ -21,8 +21,8 @@ def update_Qs(season, alien, action, reward,
     p_high = T.nnet.softmax(beta_high * Q_high_sub)
     T.printing.Print('Q_high_sub')(Q_high_sub)
     T.printing.Print('p_high')(p_high)
-    # TS = season  # Flat
-    TS = T.argmax(p_high, axis=1)  # Hierarchical deterministic
+    TS = season  # Flat
+    # TS = T.argmax(p_high, axis=1)  # Hierarchical deterministic
     # TS = pm.Categorical('TS', p=p_high, shape=20)
     # TS = theano.sandbox.rng_mrg.MRG_RandomStreams().choice(p=p_high, replace=False)  # Hierarchical stochastic
     # TS.dimshuffle(0)
@@ -44,6 +44,36 @@ def update_Qs(season, alien, action, reward,
                              Q_high[current_trial_high] + alpha_high * RPE_high)
 
     current_trial_low = T.arange(n_subj), TS, alien, action
+    RPE_low = reward - Q_low[current_trial_low]
+    Q_low = T.set_subtensor(Q_low[current_trial_low],
+                            Q_low[current_trial_low] + alpha * RPE_low)
+
+    return [Q_low, Q_high, TS]
+
+# Function to update Q-values based on stimulus, action, and reward
+def update_Qs_1subj(season, alien, action, reward,
+                    Q_low, Q_high,
+                    beta_high, alpha, alpha_high, forget, forget_high, n_subj):
+
+    # Select TS
+    Q_high_sub = Q_high[season]
+    p_high = T.nnet.softmax(beta_high * Q_high_sub)
+    # TS = season  # Flat
+    TS = T.argmax(p_high, axis=1)  # Hierarchical deterministic
+
+    # Participant selects action based on TS and observes a reward
+
+    # Forget Q-values a little bit
+    Q_low = (1 - forget) * Q_low + forget * alien_initial_Q
+    Q_high = (1 - forget_high) * Q_high + forget_high * alien_initial_Q  # TODO THIS IS WHERE THE NANS ARE INTRODUCED
+
+    # Calculate RPEs & update Q-values
+    current_trial_high = season, TS
+    RPE_high = reward - Q_high[current_trial_high]
+    Q_high = T.set_subtensor(Q_high[current_trial_high],
+                             Q_high[current_trial_high] + alpha_high * RPE_high)
+
+    current_trial_low = TS, alien, action
     RPE_low = reward - Q_low[current_trial_low]
     Q_low = T.set_subtensor(Q_low[current_trial_low],
                             Q_low[current_trial_low] + alpha * RPE_low)
