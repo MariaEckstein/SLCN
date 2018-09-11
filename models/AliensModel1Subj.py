@@ -22,25 +22,28 @@ from modeling_helpers import *
 # p = eps / n_actions + (1 - eps) * softmax(Q)
 # requirements file
 # issues.md -> all the issues and how I solved them
+# to plot distributions: plt.hist(pm.Bound(pm.Normal, lower=0).dist(mu=1, sd=3).random(size=int(1e6)), bins=int(1e2)); plt.show()
 
 
 # Switches for this script
 run_on_cluster = False
 print_logps = False
-file_name_suff = 'h'
+file_name_suff = 'h_1subj'
 use_fake_data = False
 
 # Which data should be fitted?
 fitted_data_name = 'humans'  # 'humans', 'simulations'
 
 # Sampling details
-n_samples = 50
-n_tune = 50
 max_n_subj = 1  # set > 31 to include all subjects
 if run_on_cluster:
     n_cores = 4
+    n_samples = 2000
+    n_tune = 2000
 else:
     n_cores = 1
+    n_samples = 10
+    n_tune = 10
 n_chains = 1
 
 # Get data
@@ -55,10 +58,10 @@ else:
     n_subj, n_trials, seasons, aliens, actions, rewards =\
         load_aliens_data(run_on_cluster, fitted_data_name, max_n_subj, verbose)
 
-    pd.DataFrame(seasons).to_csv("seasons.csv", index=False)
-    pd.DataFrame(aliens).to_csv("aliens.csv", index=False)
-    pd.DataFrame(actions).to_csv("actions.csv", index=False)
-    pd.DataFrame(rewards).to_csv("rewards.csv", index=False)
+    # pd.DataFrame(seasons).to_csv("seasons.csv", index=False)
+    # pd.DataFrame(aliens).to_csv("aliens.csv", index=False)
+    # pd.DataFrame(actions).to_csv("actions.csv", index=False)
+    # pd.DataFrame(rewards).to_csv("rewards.csv", index=False)
     # seasons = pd.read_csv("seasons.csv")
     # aliens = pd.read_csv("aliens.csv")
     # actions = pd.read_csv("actions.csv")
@@ -89,27 +92,17 @@ with pm.Model() as model:
 
     ## RL parameters: softmax temperature beta; learning rate alpha; forgetting of Q-values
     # Parameter means
-    beta = pm.Gamma('beta', mu=1, sd=2, testval=1.5)
+    beta = pm.Bound(pm.Normal, lower=0)('beta', mu=1, sd=5, testval=1.5)
     alpha = pm.Uniform('alpha', lower=0, upper=1, testval=0.1)
     forget = pm.Uniform('forget', lower=0, upper=1, testval=0.001)
-    beta_high = pm.Gamma('beta_high', mu=1, sd=2, testval=1.5)
+    beta_high = pm.Bound(pm.Normal, lower=0)('beta_high', mu=1, sd=5, testval=1.5)
     alpha_high = pm.Uniform('alpha_high', lower=0, upper=1, testval=0.1)
     forget_high = pm.Uniform('forget_high', lower=0, upper=1, testval=0.001)
 
-    # Print resulting parameters
-    T.printing.Print('beta')(beta)
-    T.printing.Print('alpha')(alpha)
-    T.printing.Print('forget')(forget)
-    T.printing.Print('beta_high')(beta_high)
-    T.printing.Print('alpha_high')(alpha_high)
-    T.printing.Print('forget_high')(forget_high)
-
     ## Select action based on Q-values
-    # Initialize Q-values
     Q_low0 = alien_initial_Q * T.ones([n_TS, n_aliens, n_actions])
     Q_high0 = alien_initial_Q * T.ones([n_seasons, n_TS])
 
-    # Calculate Q-values (update in each trial)
     [Q_low, Q_high, TS], _ = theano.scan(fn=update_Qs_1subj,
                                          sequences=[seasons, aliens, actions, rewards],
                                          outputs_info=[Q_low0, Q_high0, None],
@@ -128,8 +121,6 @@ with pm.Model() as model:
     # Select actions based on Q-values
     action_wise_actions = actions.flatten()
     actions = pm.Categorical('actions', p=p_low, observed=action_wise_actions)
-    T.printing.Print('Q_sub')(Q_sub)
-    T.printing.Print('p_low')(p_low)
 
     # Check logps and draw samples
     # print_logp_info(model)
