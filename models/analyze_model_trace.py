@@ -22,8 +22,8 @@ calculate_waic = False
               # ]
 # model_names = ['albenalcal', 'rew_swi_eps']
 file_names = [
-    'albenal_2018_8_13_23_57_humans_n_samples1000RL',
-    # 'f_bugfix_2018_9_5_14_25_humans_n_samples300aliens',
+    'h_1subj_2018_9_13_9_37_humans_n_samples200aliens',
+    # 'f_1subj_2018_9_11_0_3_humans_n_samples2000aliens',
     # 'h_bugfix_2018_9_5_14_23_humans_n_samples100aliens',
     # 'AliensFlat/fs_abf_2018_8_11_13_27_humans_n_samples500aliens',
     # 'AliensFlat/flat_tilde_ta99_abf_2018_8_10_14_58_humans_n_samples300aliens',
@@ -38,7 +38,7 @@ file_names = [
 #     'RL_3groups/10s/alpha_beta_calpha_2018_7_24_14_15_humans_n_samples5000RL',
     # 'RL_3groups/10s/alpha_beta_nalpha_calpha_eps_2018_7_24_18_46_humans_n_samples5000RL'
               ]
-model_names = ['fs', 'fabf', 'fabf', 'fabf', 'hab', 'habf', 'f', 'h', 'h', 'albecal10', 'albenalcaleps10']
+model_names = ['h', 'f', 'fabf', 'fabf', 'hab', 'habf', 'f', 'h', 'h', 'albecal10', 'albenalcaleps10']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)

@@ -9,19 +9,17 @@ import theano.tensor as T
 from shared_modeling_simulation import get_paths, get_alien_paths
 
 
-def load_aliens_data(run_on_cluster, fitted_data_name, n_subj, verbose):
+def load_aliens_data(run_on_cluster, fitted_data_name, n_subj, n_trials, verbose):
 
     # Get data path and save path
     paths = get_alien_paths(run_on_cluster)
     if fitted_data_name == 'humans':
         data_dir = paths['human data']
         file_name_pattern = 'aliens*.csv'
-        n_trials = 440  # nan trials will be excluded!
     else:
         learning_style = '_f'
         data_dir = paths['simulations']
         file_name_pattern = 'aliens' + learning_style + '*.csv'
-        n_trials = 463
 
     # Prepare things for loading data
     filenames = glob.glob(data_dir + file_name_pattern)[:n_subj]

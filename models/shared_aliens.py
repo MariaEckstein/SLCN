@@ -1,11 +1,8 @@
-verbose = False
 import numpy as np
 import theano.tensor as T
-import theano
-import pymc3 as pm
 
-from theano.tensor.shared_randomstreams import RandomStreams
-rs = RandomStreams()
+# from theano.tensor.shared_randomstreams import RandomStreams
+# rs = RandomStreams()
 
 
 # Initial Q-value for actions and TS
@@ -50,33 +47,76 @@ def update_Qs(season, alien, action, reward,
 
     return [Q_low, Q_high, TS]
 
-# Function to update Q-values based on stimulus, action, and reward
-def update_Qs_1subj(season, alien, action, reward,
-                    Q_low, Q_high,
-                    beta_high, alpha, alpha_high, forget, forget_high, n_subj):
+def update_Qs_hier(season, alien, action, reward,
+              Q_low, Q_high,
+              alpha, alpha_high, forget, n_subj):
 
     # Select TS
-    Q_high_sub = Q_high[season]
-    p_high = T.nnet.softmax(beta_high * Q_high_sub)
-    # TS = season  # Flat
-    TS = T.argmax(p_high, axis=1)  # Hierarchical deterministic
-
-    # Participant selects action based on TS and observes a reward
+    Q_high_sub = Q_high[T.arange(n_subj), season]
+    TS = T.argmax(Q_high_sub, axis=1)  # Hierarchical deterministic
 
     # Forget Q-values a little bit
     Q_low = (1 - forget) * Q_low + forget * alien_initial_Q
-    Q_high = (1 - forget_high) * Q_high + forget_high * alien_initial_Q  # TODO THIS IS WHERE THE NANS ARE INTRODUCED
 
     # Calculate RPEs & update Q-values
-    current_trial_high = season, TS
+    current_trial_high = T.arange(n_subj), season, TS
     RPE_high = reward - Q_high[current_trial_high]
     Q_high = T.set_subtensor(Q_high[current_trial_high],
                              Q_high[current_trial_high] + alpha_high * RPE_high)
 
-    current_trial_low = TS, alien, action
+    current_trial_low = T.arange(n_subj), TS, alien, action
     RPE_low = reward - Q_low[current_trial_low]
     Q_low = T.set_subtensor(Q_low[current_trial_low],
                             Q_low[current_trial_low] + alpha * RPE_low)
+
+    return [Q_low, Q_high, TS]
+
+def update_Qs_flat(season, alien, action, reward,
+              Q_low,
+              alpha, forget, n_subj):
+
+    # Forget Q-values a little bit
+    Q_low = (1 - forget) * Q_low + forget * alien_initial_Q
+
+    # Calculate RPEs & update Q-values
+    Q_low = T.set_subtensor(Q_low[T.arange(n_subj), season, alien, action],
+                            Q_low[T.arange(n_subj), season, alien, action] + alpha * (reward - Q_low[T.arange(n_subj), season, alien, action]))
+
+    return [Q_low]
+
+# Function to update Q-values based on stimulus, action, and reward
+def update_Qs_1subj_flat(season, alien, action, reward,
+                    Q_low,
+                    alpha, forget):
+
+    # Forget Q-values a little bit
+    Q_low = (1 - forget) * Q_low + forget * alien_initial_Q
+
+    # Calculate RPEs & update Q-values
+    current_trial_low = season, alien, action
+    RPE_low = reward - Q_low[current_trial_low]
+    Q_low = T.set_subtensor(Q_low[current_trial_low],
+                            Q_low[current_trial_low] + alpha * RPE_low)
+
+    return Q_low
+
+
+# Function to update Q-values based on stimulus, action, and reward
+def update_Qs_1subj_hier(season, alien, action, reward,
+                         Q_low, Q_high,
+                         alpha, alpha_high, forget):
+
+    # Select TS
+    TS = T.argmax(Q_high[season], axis=1)  # Hierarchical deterministic
+
+    # Forget Q-values a little bit
+    Q_low = (1 - forget) * Q_low + forget * alien_initial_Q
+
+    # Calculate RPEs & update Q-values
+    Q_high = T.set_subtensor(Q_high[season, TS],
+                             Q_high[season, TS] + alpha_high * (reward - Q_high[season, TS]))
+    Q_low = T.set_subtensor(Q_low[TS, alien, action],
+                            Q_low[TS, alien, action] + alpha * (reward - Q_low[TS, alien, action]))
 
     return [Q_low, Q_high, TS]
 
