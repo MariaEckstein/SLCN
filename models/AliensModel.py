@@ -25,6 +25,7 @@ np.random.seed(123456)
 
 
 # Switches for this script
+verbose = False
 run_on_cluster = False
 print_logps = False
 file_name_suff = 'h'
