@@ -3,10 +3,11 @@ import theano
 import theano.tensor as T
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import pickle
 import pandas as pd
 
-from shared_aliens import alien_initial_Q, update_Qs_flat, update_Qs_hier  #, update_Qs_hier
+from shared_aliens import alien_initial_Q, update_Qs, update_Qs_flat, update_Qs_hier  #, update_Qs_hier
 from modeling_helpers import load_aliens_data, get_save_dir_and_save_id
 
 # TODO
@@ -38,16 +39,16 @@ from modeling_helpers import load_aliens_data, get_save_dir_and_save_id
 verbose = False
 run_on_cluster = False
 print_logps = False
-file_name_suff = 'h_many'
+file_name_suff = 'h'
 use_fake_data = False
 
 # Which data should be fitted?
-fitted_data_name = 'humans'  # 'humans', 'simulations'
+fitted_data_name = 'simulations'  # 'humans', 'simulations'
 n_seasons, n_TS, n_aliens, n_actions = 3, 3, 4, 3
 
 # Sampling details
 max_n_subj = 30  # set > 31 to include all subjects
-max_n_trials = 20
+max_n_trials = 440  # 960
 if run_on_cluster:
     n_cores = 4
     n_samples = 2000
@@ -65,8 +66,8 @@ if use_fake_data:
     actions = np.ones([n_trials, n_subj], dtype=int)  # np.random.choice(range(n_actions), size=[n_trials, n_subj])
     rewards = 10 * np.ones([n_trials, n_subj])  # np.random.rand(n_trials * n_subj).reshape([n_trials, n_subj]).round(2)
 else:
-    n_subj, n_trials, seasons, aliens, actions, rewards =\
-        load_aliens_data(run_on_cluster, fitted_data_name, max_n_subj, max_n_trials, verbose)
+    n_subj, n_trials, seasons, aliens, actions, rewards, true_params =\
+        load_aliens_data(run_on_cluster, fitted_data_name, file_name_suff, max_n_subj, max_n_trials, verbose)
 
     # pd.DataFrame(seasons).to_csv("seasons.csv", index=False)
     # pd.DataFrame(aliens).to_csv("aliens.csv", index=False)
@@ -97,127 +98,97 @@ save_dir, save_id = get_save_dir_and_save_id(run_on_cluster, file_name_suff, fit
 
 # Fit models
 model_dict = {}
-print("Compiling models for {4} {0} with {1} samples, {2} tuning steps, and {3} trials...\n".
+print("Compiling model: {4} {0}, {1} samples, {2} tuning steps, {3} trials\n".
       format(fitted_data_name, n_samples, n_tune, max_n_trials, max_n_subj))
 
-# RL MODEL
-# with pm.Model() as model:
-#
-#     ## RL parameters: softmax temperature beta; learning rate alpha; forgetting of Q-values
-#     beta_shape = (1, n_subj, 1)  # Q_sub.shape -> [n_trials, n_subj, n_actions]
-#     forget_shape = (n_subj, 1, 1, 1)  # Q_low[0].shape -> [n_subj, n_TS, n_aliens, n_actions]
-#
-#     beta = pm.Bound(pm.Normal, lower=0)('beta', mu=1, sd=5, shape=beta_shape, testval=1.5 * T.ones(beta_shape))
-#     alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj, testval=0.1 * T.ones(n_subj))
-#     forget = pm.Uniform('forget', lower=0, upper=1, shape=forget_shape, testval=0.001 * T.ones(forget_shape))
-#
-#     ## Select action based on Q-values
-#     Q_low0 = alien_initial_Q * T.ones([n_subj, n_TS, n_aliens, n_actions])
-#     Q_low, _ = theano.scan(fn=update_Qs_flat,
-#                            sequences=[seasons, aliens, actions, rewards],
-#                            outputs_info=[Q_low0],
-#                            non_sequences=[alpha, forget, n_subj],
-#                            profile=True,
-#                            name='my_scan')
-#
-#     Q_low = T.concatenate([[Q_low0], Q_low[:-1]], axis=0)  # Add first trial's Q-values, remove last trials Q-values
-#
-#     # Select Q-values for each trial & translate into probabilities
-#     Q_sub = beta * Q_low[trials, subj, seasons, aliens]  # Q_sub.shape -> [n_trials, n_subj, n_actions]
-#     p_low = T.nnet.softmax(Q_sub.reshape([n_trials * n_subj, n_actions]))
-#
-#     # Select actions based on Q-values
-#     actions = pm.Categorical('actions', p=p_low, observed=actions.flatten())
-#
-#     # Draw samples
-#     trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores)
-
-# TS MODEL
+# Model for TS and RL (comment the right stuff in and out!)
 with pm.Model() as model:
 
-    ## RL parameters: softmax temperature beta; learning rate alpha; forgetting of Q-values
-    beta_shape = (1, n_subj, 1)  # Q_sub.shape -> [n_trials, n_subj, n_actions]
-    forget_shape = (n_subj, 1, 1, 1)  # Q_low[0].shape -> [n_subj, n_TS, n_aliens, n_actions]
+    # RL parameters: softmax temperature beta; learning rate alpha; forgetting of Q-values
+    beta_shape = (n_subj, 1)  # Q_sub.shape inside scan -> [n_subj, n_actions]
+    forget_shape = (n_subj, 1, 1, 1)  # Q_low.shape inside scan -> [n_subj, n_TS, n_aliens, n_actions]
+    # beta_high_shape = (n_subj, 1)  # Q_high_sub.shape inside scan -> [n_subj, n_TS]
+    # forget_high_shape = (n_subj, 1, 1)  # Q_high.shape inside scan -> [n_subj, n_seasons, n_TS]
 
-    beta = pm.Bound(pm.Normal, lower=0)('beta', mu=1, sd=5, shape=beta_shape, testval=1.5 * T.ones(beta_shape))
-    alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj, testval=0.1 * T.ones(n_subj))
-    forget = pm.Uniform('forget', lower=0, upper=1, shape=forget_shape, testval=0.001 * T.ones(forget_shape))
-    alpha_high = pm.Uniform('alpha_high', lower=0, upper=1, shape=n_subj, testval=0.1)
+    # beta = pm.Bound(pm.Normal, lower=0)('beta', mu=1, sd=10, shape=beta_shape, testval=1.5 * T.ones(beta_shape))
+    beta = pm.Deterministic('beta', 2 * T.ones(beta_shape))
+    # alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj, testval=0.1 * T.ones(n_subj))
+    alpha = pm.Deterministic('alpha', 0.1 * T.ones(n_subj))
+    forget = pm.Uniform('forget', lower=0, upper=1, shape=forget_shape, testval=0.01 * T.ones(forget_shape))
+    # forget = pm.Deterministic('forget', T.zeros(forget_shape))
+    # beta_high = T.ones(beta_high_shape)
+    # alpha_high = pm.Uniform('alpha_high', lower=0, upper=1, shape=n_subj, testval=0.1)  # Hierarchical agent
+    alpha_high = pm.Deterministic('alpha_high', 0.1 * T.ones(n_subj))  # Flat agent
+    # forget_high = T.zeros(forget_high_shape)
 
-    ## Select action based on Q-values
+    # Calculate Q_high and Q_low for each trial
     Q_low0 = alien_initial_Q * T.ones([n_subj, n_TS, n_aliens, n_actions])
     Q_high0 = alien_initial_Q * T.ones([n_subj, n_seasons, n_TS])
-    [Q_low, _, TS], _ = theano.scan(fn=update_Qs_hier,
-                           sequences=[seasons, aliens, actions, rewards],
-                           outputs_info=[Q_low0, Q_high0, None],
-                           non_sequences=[alpha, alpha_high, forget, n_subj],
-                           profile=True,
-                           name='my_scan')
+    [Q_low, _, TS, p_low], _ = theano.scan(fn=update_Qs,
+                                           sequences=[seasons, aliens, actions, rewards],
+                                           outputs_info=[Q_low0, Q_high0, None, None],
+                                           non_sequences=[beta, alpha, alpha_high, forget, n_subj],
+                                           # profile=True,
+                                           # name='my_scan')
+                                           )
 
-    Q_low = T.concatenate([[Q_low0], Q_low[:-1]], axis=0)  # Add first trial's Q-values, remove last trials Q-values
-
-    # Select Q-values for each trial & translate into probabilities
-    Q_sub = beta * Q_low[trials, subj, TS, aliens]  # Q_sub.shape -> [n_trials, n_subj, n_actions]
-    p_low = T.nnet.softmax(Q_sub.reshape([n_trials * n_subj, n_actions]))
-
-    # Select actions based on Q-values
-    actions = pm.Categorical('actions', p=p_low, observed=actions.flatten())
+    # Relate calculated p_low to observed actions
+    actions = pm.Categorical('actions',
+                             p=p_low.reshape([n_trials * n_subj, n_actions]),
+                             observed=actions.flatten())
 
     # Draw samples
-    trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores)
+    # trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores)
+    map_estimate = pm.find_MAP()  # default: Broyden–Fletcher–Goldfarb–Shanno (BFGS)
 
-model.profile(model.logpt).summary()
+# model.profile(model.logpt).summary()
 
-# Get results
-model_summary = pm.summary(trace)
+# Look at MAP estimate for all parameters
+print(map_estimate)
+param_names = ['alpha', 'beta', 'forget', 'alpha_high']
+map = pd.DataFrame([map_estimate[RV].flatten() for RV in param_names], index=param_names)
+param_data = map.append(true_params)
+param_data.to_csv(save_dir + save_id + model.name + 'map.csv', header=False)
 
-if not run_on_cluster:
-    pm.traceplot(trace)
-    plt.savefig(save_dir + save_id + model.name + 'trace_plot.png')
-    pd.DataFrame(model_summary).to_csv(save_dir + save_id + model.name + 'model_summary.csv')
+axes = plt.subplot(2, 2, 1)
+sns.regplot(param_data.loc['alpha'], param_data.loc['true_alpha'], fit_reg=False)
+plt.plot(axes.get_xlim(), axes.get_xlim())
+axes = plt.subplot(2, 2, 2)
+sns.regplot(param_data.loc['beta'], param_data.loc['true_beta'], fit_reg=False)
+plt.plot(axes.get_xlim(), axes.get_xlim())
+axes = plt.subplot(2, 2, 3)
+sns.regplot(param_data.loc['forget'], param_data.loc['true_forget'], fit_reg=False)
+plt.plot(axes.get_xlim(), axes.get_xlim())
+plt.subplot(2, 2, 4)
+sns.regplot(param_data.loc['alpha'], param_data.loc['beta'], fit_reg=False)
+plt.savefig(save_dir + save_id + model.name + 'gen_rec_plot.png')
 
-# Save results
-print('Saving trace, trace plot, model, and model summary to {0}{1}...\n'.format(save_dir, save_id + model.name))
-with open(save_dir + save_id + model.name + '.pickle', 'wb') as handle:
-    pickle.dump({'trace': trace, 'model': model, 'summary': model_summary},
-                handle, protocol=pickle.HIGHEST_PROTOCOL)
+# Check Q_low in each trial
+get_Q_low_at_map = model.fn(outs=Q_low)
+print("Q_low at map:\n", get_Q_low_at_map(map_estimate))
 
-# with pm.Model() as hier_model:
-#
-#     ## RL parameters: softmax temperature beta; learning rate alpha; forgetting of Q-values
-#     # Parameter means
-#     beta = pm.Bound(pm.Normal, lower=0)('beta', mu=1, sd=5, testval=1.5)
-#     alpha = pm.Uniform('alpha', lower=0, upper=1, testval=0.1)
-#     forget = pm.Uniform('forget', lower=0, upper=1, testval=0.001)
-#     alpha_high = pm.Uniform('alpha_high', lower=0, upper=1, testval=0.1)
-#
-#     ## Select action based on Q-values
-#     Q_low0 = alien_initial_Q * T.ones([n_TS, n_aliens, n_actions])
-#     Q_high0 = alien_initial_Q * T.ones([n_seasons, n_TS])
-#
-#     [Q_low, _, TS], _ = theano.scan(fn=update_Qs_1subj_hier,
-#                                        sequences=[seasons, aliens, actions, rewards],
-#                                        outputs_info=[Q_low0, Q_high0, None],
-#                                        non_sequences=[alpha, alpha_high, forget],
-#                                   profile=True,
-#                                   name='my_scan')
-#
-#     Q_low = T.concatenate([[Q_low0], Q_low[:-1]], axis=0)  # Add first trial's Q-values, remove last trials Q-values
-#
-#     # Select Q-values for each trial & translate into probabilities
-#     Q_sub = Q_low[T.arange(n_trials), TS.flatten(), aliens.flatten()]  # Q_sub.shape -> [n_trials, n_subj, n_actions]
-#     Q_sub = beta * Q_sub
-#     p_low = T.nnet.softmax(Q_sub)
-#
-#     # Select actions based on Q-values
-#     action_wise_actions = actions.flatten()
-#     actions = pm.Categorical('actions', p=p_low, observed=action_wise_actions)
-#
-#     # Check logps and draw samples
-#     hier_trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores, nuts_kwargs=dict(target_accept=.80))
+# Check p_low in each trial
+get_p_low_at_map = model.fn(outs=p_low)
+print("p_low at map:\n", get_p_low_at_map(map_estimate))
 
-# hier_model.profile(hier_model.logpt).summary()
+# Check TS in each trial
+get_TS_at_map = model.fn(outs=TS)
+print("TS at map:\n", get_TS_at_map(map_estimate))
+
+# # Get results
+# model_summary = pm.summary(trace)
 #
+# if not run_on_cluster:
+#     pm.traceplot(trace)
+#     plt.savefig(save_dir + save_id + model.name + 'trace_plot.png')
+#     pd.DataFrame(model_summary).to_csv(save_dir + save_id + model.name + 'model_summary.csv')
+#
+# # Save results
+# print('Saving trace, trace plot, model, and model summary to {0}{1}...\n'.format(save_dir, save_id + model.name))
+# with open(save_dir + save_id + model.name + '.pickle', 'wb') as handle:
+#     pickle.dump({'trace': trace, 'model': model, 'summary': model_summary},
+#                 handle, protocol=pickle.HIGHEST_PROTOCOL)
+
 # plt.hist(trace['alpha'])
 # plt.show()
 # plt.hist(trace['beta'])

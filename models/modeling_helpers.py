@@ -9,7 +9,7 @@ import theano.tensor as T
 from shared_modeling_simulation import get_paths, get_alien_paths
 
 
-def load_aliens_data(run_on_cluster, fitted_data_name, n_subj, n_trials, verbose):
+def load_aliens_data(run_on_cluster, fitted_data_name, file_name_suff, n_subj, n_trials, verbose):
 
     # Get data path and save path
     paths = get_alien_paths(run_on_cluster)
@@ -17,9 +17,8 @@ def load_aliens_data(run_on_cluster, fitted_data_name, n_subj, n_trials, verbose
         data_dir = paths['human data']
         file_name_pattern = 'aliens*.csv'
     else:
-        learning_style = '_f'
         data_dir = paths['simulations']
-        file_name_pattern = 'aliens' + learning_style + '*.csv'
+        file_name_pattern = 'aliens*' + file_name_suff + '*.csv'
 
     # Prepare things for loading data
     filenames = glob.glob(data_dir + file_name_pattern)[:n_subj]
@@ -28,6 +27,7 @@ def load_aliens_data(run_on_cluster, fitted_data_name, n_subj, n_trials, verbose
     aliens = np.zeros(seasons.shape)
     actions = np.zeros(seasons.shape)
     rewards = np.zeros(seasons.shape)
+    true_params = pd.DataFrame(np.full((3, n_subj), np.nan), index=['true_alpha', 'true_beta', 'true_forget'])
 
     # Load data and bring in the right format
     for file_idx, filename in enumerate(filenames):
@@ -60,6 +60,9 @@ def load_aliens_data(run_on_cluster, fitted_data_name, n_subj, n_trials, verbose
             # rewards_masked = np.ma.masked_values(rewards, value=999)
             # sID = filename[-7:-4]
 
+            if fitted_data_name == 'simulations':
+                true_params.ix[:, file_idx] = agent_data['alpha'][0], agent_data['beta'][0], agent_data['forget'][0]
+
     # Remove excess columns (participants)
     seasons = np.delete(seasons, range(file_idx + 1, n_subj), 1)
     aliens = np.delete(aliens, range(file_idx + 1, n_subj), 1)
@@ -69,12 +72,12 @@ def load_aliens_data(run_on_cluster, fitted_data_name, n_subj, n_trials, verbose
     n_subj = actions.shape[1]
 
     # Look at data
-    print("Loaded {0} datasets with pattern {1} from {2}...\n".format(n_subj, file_name_pattern, data_dir))
+    print("Loaded {0} datasets with pattern {1} from {2}\n".format(n_subj, file_name_pattern, data_dir))
     if verbose:
         print("Choices - shape: {0}\n{1}\n".format(actions.shape, actions))
         print("Rewards - shape: {0}\n{1}\n".format(rewards.shape, rewards))
 
-    return [n_subj, n_trials, seasons, aliens, actions, rewards]
+    return [n_subj, n_trials, seasons, aliens, actions, rewards, true_params]
 
 
 def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only, verbose):
