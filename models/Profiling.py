@@ -12,6 +12,23 @@ max_n_subj, max_n_trials = 1, 400
 n_seasons, n_TS, n_aliens, n_actions = 3, 3, 4, 3
 
 
+# with pm.Model() as model:
+#
+#     forget =
+#
+#     # Select TS
+#     TS = T.argmax(Q_high[season], axis=1)  # Hierarchical deterministic
+#
+#     # Forget Q-values a little bit
+#     Q_low = (1 - forget) * Q_low + forget * alien_initial_Q
+#
+#     # Calculate RPEs & update Q-values
+#     Q_high = T.set_subtensor(Q_high[season, TS],
+#                              Q_high[season, TS] + alpha_high * (reward - Q_high[season, TS]))
+#     Q_low = T.set_subtensor(Q_low[TS, alien, action],
+#                             Q_low[TS, alien, action] + alpha * (reward - Q_low[TS, alien, action]))
+
+
 # Function to update Q-values based on stimulus, action, and reward
 def update_Qs_1subj_flat(season, alien, action, reward,
                     Q_low,
