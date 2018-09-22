@@ -11,6 +11,30 @@ rs = RandomStreams()
 # Initial Q-value for actions and TS
 alien_initial_Q = 1  # rewards are z-scored!
 
+def logp(val):
+    return T.log(1/3)
+
+# def logp_TS():
+#     # most_likely = T.argmax(p_high, axis=1)
+#     def logp(val):
+#         return T.log(1 - (val - most_likely) ** 2) # 1 - squared error from most likely
+#     return logp
+
+class CustomTSDist(pm.DiscreteUniform):
+    def __init__(self, lower, upper, p, *args, **kwargs):
+        super(CustomTSDist, self).__init__(lower, upper, *args, **kwargs)
+        self.p = p
+
+    def logp(self, value):
+        upper = self.upper
+        lower = self.lower
+        return pm.distributions.dist_math.bound(-T.log(upper - lower + 1), lower <= value, value <= upper)
+
+    # def random(self, point=None, size=None, repeat=None):
+    #     # Produce sample
+    #     pass
+
+
 # Function to update Q-values based on stimulus, action, and reward
 def update_Qs(season, alien, action, reward,
               Q_low, Q_high,
@@ -19,12 +43,11 @@ def update_Qs(season, alien, action, reward,
     # Select TS
     Q_high_sub = Q_high[T.arange(n_subj), season]
     p_high = T.nnet.softmax(beta_high * Q_high_sub)
-    T.printing.Print('Q_high_sub')(Q_high_sub)
     T.printing.Print('p_high')(p_high)
-    # TS = season  # Flat
-    TS = T.argmax(p_high, axis=1)  # Hierarchical deterministic
-    # TS = pm.Categorical('TS', p=p_high, shape=20)
-    # TS = theano.sandbox.rng_mrg.MRG_RandomStreams().choice(p=p_high, replace=False)  # Hierarchical stochastic
+
+    TS = CustomTSDist('TS', 0, 2, p_high)
+    T.printing.Print('TS')(TS)
+
     # TS.dimshuffle(0)
     # TS = TS.flatten(ndim=1)
 
@@ -36,9 +59,6 @@ def update_Qs(season, alien, action, reward,
 
     # Calculate RPEs & update Q-values
     current_trial_high = T.arange(n_subj), season, TS
-    T.printing.Print('season')(season)
-    T.printing.Print('TS')(TS)
-    T.printing.Print('reward')(reward)
     RPE_high = reward - Q_high[current_trial_high]
     Q_high = T.set_subtensor(Q_high[current_trial_high],
                              Q_high[current_trial_high] + alpha_high * RPE_high)

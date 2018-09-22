@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 from shared_aliens import *
 from modeling_helpers import *
 
+np.random.seed(123456)
+theano.config.exception_verbosity = 'high'
+
 # TODO
 # sample TS rather than argmax
 # independent low & high parameters
@@ -33,7 +36,7 @@ fitted_data_name = 'humans'  # 'humans', 'simulations'
 # Sampling details
 n_samples = 50
 n_tune = 50
-max_n_subj = 20  # set > 31 to include all subjects
+max_n_subj = 1  # set > 31 to include all subjects
 if run_on_cluster:
     n_cores = 4
 else:
@@ -154,7 +157,7 @@ with pm.Model() as model:
     Q_high0 = alien_initial_Q * T.ones([n_subj, n_seasons, n_TS])
 
     # Calculate Q-values (update in each trial)
-    [Q_low, Q_high, TS], _ = theano.scan(fn=update_Qs,
+    [Q_low, Q_high, TS], updates = theano.scan(fn=update_Qs,
                                          sequences=[seasons, aliens, actions, rewards],
                                          outputs_info=[Q_low0, Q_high0, None],
                                          non_sequences=[beta_high, alpha, alpha_high, forget, forget_high, n_subj])

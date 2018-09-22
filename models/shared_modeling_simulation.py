@@ -3,6 +3,8 @@ import numpy as np
 
 alien_initial_Q = 5 / 3
 
+ENV_USER = "jeremy"  # Set for easier switching between local paths
+
 def get_paths(run_on_cluster):
 
     if run_on_cluster:
@@ -15,13 +17,13 @@ def get_paths(run_on_cluster):
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
     else:
-        base_path = '~/repos-other/SLCN'
-        return {'human data': base_path + '/PShumanData/',
-                'fitting results': base_path + '/PShumanData/fitting/',
-                'ages file name': base_path + 'data/SLCNinfo.csv',
-                'fitted ages file name': base_path + 'data/ages.csv',
-                'simulations': base_path + '/PSsimulations/',
-                'old simulations': base_path + '/PSGenRecCluster/fit_par/',
+        base_path = '~/repos-other/SLCN' if ENV_USER == "jeremy" else 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
+        return {'human data': base_path + '/output/PShumanData/',
+                'fitting results': base_path + '/output/PShumanData/fitting/',
+                'ages file name': base_path + '/output/data/SLCNinfo.csv',
+                'fitted ages file name': base_path + '/output/data/ages.csv',
+                'simulations': base_path + '/output/PSsimulations/',
+                'old simulations': base_path + '/output/PSGenRecCluster/fit_par/',
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
 
@@ -34,7 +36,7 @@ def get_alien_paths(run_on_cluster):
                 'simulations': base_path + 'AliensPyMC3/Aliensimulations/'}
 
     else:
-        base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
+        base_path = '~/repos-other/SLCN' if ENV_USER == "jeremy" else 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
         return {'human data': base_path + '/Data/version3.1/',
                 'fitting results': base_path + '/Data/version3.1/fitting/',
                 'simulations': 'C:/Users/maria/MEGAsync/SLCN/PSsimulations/'}
