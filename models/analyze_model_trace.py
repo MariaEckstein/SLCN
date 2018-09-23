@@ -2,6 +2,7 @@
 
 import pickle
 import pandas as pd
+import seaborn as sns
 
 import pymc3 as pm
 from theano.printing import pydotprint
@@ -22,7 +23,7 @@ calculate_waic = False
               # ]
 # model_names = ['albenalcal', 'rew_swi_eps']
 file_names = [
-    'h_1subj_2018_9_13_9_37_humans_n_samples200aliens',
+    'f_2018_9_21_0_31_simulations_n_samples1000',
     # 'f_1subj_2018_9_11_0_3_humans_n_samples2000aliens',
     # 'h_bugfix_2018_9_5_14_23_humans_n_samples100aliens',
     # 'AliensFlat/fs_abf_2018_8_11_13_27_humans_n_samples500aliens',
@@ -38,13 +39,13 @@ file_names = [
 #     'RL_3groups/10s/alpha_beta_calpha_2018_7_24_14_15_humans_n_samples5000RL',
     # 'RL_3groups/10s/alpha_beta_nalpha_calpha_eps_2018_7_24_18_46_humans_n_samples5000RL'
               ]
-model_names = ['h', 'f', 'fabf', 'fabf', 'hab', 'habf', 'f', 'h', 'h', 'albecal10', 'albenalcaleps10']
+model_names = ['f', 'f', 'fabf', 'fabf', 'hab', 'habf', 'f', 'h', 'h', 'albecal10', 'albenalcaleps10']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)
 parameter_dir = paths['fitting results']
 save_dir = paths['fitting results']
-print("Loading models {0}.\n".format(file_names))
+print("Workin on {0}.\n".format(file_names))
 
 model_dict = {}
 for file_name, model_name in zip(file_names, model_names):
@@ -57,10 +58,25 @@ for file_name, model_name in zip(file_names, model_names):
         model_summary = data['summary']
         model.name = model_name
 
+    map_gen_rec = pd.read_csv(parameter_dir + file_name + 'map.csv', index_col=0, header=None)
+
     # Add model to model_dict
     model_dict.update({model: trace})
 
     if analyze_indiv_models:
+
+        # Compare true parameters and estimates
+        for param_name in ['alpha', 'beta', 'forget', 'alpha_high']:
+            traces = trace[param_name].reshape(trace['alpha'].shape).T
+            true_forgets = map_gen_rec.loc[param_name]
+            colors = plt.cm.PRGn(np.linspace(0, 1, len(true_forgets)))
+            plt.figure()
+            for forget_trace, true_forget, color in zip(traces, true_forgets, colors):
+                sns.kdeplot(forget_trace, color=color)
+                plt.axvline(true_forget, color=color)
+                plt.xlabel(param_name)
+            plt.savefig(save_dir + file_name + param_name + 'MCMC_gen_rec.png')
+
         par_names = [str(RV_name) for RV_name in model.free_RVs]
 
         # Graph (does not seem to exist any more in PyMC3)
