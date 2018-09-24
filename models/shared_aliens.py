@@ -64,8 +64,8 @@ def update_Qs(season, alien, action, reward,
 
     # Select TS
     Q_high_sub = Q_high[T.arange(n_subj), season]  # Q_high_sub.shape -> [n_subj, n_TS]
-    TS = season  # Flat
-    # TS = T.argmax(Q_high_sub, axis=1)  # Hierarchical deterministic
+    # TS = season  # Flat
+    TS = T.argmax(Q_high_sub, axis=1)  # Hierarchical deterministic
 
     # Calculate action probabilities based on TS
     Q_low_sub = Q_low[T.arange(n_subj), TS, alien]  # Q_low_sub.shape -> [n_subj, n_actions]

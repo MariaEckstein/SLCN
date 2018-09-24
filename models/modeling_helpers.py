@@ -6,6 +6,9 @@ import numpy as np
 import pandas as pd
 import theano.tensor as T
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from shared_modeling_simulation import get_paths, get_alien_paths
 
 
@@ -186,3 +189,28 @@ def print_logp_info(model):
 
     for RV in model.basic_RVs:
         print("\tlogp of {0}: {1}".format(RV.name, RV.logp(model.test_point)))
+
+
+def plot_gen_rec(param_names, gen_rec, save_name):
+
+    plt.figure()
+    for i, param_name in enumerate(param_names):
+
+        # Plot fitted parameters against true parameters
+        plt.subplot(3, 3, i + 1)
+        sns.regplot(gen_rec.loc[param_name], gen_rec.loc['true_' + param_name], fit_reg=False)
+        y_max = np.max(gen_rec.loc['true_' + param_name])
+        plt.plot((0, y_max), (0, y_max))
+
+    # Plot fitted alpha * beta against recovered alpha * beta
+    plt.subplot(3, 3, 8)
+    sns.regplot(gen_rec.loc['alpha'] * gen_rec.loc['beta'], gen_rec.loc['true_alpha'] * gen_rec.loc['true_beta'], fit_reg=False)
+    y_max = np.max(gen_rec.loc['true_alpha'] * gen_rec.loc['true_beta'])
+    plt.plot((0, y_max), (0, y_max))
+    plt.xlabel('alpha * beta')
+    plt.ylabel('true alpha * beta')
+
+    # Plot fitted alpha against fitted beta
+    plt.subplot(3, 3, 9)
+    sns.regplot(gen_rec.loc['alpha'], gen_rec.loc['beta'], fit_reg=False)
+    plt.savefig(save_name)

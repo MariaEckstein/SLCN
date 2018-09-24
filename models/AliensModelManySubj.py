@@ -8,7 +8,7 @@ import pickle
 import pandas as pd
 
 from shared_aliens import alien_initial_Q, update_Qs
-from modeling_helpers import load_aliens_data, get_save_dir_and_save_id
+from modeling_helpers import load_aliens_data, get_save_dir_and_save_id, plot_gen_rec
 
 # TODO
 # sample TS rather than argmax
@@ -39,7 +39,8 @@ from modeling_helpers import load_aliens_data, get_save_dir_and_save_id
 verbose = False
 run_on_cluster = False
 print_logps = False
-file_name_suff = 'f_abf'
+file_name_suff = 'h_argmax_abf'
+param_names = ['alpha', 'beta', 'forget', 'alpha_high']
 use_fake_data = False
 
 # Which data should be fitted?
@@ -55,8 +56,8 @@ if run_on_cluster:
     n_tune = 2000
 else:
     n_cores = 1
-    n_samples = 200
-    n_tune = 100
+    n_samples = 2000
+    n_tune = 1000
 n_chains = 1
 
 if use_fake_data:
@@ -101,8 +102,63 @@ model_dict = {}
 print("Compiling model: {4} {0}, {1} samples, {2} tuning steps, {3} trials\n".
       format(fitted_data_name, n_samples, n_tune, max_n_trials, max_n_subj))
 
-# Model for TS and RL (comment the right stuff in and out!)
-with pm.Model() as model:
+# # Model for TS and RL
+# print("Running model with uniform priors")
+# with pm.Model() as unif_model:
+#
+#     # RL parameters: softmax temperature beta; learning rate alpha; forgetting of Q-values
+#     beta_shape = (n_subj, 1)  # Q_sub.shape inside scan -> [n_subj, n_actions]
+#     forget_shape = (n_subj, 1, 1, 1)  # Q_low.shape inside scan -> [n_subj, n_TS, n_aliens, n_actions]
+#     # beta_high_shape = (n_subj, 1)  # Q_high_sub.shape inside scan -> [n_subj, n_TS]
+#     # forget_high_shape = (n_subj, 1, 1)  # Q_high.shape inside scan -> [n_subj, n_seasons, n_TS]
+#
+#     alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj)
+#     beta = pm.Bound(pm.Normal, lower=0)('beta', mu=1, sd=10, shape=beta_shape)
+#     forget = pm.Uniform('forget', lower=0, upper=1, shape=forget_shape)
+#     alpha_high = pm.Uniform('alpha_high', lower=0, upper=1, shape=n_subj)  # Hierarchical agent
+#     # alpha_high = pm.Deterministic('alpha_high', 0.1 * T.ones(n_subj))  # Flat agent
+#
+#     # Calculate Q_high and Q_low for each trial
+#     Q_low0 = alien_initial_Q * T.ones([n_subj, n_TS, n_aliens, n_actions])
+#     Q_high0 = alien_initial_Q * T.ones([n_subj, n_seasons, n_TS])
+#     [Q_low, _, TS, p_low], _ = theano.scan(fn=update_Qs,
+#                                            sequences=[seasons, aliens, actions, rewards],
+#                                            outputs_info=[Q_low0, Q_high0, None, None],
+#                                            non_sequences=[beta, alpha, alpha_high, forget, n_subj])
+#
+#     # Relate calculated p_low to observed actions
+#     actions = pm.Categorical('actions',
+#                              p=p_low.reshape([n_trials * n_subj, n_actions]),
+#                              observed=actions.flatten())
+#
+#     # Draw samples
+#     map_unif_estimate = pm.find_MAP()
+#
+# map_unif_gen_rec = true_params.append(pd.DataFrame([map_unif_estimate[RV].flatten() for RV in param_names], index=param_names))
+# map_unif_gen_rec.to_csv(save_dir + save_id + file_name_suff + '_map_unif_gen_rec_plot.csv')
+# if not run_on_cluster:
+#     plot_gen_rec(param_names=param_names, gen_rec=map_unif_gen_rec, save_name=save_dir + save_id + file_name_suff + '_map_unif_gen_rec_plot.png')
+#
+# # Get and plot MCMC results
+# with unif_model:
+#     unif_MCMC_trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores)
+#
+# unif_MCMC_model_summary = pm.summary(unif_MCMC_trace)
+# pd.DataFrame(unif_MCMC_model_summary).to_csv(save_dir + save_id + file_name_suff + 'unif_MCMC_model_summary.csv')
+# mcmc_params = np.full((len(param_names), n_subj), np.nan)
+# for i, param_name in enumerate(param_names):
+#     idxs = unif_MCMC_model_summary.index.str.contains(param_name + '__')
+#     mcmc_params[i] = np.array(unif_MCMC_model_summary.loc[idxs, 'mean'])
+# mcmc_params = pd.DataFrame(mcmc_params, index=param_names)
+# mcmc_unif_gen_rec = true_params.append(mcmc_params)
+#
+# if not run_on_cluster:
+#     pm.traceplot(unif_MCMC_trace)
+#     plt.savefig(save_dir + save_id + file_name_suff + 'trace_plot.png')
+#     plot_gen_rec(param_names=param_names, gen_rec=mcmc_unif_gen_rec, save_name=save_dir + save_id + file_name_suff + '_mcmc_unif_gen_rec_plot.png')
+
+print("Running model with informative priors")  # throws weird errors when running both models
+with pm.Model() as prior_model:
 
     # RL parameters: softmax temperature beta; learning rate alpha; forgetting of Q-values
     beta_shape = (n_subj, 1)  # Q_sub.shape inside scan -> [n_subj, n_actions]
@@ -110,20 +166,11 @@ with pm.Model() as model:
     # beta_high_shape = (n_subj, 1)  # Q_high_sub.shape inside scan -> [n_subj, n_TS]
     # forget_high_shape = (n_subj, 1, 1)  # Q_high.shape inside scan -> [n_subj, n_seasons, n_TS]
 
-    alpha = pm.Beta('alpha', mu=0.3, sd=0.2, shape=n_subj)
-    # alpha = pm.Uniform('alpha', lower=0, upper=1, shape=n_subj, testval=0.1 * T.ones(n_subj))
-    # alpha = pm.Deterministic('alpha', 0.1 * T.ones(n_subj))
+    alpha = pm.Beta('alpha', mu=0.29, sd=0.21, shape=n_subj)
     beta = pm.Bound(pm.Normal, lower=0)('beta', mu=1, sd=2, shape=beta_shape)
-    # beta = pm.Bound(pm.Normal, lower=0)('beta', mu=1, sd=10, shape=beta_shape, testval=1.5 * T.ones(beta_shape))
-    # beta = pm.Deterministic('beta', 2 * T.ones(beta_shape))
     forget = pm.Beta('forget', mu=0.1, sd=0.1, shape=forget_shape)
-    # forget = pm.Uniform('forget', lower=0, upper=1, shape=forget_shape, testval=0.01 * T.ones(forget_shape))
-    # forget = pm.Deterministic('forget', T.zeros(forget_shape))
-    # alpha_high = pm.Beta('alpha_high', mu=0.3, sd=0.2, shape=n_subj)
-    # alpha_high = pm.Uniform('alpha_high', lower=0, upper=1, shape=n_subj)  # Hierarchical agent
+    # alpha_high = pm.Beta('alpha_high', mu=0.29, sd=0.21, shape=n_subj)
     alpha_high = pm.Deterministic('alpha_high', 0.1 * T.ones(n_subj))  # Flat agent
-    # beta_high = T.ones(beta_high_shape)
-    # forget_high = T.zeros(forget_high_shape)
 
     # Calculate Q_high and Q_low for each trial
     Q_low0 = alien_initial_Q * T.ones([n_subj, n_TS, n_aliens, n_actions])
@@ -131,10 +178,7 @@ with pm.Model() as model:
     [Q_low, _, TS, p_low], _ = theano.scan(fn=update_Qs,
                                            sequences=[seasons, aliens, actions, rewards],
                                            outputs_info=[Q_low0, Q_high0, None, None],
-                                           non_sequences=[beta, alpha, alpha_high, forget, n_subj],
-                                           # profile=True,
-                                           # name='my_scan')
-                                           )
+                                           non_sequences=[beta, alpha, alpha_high, forget, n_subj])
 
     # Relate calculated p_low to observed actions
     actions = pm.Categorical('actions',
@@ -142,93 +186,32 @@ with pm.Model() as model:
                              observed=actions.flatten())
 
     # Draw samples
-    map_estimate = pm.find_MAP()  # default: Broyden–Fletcher–Goldfarb–Shanno (BFGS)
+    map_prior_estimate = pm.find_MAP()
 
-# model.profile(model.logpt).summary()
+map_prior_gen_rec = true_params.append(pd.DataFrame([map_prior_estimate[RV].flatten() for RV in param_names], index=param_names))
+map_prior_gen_rec.to_csv(save_dir + save_id + file_name_suff + '_map_prior_gen_rec_plot.csv')
+if not run_on_cluster:
+    plot_gen_rec(param_names=param_names, gen_rec=map_prior_gen_rec, save_name=save_dir + save_id + file_name_suff + 'map_prior_gen_rec_plot.png')
 
-# Look at MAP estimate for all parameters
-print(map_estimate)
-param_names = ['alpha', 'beta', 'forget', 'alpha_high']
-map = pd.DataFrame([map_estimate[RV].flatten() for RV in param_names], index=param_names)
-map_gen_rec = map.append(true_params)
-map_gen_rec.to_csv(save_dir + save_id + model.name + 'map.csv', header=False)
+with prior_model:
+    prior_MCMC_trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores)
+
+prior_MCMC_model_summary = pm.summary(prior_MCMC_trace)
+pd.DataFrame(prior_MCMC_model_summary).to_csv(save_dir + save_id + file_name_suff + 'prior_MCMC_model_summary.csv')
+mcmc_params = np.full((len(param_names), n_subj), np.nan)
+for i, param_name in enumerate(param_names):
+    idxs = prior_MCMC_model_summary.index.str.contains(param_name + '__')
+    mcmc_params[i] = np.array(prior_MCMC_model_summary.loc[idxs, 'mean'])
+mcmc_params = pd.DataFrame(mcmc_params, index=param_names)
+mcmc_prior_gen_rec = true_params.append(mcmc_params)
 
 if not run_on_cluster:
-    axes = plt.subplot(2, 3, 1)
-    sns.regplot(map_gen_rec.loc['alpha'], map_gen_rec.loc['true_alpha'], fit_reg=False)
-    plt.plot(axes.get_xlim(), axes.get_xlim())
-    axes = plt.subplot(2, 3, 2)
-    sns.regplot(map_gen_rec.loc['beta'], map_gen_rec.loc['true_beta'], fit_reg=False)
-    plt.plot(axes.get_xlim(), axes.get_xlim())
-    axes = plt.subplot(2, 3, 3)
-    sns.regplot(map_gen_rec.loc['forget'], map_gen_rec.loc['true_forget'], fit_reg=False)
-    plt.plot(axes.get_xlim(), axes.get_xlim())
-    axes = plt.subplot(2, 3, 4)
-    sns.regplot(map_gen_rec.loc['alpha_high'], map_gen_rec.loc['true_alpha_high'], fit_reg=False)
-    plt.plot(axes.get_xlim(), axes.get_xlim())
-    plt.subplot(2, 3, 5)
-    sns.regplot(map_gen_rec.loc['alpha'], map_gen_rec.loc['beta'], fit_reg=False)
-    plt.savefig(save_dir + save_id + model.name + 'gen_rec_plot.png')
+    pm.traceplot(prior_MCMC_trace)
+    plt.savefig(save_dir + save_id + file_name_suff + 'trace_plot.png')
+    plot_gen_rec(param_names=param_names, gen_rec=mcmc_prior_gen_rec, save_name=save_dir + save_id + file_name_suff + '_mcmc_prior_gen_rec_plot.png')
 
-# # Check Q_low in each trial
-# get_Q_low_at_map = model.fn(outs=Q_low)
-# print("Q_low at map:\n", get_Q_low_at_map(map_estimate))
-#
-# # Check p_low in each trial
-# get_p_low_at_map = model.fn(outs=p_low)
-# print("p_low at map:\n", get_p_low_at_map(map_estimate))
-#
-# # Check TS in each trial
-# get_TS_at_map = model.fn(outs=TS)
-# print("TS at map:\n", get_TS_at_map(map_estimate))
-
-# Get results
-with model:
-    trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores)
-
-model_summary = pm.summary(trace)
-
-if not run_on_cluster:
-    pm.traceplot(trace)
-    plt.savefig(save_dir + save_id + model.name + 'trace_plot.png')
-    pd.DataFrame(model_summary).to_csv(save_dir + save_id + model.name + 'model_summary.csv')
-
-    # Plot MCMC and MAP estimates in the same plot
-    plt.figure()
-    for i, param_name in enumerate(['alpha', 'beta', 'forget']):
-        param_idxs = [idx for idx in model_summary.index if param_name + '_' in idx and 'high' not in idx]
-        mcmc_params = model_summary.loc[param_idxs, 'mean']
-        plt.subplot(3, 3, i + 1)
-        sns.regplot(mcmc_params, map_gen_rec.loc['true_' + param_name], fit_reg=False)
-        sns.regplot(map_gen_rec.loc[param_name], map_gen_rec.loc['true_' + param_name], fit_reg=False)
-        y_max = np.max(map_gen_rec.loc['true_' + param_name])
-        plt.plot((0, y_max), (0, y_max))
-        plt.plot([mcmc_params, map_gen_rec.loc[param_name]],
-                 [map_gen_rec.loc['true_' + param_name], map_gen_rec.loc['true_' + param_name]], '-', color='grey',
-                 alpha=0.5)
-    plt.subplot(3, 3, 9)
-    alpha_idxs = [idx for idx in model_summary.index if 'alpha_' in idx and 'high' not in idx]
-    beta_idxs = [idx for idx in model_summary.index if 'beta_' in idx and 'high' not in idx]
-    sns.regplot(model_summary.loc[alpha_idxs, 'mean'], model_summary.loc[beta_idxs, 'mean'], fit_reg=False)
-    sns.regplot(map_gen_rec.loc['alpha'], map_gen_rec.loc['beta'], fit_reg=False)
-    plt.xlabel('recovered alpha')
-    plt.ylabel('recovered beta')
-    plt.savefig(save_dir + save_id + model.name + 'mcmc_vs_map.png', figsize=(20, 20))
-
-    for param_name in ['alpha', 'beta', 'forget', 'alpha_high']:
-        traces = trace[param_name].reshape(trace['alpha'].shape).T
-        true_param = map_gen_rec.loc['true_' + param_name]
-        colors = plt.cm.PRGn(np.linspace(0, 1, len(true_param)))
-        plt.figure()
-        for forget_trace, true_forget, color in zip(traces, true_param, colors):
-            sns.kdeplot(forget_trace, color=color)
-            plt.axvline(true_forget, color=color)
-            plt.xlabel(param_name)
-            plt.xlim((0, 0.2))
-        plt.savefig(save_dir + save_id + model.name + param_name + 'MCMC_gen_rec.png')
-
-# Save results
-print('Saving trace, trace plot, model, and model summary to {0}{1}...\n'.format(save_dir, save_id + model.name))
-with open(save_dir + save_id + model.name + '.pickle', 'wb') as handle:
-    pickle.dump({'trace': trace, 'model': model, 'summary': model_summary},
-                handle, protocol=pickle.HIGHEST_PROTOCOL)
+# # Save results
+# print('Saving trace, trace plot, model, and model summary to {0}{1}...\n'.format(save_dir, save_id + model.name))
+# with open(save_dir + save_id + model.name + '.pickle', 'wb') as handle:
+#     pickle.dump({'trace': trace, 'model': model, 'summary': model_summary},
+#                 handle, protocol=pickle.HIGHEST_PROTOCOL)
