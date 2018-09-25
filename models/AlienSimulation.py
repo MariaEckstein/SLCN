@@ -9,7 +9,7 @@ from shared_aliens import alien_initial_Q, update_Qs_sim
 from AlienTask import Task
 
 # Switches for this script
-model_name = "h_softmax_abf"
+model_name = "h_argmax_abf"
 verbose = False
 max_n_subj = 30  # must be > 1
 start_id = 0
@@ -31,13 +31,13 @@ forget_shape = (max_n_subj, 1, 1, 1)  # Q_low[0].shape -> [n_subj, n_TS, n_alien
 if model_to_be_simulated == 'none':
     n_subj = max_n_subj
 
-    alpha = 0.2 * np.random.rand(n_subj)  # 0 < alpha < 0.3
+    alpha = 0.2 * np.random.rand(n_subj)  # 0 < alpha < 0.2
     beta = 1 + 4 * np.random.rand(np.prod(beta_shape)).reshape(beta_shape)  # 1 < beta < 2
     forget = 0.1 * np.random.rand(np.prod(forget_shape)).reshape(forget_shape)  # 0 < forget < 0.1
 
-    alpha_high = 0.2 * np.random.rand(n_subj)  # 0 < alpha_high < 1
-    beta_high = np.ones(beta_high_shape)  # 1 + 4 * np.random.rand(np.prod(beta_high_shape)).reshape(beta_high_shape)  # 1 < beta < 2
-    forget_high = np.zeros(forget_high_shape)  # 0.1 * np.random.rand(np.prod(forget_high_shape)).reshape(forget_high_shape)
+    alpha_high = 0.2 * np.random.rand(n_subj)  # 0 < alpha_high < 0.2
+    beta_high = 1 + 4 * np.random.rand(np.prod(beta_high_shape)).reshape(beta_high_shape)  # 1 < beta < 2
+    forget_high = 0.1 * np.random.rand(np.prod(forget_high_shape)).reshape(forget_high_shape)
 
 # Load fitted parameters
 else:

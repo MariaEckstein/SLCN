@@ -12,7 +12,7 @@ import seaborn as sns
 from shared_modeling_simulation import get_paths, get_alien_paths
 
 
-def load_aliens_data(run_on_cluster, fitted_data_name, file_name_suff, n_subj, n_trials, verbose):
+def load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_suff, n_subj, n_trials, verbose):
 
     # Get data path and save path
     paths = get_alien_paths(run_on_cluster)
@@ -30,8 +30,8 @@ def load_aliens_data(run_on_cluster, fitted_data_name, file_name_suff, n_subj, n
     aliens = np.zeros(seasons.shape)
     actions = np.zeros(seasons.shape)
     rewards = np.zeros(seasons.shape)
-    true_params = pd.DataFrame(np.full((4, n_subj), np.nan),
-                               index=['true_alpha', 'true_beta', 'true_forget', 'true_alpha_high'])
+    true_params = pd.DataFrame(np.full((len(param_names), n_subj), np.nan),
+                               index=['true_' + param_name for param_name in param_names])
 
     # Load data and bring in the right format
     for file_idx, filename in enumerate(filenames):
@@ -65,7 +65,7 @@ def load_aliens_data(run_on_cluster, fitted_data_name, file_name_suff, n_subj, n
             # sID = filename[-7:-4]
 
             if fitted_data_name == 'simulations':
-                true_params.ix[:, file_idx] = agent_data['alpha'][0], agent_data['beta'][0], agent_data['forget'][0], agent_data['alpha_high'][0]
+                true_params.ix[:, file_idx] = [agent_data[param_name][0] for param_name in param_names]
 
     # Remove excess columns (participants)
     seasons = np.delete(seasons, range(file_idx + 1, n_subj), 1)

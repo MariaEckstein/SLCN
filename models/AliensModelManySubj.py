@@ -39,8 +39,8 @@ from modeling_helpers import load_aliens_data, get_save_dir_and_save_id, plot_ge
 verbose = False
 run_on_cluster = False
 print_logps = False
-file_name_suff = 'h_argmax_abf'
-param_names = ['alpha', 'beta', 'forget', 'alpha_high']
+file_name_suff = 'f_abf'
+param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high']
 use_fake_data = False
 
 # Which data should be fitted?
@@ -56,8 +56,8 @@ if run_on_cluster:
     n_tune = 2000
 else:
     n_cores = 1
-    n_samples = 2000
-    n_tune = 1000
+    n_samples = 200
+    n_tune = 100
 n_chains = 1
 
 if use_fake_data:
@@ -68,7 +68,7 @@ if use_fake_data:
     rewards = 10 * np.ones([n_trials, n_subj])  # np.random.rand(n_trials * n_subj).reshape([n_trials, n_subj]).round(2)
 else:
     n_subj, n_trials, seasons, aliens, actions, rewards, true_params =\
-        load_aliens_data(run_on_cluster, fitted_data_name, file_name_suff, max_n_subj, max_n_trials, verbose)
+        load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_suff, max_n_subj, max_n_trials, verbose)
 
     # pd.DataFrame(seasons).to_csv("seasons.csv", index=False)
     # pd.DataFrame(aliens).to_csv("aliens.csv", index=False)
@@ -163,14 +163,26 @@ with pm.Model() as prior_model:
     # RL parameters: softmax temperature beta; learning rate alpha; forgetting of Q-values
     beta_shape = (n_subj, 1)  # Q_sub.shape inside scan -> [n_subj, n_actions]
     forget_shape = (n_subj, 1, 1, 1)  # Q_low.shape inside scan -> [n_subj, n_TS, n_aliens, n_actions]
-    # beta_high_shape = (n_subj, 1)  # Q_high_sub.shape inside scan -> [n_subj, n_TS]
-    # forget_high_shape = (n_subj, 1, 1)  # Q_high.shape inside scan -> [n_subj, n_seasons, n_TS]
+    beta_high_shape = (n_subj, 1)  # Q_high_sub.shape inside scan -> [n_subj, n_TS]
+    forget_high_shape = (n_subj, 1, 1)  # Q_high.shape inside scan -> [n_subj, n_seasons, n_TS]
 
-    alpha = pm.Beta('alpha', mu=0.29, sd=0.21, shape=n_subj)
-    beta = pm.Bound(pm.Normal, lower=0)('beta', mu=1, sd=2, shape=beta_shape)
-    forget = pm.Beta('forget', mu=0.1, sd=0.1, shape=forget_shape)
+    alpha_mu = pm.Beta('alpha_mu', mu=0.2, sd=0.2)  # pm.HalfNormal('alpha_mu', sd=0.1)  # pm.Beta('alpha_mu', mu=0.29, sd=0.21)
+    alpha_sd = pm.HalfNormal('alpha_sd', sd=0.1)
+    beta_mu = pm.Bound(pm.Normal, lower=0)('beta_mu', mu=1, sd=2)
+    beta_sd = pm.HalfNormal('beta_sd', sd=1)
+    forget_mu = pm.Beta('forget_mu', mu=0.1, sd=0.1)
+    forget_sd = pm.HalfNormal('forget_sd', sd=0.05)
+
+    alpha = pm.Beta('alpha', mu=alpha_mu, sd=alpha_sd, shape=n_subj)
+    beta = pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu, sd=beta_sd, shape=beta_shape)
+    forget = pm.Beta('forget', mu=forget_mu, sd=forget_sd, shape=forget_shape)
+    # alpha = pm.Beta('alpha', mu=0.29, sd=0.21, shape=n_subj)
+    # beta = pm.Bound(pm.Normal, lower=0)('beta', mu=1, sd=2, shape=beta_shape)
+    # forget = pm.Beta('forget', mu=0.1, sd=0.1, shape=forget_shape)
     # alpha_high = pm.Beta('alpha_high', mu=0.29, sd=0.21, shape=n_subj)
     alpha_high = pm.Deterministic('alpha_high', 0.1 * T.ones(n_subj))  # Flat agent
+    beta_high = pm.Deterministic('beta_high', T.ones(beta_high_shape))
+    forget_high = pm.Deterministic('forget_high', T.zeros(forget_high_shape))
 
     # Calculate Q_high and Q_low for each trial
     Q_low0 = alien_initial_Q * T.ones([n_subj, n_TS, n_aliens, n_actions])
@@ -188,7 +200,7 @@ with pm.Model() as prior_model:
     # Draw samples
     map_prior_estimate = pm.find_MAP()
 
-map_prior_gen_rec = true_params.append(pd.DataFrame([map_prior_estimate[RV].flatten() for RV in param_names], index=param_names))
+map_prior_gen_rec = true_params.append(pd.DataFrame([map_prior_estimate[param_name].flatten() for param_name in param_names], index=param_names))
 map_prior_gen_rec.to_csv(save_dir + save_id + file_name_suff + '_map_prior_gen_rec_plot.csv')
 if not run_on_cluster:
     plot_gen_rec(param_names=param_names, gen_rec=map_prior_gen_rec, save_name=save_dir + save_id + file_name_suff + 'map_prior_gen_rec_plot.png')

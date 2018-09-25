@@ -11,16 +11,16 @@ alien_initial_Q = 1.2  # rewards are z-scored!
 
 # Same, but without theano, and selecting actions rather than reading them in from a file
 def update_Qs_sim(season, alien,
-                       Q_low, Q_high,
-                       beta, beta_high, alpha, alpha_high, forget, forget_high,
-                       n_subj, n_actions, task, verbose=False):
+                  Q_low, Q_high,
+                  beta, beta_high, alpha, alpha_high, forget, forget_high,
+                  n_subj, n_actions, task, verbose=False):
 
     # Select TS
     Q_high_sub = Q_high[np.arange(n_subj), season]  # Q_high_sub.shape -> (n_subj, n_TS)
     p_high = softmax(beta_high * Q_high_sub, axis=1)
     # TS = season  # Flat
-    # TS = Q_high_sub.argmax(axis=1)  # Hierarchical deterministic
-    TS = np.array([np.random.choice(a=3, p=p_high_subj) for p_high_subj in p_high])  # Hierarchical softmax
+    TS = Q_high_sub.argmax(axis=1)  # Hierarchical deterministic
+    # TS = np.array([np.random.choice(a=3, p=p_high_subj) for p_high_subj in p_high])  # Hierarchical softmax
 
     # Calculate action probabilities based on TS and select action
     Q_low_sub = Q_low[np.arange(n_subj), TS, alien]  # Q_low_sub.shape -> [n_subj, n_actions]
@@ -64,8 +64,8 @@ def update_Qs(season, alien, action, reward,
 
     # Select TS
     Q_high_sub = Q_high[T.arange(n_subj), season]  # Q_high_sub.shape -> [n_subj, n_TS]
-    # TS = season  # Flat
-    TS = T.argmax(Q_high_sub, axis=1)  # Hierarchical deterministic
+    TS = season  # Flat
+    # TS = T.argmax(Q_high_sub, axis=1)  # Hierarchical deterministic
 
     # Calculate action probabilities based on TS
     Q_low_sub = Q_low[T.arange(n_subj), TS, alien]  # Q_low_sub.shape -> [n_subj, n_actions]
