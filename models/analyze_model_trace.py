@@ -15,31 +15,19 @@ from shared_modeling_simulation import *
 create_pairplot = False
 analyze_indiv_models = True
 test_group_differences = False
-compare_models = False
-calculate_waic = False
+compare_models = True
+calculate_waic = True
 
 # file_names = ['RL_3groups/TestGroupDifferences/albenalcal_2018_7_27_21_19_humans_n_samples5000RL',
               # 'Bayes_groups/rew_swi_eps20_2018_7_24_19_16_humans_n_samples5000Bayes'
               # ]
 # model_names = ['albenalcal', 'rew_swi_eps']
 file_names = [
-    'f_2018_9_21_0_31_simulations_n_samples1000',
-    # 'f_1subj_2018_9_11_0_3_humans_n_samples2000aliens',
-    # 'h_bugfix_2018_9_5_14_23_humans_n_samples100aliens',
-    # 'AliensFlat/fs_abf_2018_8_11_13_27_humans_n_samples500aliens',
-    # 'AliensFlat/flat_tilde_ta99_abf_2018_8_10_14_58_humans_n_samples300aliens',
-    # 'AliensFlat/hier_ab_2018_8_9_16_26_humans_n_samples200aliens',
-    # 'AliensFlat/hier_abf_2018_8_9_16_26_humans_n_samples200aliens',
-    # 'AliensFlat/test_flat_long_2018_8_2_1_1_humans_n_samples1000aliens',
-    # 'AliensFlat/test_hier_2018_8_2_9_25_humans_n_samples100aliens',
-    # 'AliensFlat/test_hier_2018_8_2_10_11_humans_n_samples200aliens'
-#     'RL_3groups/100s/al_be_nal100_2018_7_25_21_38_humans_n_samples5000RL',
-#     'RL_3groups/100s/alpha_beta100_2018_7_25_21_20_humans_n_samples5000RL',
-#     'RL_3groups/10s/alpha_beta_2018_7_24_14_11_humans_n_samples5000RL',
-#     'RL_3groups/10s/alpha_beta_calpha_2018_7_24_14_15_humans_n_samples5000RL',
-    # 'RL_3groups/10s/alpha_beta_nalpha_calpha_eps_2018_7_24_18_46_humans_n_samples5000RL'
+    'albecal_2018_9_24_19_20_humans_n_samples500',
+    'albenalcal_2018_9_24_19_18_humans_n_samples500',
+    # albenal model
               ]
-model_names = ['f', 'f', 'fabf', 'fabf', 'hab', 'habf', 'f', 'h', 'h', 'albecal10', 'albenalcaleps10']
+model_names = ['abc', 'abnccn', 'abn']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)
@@ -58,7 +46,7 @@ for file_name, model_name in zip(file_names, model_names):
         model_summary = data['summary']
         model.name = model_name
 
-    map_gen_rec = pd.read_csv(parameter_dir + file_name + 'map.csv', index_col=0, header=None)
+    # map_gen_rec = pd.read_csv(parameter_dir + file_name + 'map.csv', index_col=0, header=None)
 
     # Add model to model_dict
     model_dict.update({model: trace})
@@ -66,16 +54,16 @@ for file_name, model_name in zip(file_names, model_names):
     if analyze_indiv_models:
 
         # Compare true parameters and estimates
-        for param_name in ['alpha', 'beta', 'forget', 'alpha_high']:
-            traces = trace[param_name].reshape(trace['alpha'].shape).T
-            true_forgets = map_gen_rec.loc[param_name]
-            colors = plt.cm.PRGn(np.linspace(0, 1, len(true_forgets)))
-            plt.figure()
-            for forget_trace, true_forget, color in zip(traces, true_forgets, colors):
-                sns.kdeplot(forget_trace, color=color)
-                plt.axvline(true_forget, color=color)
-                plt.xlabel(param_name)
-            plt.savefig(save_dir + file_name + param_name + 'MCMC_gen_rec.png')
+        # for param_name in ['alpha', 'beta', 'forget', 'alpha_high']:
+        #     traces = trace[param_name].reshape(trace['alpha'].shape).T
+        #     true_forgets = map_gen_rec.loc[param_name]
+        #     colors = plt.cm.PRGn(np.linspace(0, 1, len(true_forgets)))
+        #     plt.figure()
+        #     for forget_trace, true_forget, color in zip(traces, true_forgets, colors):
+        #         sns.kdeplot(forget_trace, color=color)
+        #         plt.axvline(true_forget, color=color)
+        #         plt.xlabel(param_name)
+        #     plt.savefig(save_dir + file_name + param_name + 'MCMC_gen_rec.png')
 
         par_names = [str(RV_name) for RV_name in model.free_RVs]
 
@@ -111,8 +99,8 @@ for file_name, model_name in zip(file_names, model_names):
         # Plot traces and parameter estimates
         pm.traceplot(trace)
         plt.savefig(save_dir + file_name + '_traceplot.png')
-        pm.forestplot(trace)
-        plt.savefig(save_dir + file_name + '_forestplot.png')
+        # pm.forestplot(trace)
+        # plt.savefig(save_dir + file_name + '_forestplot.png')
         print("Saved traces for {0} model to {1}{2}.".format(model_name, save_dir, file_name))
 
         # Get model WAICs

@@ -11,8 +11,8 @@ verbose = False
 n_trials = 128  # humans: 128
 max_n_subj = 227  # must be > 1  # TODO figure out if 227 or 231
 learning_style = 'RL'  # 'Bayes' or 'RL'
-model_to_be_simulated = 'abn_2018_8_14_23_36_humans_n_samples200RL'
-# model_to_be_simulated = 'none'
+# model_to_be_simulated = 'abn_2018_8_14_23_36_humans_n_samples200RL'
+model_to_be_simulated = 'none'
 
 # Get save path
 save_dir = get_paths(False)['simulations']
@@ -22,10 +22,10 @@ if not os.path.exists(save_dir):
 # Type in some parameters
 if model_to_be_simulated == 'none':
     n_subj = max_n_subj
-    alpha = 0.8 * np.ones(n_subj)
+    alpha = np.random.rand(n_subj)
     eps = 0 * np.ones(n_subj)
-    beta = 4 * np.ones(n_subj)
-    nalpha = alpha.copy()
+    beta = 1 + 3 * np.random.rand(n_subj)
+    nalpha = np.random.rand(n_subj)
     calpha_sc = 0 * np.ones(n_subj)
     calpha = alpha * calpha_sc
     cnalpha_sc = 0 * np.ones(n_subj)

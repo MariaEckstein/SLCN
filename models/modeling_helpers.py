@@ -150,9 +150,9 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
     choices = choices[:, keep]
 
     # z-score age
-    pd.DataFrame(age).to_csv("ages.csv")
-    print('saved!')
     # age = (age - np.nanmean(age)) / np.nanstd(age)
+    pd.DataFrame(age).to_csv("ages.csv")
+    print('saved ages.csv!')
 
     # Look at data
     print("Loaded {0} datasets with pattern {1} from {2}...\n".format(n_subj, file_name_pattern, data_dir))
@@ -160,11 +160,7 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
         print("Choices - shape: {0}\n{1}\n".format(choices.shape, choices))
         print("Rewards - shape: {0}\n{1}\n".format(rewards.shape, rewards))
 
-    return [n_subj,
-            T.as_tensor_variable(rewards),
-            T.as_tensor_variable(choices),
-            T.as_tensor_variable(group),
-            n_groups]
+    return [n_subj, rewards, choices, group, n_groups]
 
 
 def get_save_dir_and_save_id(run_on_cluster, file_name_suff, fitted_data_name, n_samples):
