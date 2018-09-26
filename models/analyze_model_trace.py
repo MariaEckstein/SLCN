@@ -23,11 +23,12 @@ calculate_waic = True
               # ]
 # model_names = ['albenalcal', 'rew_swi_eps']
 file_names = [
+    'albenal_2018_9_24_20_17_humans_n_samples500',
     'albecal_2018_9_24_19_20_humans_n_samples500',
     'albenalcal_2018_9_24_19_18_humans_n_samples500',
-    # albenal model
+    'albenalcal_2018_9_24_20_42_humans_n_samples500',
               ]
-model_names = ['abc', 'abnccn', 'abn']
+model_names = ['abn', 'abc', 'abnc', 'abnccn']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)

@@ -9,7 +9,7 @@ from shared_aliens import alien_initial_Q, update_Qs_sim
 from AlienTask import Task
 
 # Switches for this script
-model_name = "h_argmax_abf"
+model_name = "h_softmax_abfabf"
 verbose = False
 max_n_subj = 30  # must be > 1
 start_id = 0

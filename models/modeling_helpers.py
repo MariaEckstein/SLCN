@@ -30,7 +30,7 @@ def load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_su
     aliens = np.zeros(seasons.shape)
     actions = np.zeros(seasons.shape)
     rewards = np.zeros(seasons.shape)
-    true_params = pd.DataFrame(np.full((len(param_names), n_subj), np.nan),
+    true_params = pd.DataFrame(np.ones((len(param_names), n_subj)),
                                index=['true_' + param_name for param_name in param_names])
 
     # Load data and bring in the right format

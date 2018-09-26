@@ -1,8 +1,8 @@
 import numpy as np
 import theano.tensor as T
 
-# from theano.tensor.shared_randomstreams import RandomStreams
-# rs = RandomStreams()
+from theano.tensor.shared_randomstreams import RandomStreams
+rs = RandomStreams()
 
 
 # Initial Q-value for actions and TS
@@ -19,8 +19,8 @@ def update_Qs_sim(season, alien,
     Q_high_sub = Q_high[np.arange(n_subj), season]  # Q_high_sub.shape -> (n_subj, n_TS)
     p_high = softmax(beta_high * Q_high_sub, axis=1)
     # TS = season  # Flat
-    TS = Q_high_sub.argmax(axis=1)  # Hierarchical deterministic
-    # TS = np.array([np.random.choice(a=3, p=p_high_subj) for p_high_subj in p_high])  # Hierarchical softmax
+    # TS = Q_high_sub.argmax(axis=1)  # Hierarchical deterministic
+    TS = np.array([np.random.choice(a=3, p=p_high_subj) for p_high_subj in p_high])  # Hierarchical softmax
 
     # Calculate action probabilities based on TS and select action
     Q_low_sub = Q_low[np.arange(n_subj), TS, alien]  # Q_low_sub.shape -> [n_subj, n_actions]
@@ -60,12 +60,16 @@ def update_Qs_sim(season, alien,
 
 def update_Qs(season, alien, action, reward,
               Q_low, Q_high,
-              beta, alpha, alpha_high, forget, n_subj):
+              beta, beta_high, alpha, alpha_high, forget, forget_high, n_subj, n_TS):
 
     # Select TS
     Q_high_sub = Q_high[T.arange(n_subj), season]  # Q_high_sub.shape -> [n_subj, n_TS]
-    TS = season  # Flat
+    p_high = T.nnet.softmax(beta_high * Q_high_sub)
+    # TS = season  # Flat
     # TS = T.argmax(Q_high_sub, axis=1)  # Hierarchical deterministic
+    rand = rs.uniform()
+    cumsum = T.extra_ops.cumsum(p_high, axis=1)
+    TS = n_TS - T.sum(rand < cumsum, axis=1)
 
     # Calculate action probabilities based on TS
     Q_low_sub = Q_low[T.arange(n_subj), TS, alien]  # Q_low_sub.shape -> [n_subj, n_actions]
@@ -73,7 +77,7 @@ def update_Qs(season, alien, action, reward,
 
     # Forget Q-values a little bit
     Q_low = (1 - forget) * Q_low + forget * alien_initial_Q
-    # Q_high = (1 - forget_high) * Q_high + forget_high * alien_initial_Q
+    Q_high = (1 - forget_high) * Q_high + forget_high * alien_initial_Q
 
     # Calculate RPEs & update Q-values
     current_trial_high = T.arange(n_subj), season, TS
