@@ -13,7 +13,7 @@ import pymc3 as pm
 run_on_cluster = False
 verbose = False
 print_logps = False
-file_name_suff = 'albenalcal'
+file_name_suff = 'albenalcaleps'
 upper = 1000
 
 # Which data should be fitted?
