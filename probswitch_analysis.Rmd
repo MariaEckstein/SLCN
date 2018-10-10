@@ -8,19 +8,20 @@ output: html_notebook
 ```{r Set up parameters}
 gg_save = T
 data = "simulated_human"  # Can be "human", "fitted_human", or "simulated_human"
-parameter_names = c("alpha", "alpha_high", "beta", "beta_high", "epsilon", "TS_bias", "forget")
-desired_columns = c("sID", "selected_box", "p_right", "reward", "RT", "correct", "correct_box", "learning_style", "model_name", "NLL", parameter_names, paste0(parameter_names, "_rec"))
+# parameter_names = c("alpha", "alpha_high", "beta", "beta_high", "epsilon", "TS_bias", "forget")
+parameter_names = c('alpha', 'beta', 'nalpha', 'calpha', 'cnalpha')
+desired_columns = c("sID", "version", "selected_box", "p_right", "reward", "RT", "correct", "correct_box", "learning_style", "model_name", "NLL", parameter_names, paste0(parameter_names, "_rec"))
 library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo")
 
-  
 if (data == "human") {
-  data_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData"
+  # data_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData"
+  data_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch"
 } else if (data == "fitted_human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSGenRec"
 } else if (data == "simulated_human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSsimulations" # "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
 }
-plot_dir = file.path(data_dir, "plots")
+plot_dir = file.path(data_dir, "PS_plots_abcncn_samples")
 
 if (!dir.exists(plot_dir)) {
   dir.create(plot_dir)
@@ -30,33 +31,31 @@ if (!dir.exists(plot_dir)) {
 # Read in and clean data
 
 ```{r Read in ages}
-if (data %in% c("human", "fitted_human")) {
-  ages = read.csv("C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo.csv")
-  ages$age_group = "Adults"
-  ages$age_group[ages$PreciseYrs < 18] = "Teens"
-  ages$age_group[ages$PreciseYrs < 13] = "Children"
-  ages$age_group = factor(ages$age_group, levels = c("Children", "Teens", "Adults"))
-  ages$PDS[ages$age_group == "Adults"] = 6
+# if (data %in% c("human", "fitted_human")) {
+  ages = read.csv("C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv")
   colnames(ages)[colnames(ages) == "ID"] = "sID"
-  ages
-} else {
-  ages = read.csv("C:/Users/maria/MEGAsync/SLCN/models/ages.csv")
-  colnames(ages) = c("sID", "PreciseYrs")
-  ages$age_group = "Adults"
-  ages$age_group[ages$PreciseYrs < 18] = "Teens"
-  ages$age_group[ages$PreciseYrs < 13] = "Children"
-  ages$age_group = factor(ages$age_group, levels = c("Children", "Teens", "Adults"))
-  ages$PDS[ages$age_group == "Adults"] = 6
-  ages
-}
+# } else {
+#   ages = read.csv("C:/Users/maria/MEGAsync/SLCN/models/ages.csv")
+#   colnames(ages)[colnames(ages) == "age"] = "PreciseYrs"
+#   ages$X = NULL
+# }
+
+ages$age_group = "Adults"
+ages$age_group[ages$PreciseYrs < 18] = "Teens"
+ages$age_group[ages$PreciseYrs < 13] = "Children"
+ages$age_group = factor(ages$age_group, levels = c("Children", "Teens", "Adults"))
+ages$PDS[ages$age_group == "Adults"] = 6
+ages
 ```
 ```{r Read in data}
 all_files = data.frame()
 
-filenames = list.files(data_dir, pattern = ifelse(data == "human", "*.mat", "PS*"))
+filenames = list.files(data_dir, pattern = ifelse(data == "human", "*.mat", "PSRL*"))
+print(paste(length(filenames), "filenames on the list."))
 filename = filenames[1]  # debugging
 
 for(filename in filenames) {
+  
   if (data == "human") {
     mat_file = readMat(file.path(data_dir, filename))$exp[,,1]$PROBSWITCHdata[,,1]
     subj_file = data.frame(RT = t(mat_file$RT))
@@ -87,41 +86,35 @@ for(filename in filenames) {
   if (is.na(subj_file$model_name[1])) {
     subj_file$model_name = subj_file$learning_style
   }
+  if (is.na(subj_file$model_name[1])) {
+    subj_file$model_name = "no_model"
+  }
+  if (is.na(subj_file$version[1])) {
+    subj_file$version = "no_version"
+  }
   
   # Add columns
   subj_file$TrialID = 1:nrow(subj_file)
   subj_file$rewardversion = subj_file$sID %% 4
   subj_file$ACC = with(subj_file, selected_box == correct_box)
   
-  # Get trials since last switch (forward pass -> numbers > 0)
-  subj_file$switch_trial = NA
-  box_prev_trial = subj_file$correct_box[1]
-  block = 1
-  trialsinceswitch = 0
-  for (t in subj_file$TrialID) {
-    # Find switch trials
-    subj_file$switch_trial[t] = box_prev_trial != subj_file$correct_box[t]
-    box_prev_trial = subj_file$correct_box[t]
-    # Get blocks
-    block = block + subj_file$switch_trial[t]
-    subj_file$block[t] = block
-    trialsinceswitch = ifelse(subj_file$switch_trial[t] == 1, 0, trialsinceswitch + 1)
-    subj_file$trialsinceswitch[t] = trialsinceswitch
-  }
-  # Get trials since last switch (backward pass -> numbers < 0)
-  block = 1
-  trialsinceswitch = 0
-  for (t in rev(subj_file$TrialID)) {
-    trialsinceswitch = ifelse(subj_file$switch_trial[t] == 1, 0, trialsinceswitch - 1)
-    if (trialsinceswitch > -4) {
-      subj_file$trialsinceswitch[t] = trialsinceswitch
+  # Get switch_trial, block, and trialssinceswitch
+  this_trial = subj_file$correct_box[2:nrow(subj_file)]
+  prev_trial = subj_file$correct_box[1:(nrow(subj_file) - 1)]
+  subj_file$switch_trial = c(F, this_trial != prev_trial)
+  subj_file$block = cumsum(subj_file$switch_trial)
+  
+  subj_file$trialsinceswitch = NA
+  for (blocki in subj_file$block) {
+    n_rows = nrow(subset(subj_file, block == blocki))
+    if (n_rows >= 4) {
+      subj_file$trialsinceswitch[subj_file$block == blocki] = 0:(n_rows - 1)
+      subj_file$trialsinceswitch[subj_file$block == blocki][(n_rows - 3):n_rows] = -4:-1
     }
   }
   
-  outcome_1_back = c(NA, subj_file$reward[1:(nrow(subj_file) - 1)])
-  subj_file$outcome_1_back = outcome_1_back
-  outcome_2_back = c(NA, NA, subj_file$reward[1:(nrow(subj_file) - 2)])
-  subj_file$outcome_2_back = outcome_2_back
+  subj_file$outcome_1_back = c(NA, subj_file$reward[1:(nrow(subj_file) - 1)])
+  subj_file$outcome_2_back = c(NA, NA, subj_file$reward[1:(nrow(subj_file) - 2)])
   
   subj_file$choice_left = subj_file$selected_box == 0  # left: 0; right: 1
   subj_file$choice_1_back = c(NA, subj_file$choice_left[1:(nrow(subj_file) - 1)])
@@ -134,6 +127,9 @@ for(filename in filenames) {
   all_files = as.data.frame(rbind(all_files, subj_file))
 }
 
+reward_versions = ddply(all_files, .(sID), summarize, rewardversion = rewardversion[1])
+write.csv(reward_versions, paste0(data_dir, "_rewardversions.csv"))
+print(paste("Red in data from", length(unique(all_files$sID)), "subjects"))
 summary(all_files)
 ```
 ```{r Remaining fixes for all_filess}
@@ -150,27 +146,41 @@ old_nrows = nrow(all_files)
 all_files = merge(all_files, ages, all.x = T)
 all_files$age_group = as.character(all_files$age_group)
 all_files$age_group[is.na(all_files$age_group)] = "None"
+all_files$age_group = factor(all_files$age_group, levels=c("Children", "Teens", "Adults"))
 assertthat::assert_that(nrow(all_files) == old_nrows)
 summary(all_files)
 
 unique(subset(all_files, is.na(PreciseYrs))$sID)
+
+all_files = subset(all_files, !is.na(PreciseYrs))
 ```
 
 # Analyze behavior
 
 ```{r Get behavioral summary and win-stay loose-shift}
 # Behavior
-all_files_sum = ddply(subset(all_files, !is.na(choice_12_back)),
+## Summarize over individual simulations of the same participant (necesary for simulated_humans - should not do anything for the other datasets)
+all_files_sum_pre = ddply(subset(all_files, !is.na(choice_12_back)),
+                      .(sID, version, age_group, model_name, outcome_12_back, choice_12_back), summarize,
+                      choice_left = mean(choice_left, na.rm = T))
+all_files_sum = ddply(all_files_sum_pre,
                       .(sID, age_group, model_name, outcome_12_back, choice_12_back), summarize,
                       choice = mean(choice_left, na.rm = T))
-all_files_sum2 = ddply(subset(all_files, !is.na(trialsinceswitch)),
+all_files_sum2_pre = ddply(subset(all_files, !is.na(trialsinceswitch)),
+                       .(sID, version, age_group, model_name, trialsinceswitch), summarize,
+                       choice_left = mean(choice_left, na.rm = T),
+                       RT = median(RT, na.rm = T))
+all_files_sum2 = ddply(all_files_sum2_pre,
                        .(sID, age_group, model_name, trialsinceswitch), summarize,
                        choice = mean(choice_left, na.rm = T),
                        RT = median(RT, na.rm = T))
 # Win-stay loose-shift
 stay = with(all_files, c(choice_left == choice_1_back))
 all_files$stay = c(stay[2:length(stay)], NA)
-wsls = ddply(all_files, .(sID, reward, age_group), summarize,
+all_files$stay[all_files$TrialID == 1] = NA  # first trial is no stay - doing this is faster than looping
+wsls_pre = ddply(all_files, .(sID, version, reward, age_group), summarize,
+             stay = mean(stay, na.rm = T))
+wsls = ddply(wsls_pre, .(sID, reward, age_group), summarize,
              stay = mean(stay, na.rm = T))
 wsls$reward = factor(wsls$reward)
 ```
@@ -252,7 +262,7 @@ if (gg_save) {
 
 ```{r Prepare data for regression}
 # Prepare data
-all_files_regr = subset(all_files, select = c("sID", "model_name", "TrialID", "block", "reward", "selected_box"))
+all_files_regr = subset(all_files, select = c("sID", "version", "model_name", "TrialID", "block", "reward", "selected_box"))
 ## Times rewarded and times selected
 all_files_regr$selected = as.numeric(as.character(factor(all_files_regr$selected_box, levels = c(0, 1), labels = c(-1, 1))))  # 0 / -1: left; +1: right
 ## Choice regressors
@@ -277,43 +287,45 @@ reward_predictors = c("reward", "noReward")
 
 nback_regr_dat = data.frame()
 for (subj in unique(all_files_regr$sID)) {
-  for (model in unique(all_files_regr$model_name)) {
-    for (n in 1:12) {
-      subj_dat = subset(all_files_regr, sID == subj & model_name == model, !is.na(selected_box))
+  for (versi in unique(all_files_regr$version)) {
+    for (model in unique(all_files_regr$model_name)) {
+      for (n in 1:12) {
+        subj_dat = subset(all_files_regr, sID == subj & version == versi & model_name == model, !is.na(selected_box))
+        
+        if (nrow(subj_dat) > 0) {
+        
+          ## Add nback columns
+          for (cond in c(choice_predictors, reward_predictors, sel_rew_predictors)) {
+            col_name = paste0("back", n, cond)
+            subj_dat[,col_name] = c(rep(NA, n), subj_dat[1:(nrow(subj_dat)-n), cond])
+          }
+          
+          ## Selected/rewarded model (predictors: selected [left: -1, right: +1], reward [left: -1, right: +1, none: 0])
+          sel_rew_formula = paste("selected_box ~", paste(paste0("back", n, sel_rew_predictors), collapse = " + "), "+ (1 | block)")
+          sel_rew_mod = glm(as.formula(sel_rew_formula),
+                    family = "binomial",
+                    data = subj_dat)
+          sel_rew_coefs = as.data.frame(summary(sel_rew_mod)$coef)
+          sel_rew_coefss = cbind(sID = subj, version = versi, model_name = model, model = "selectedRewarded", predictor = rownames(sel_rew_coefs), back = n, data.frame(sel_rew_coefs, row.names = NULL))
+          
+          ## Choice model (predictors: left_rew [reward: +1, no reward: -1, none: 0], right_rew [reward: +1, no reward: -1, none: 0])
+          choice_formula = paste("selected_box ~ ", paste(paste0("back", n, choice_predictors), collapse = "+"))
+          choice_mod = glm(as.formula(choice_formula),
+                    family = "binomial",
+                    data = subj_dat)
+          choice_coefs = as.data.frame(summary(choice_mod)$coef)
+          choice_coefss = cbind(sID = subj, version = versi, model_name = model, model = "leftRight", predictor = rownames(choice_coefs), back = n, data.frame(choice_coefs, row.names = NULL))
       
-      if (nrow(subj_dat) > 0) {
-      
-        ## Add nback columns
-        for (cond in c(choice_predictors, reward_predictors, sel_rew_predictors)) {
-          col_name = paste0("back", n, cond)
-          subj_dat[,col_name] = c(rep(NA, n), subj_dat[1:(nrow(subj_dat)-n), cond])
+          ## Reward model (predictors: reward [left: -1, right: +1, none: 0], no reward [left: -1, right: +1, none: 0])
+          reward_formula = paste("selected_box ~ ", paste(paste0("back", n, reward_predictors), collapse = "+"))
+          reward_mod = glm(as.formula(reward_formula),
+                    family = "binomial",
+                    data = subj_dat)
+          reward_coefs = as.data.frame(summary(reward_mod)$coef)
+          reward_coefss = cbind(sID = subj, version = versi, model_name = model, model = "rewardNoReward", predictor = rownames(reward_coefs), back = n, data.frame(reward_coefs, row.names = NULL))
+          
+          nback_regr_dat = rbind(nback_regr_dat, choice_coefss, reward_coefss, sel_rew_coefss)
         }
-        
-        ## Selected/rewarded model (predictors: selected [left: -1, right: +1], reward [left: -1, right: +1, none: 0])
-        sel_rew_formula = paste("selected_box ~", paste(paste0("back", n, sel_rew_predictors), collapse = " + "), "+ (1 | block)")
-        sel_rew_mod = glm(as.formula(sel_rew_formula),
-                  family = "binomial",
-                  data = subj_dat)
-        sel_rew_coefs = as.data.frame(summary(sel_rew_mod)$coef)
-        sel_rew_coefss = cbind(sID = subj, model_name = model, model = "selectedRewarded", predictor = rownames(sel_rew_coefs), back = n, data.frame(sel_rew_coefs, row.names = NULL))
-        
-        ## Choice model (predictors: left_rew [reward: +1, no reward: -1, none: 0], right_rew [reward: +1, no reward: -1, none: 0])
-        choice_formula = paste("selected_box ~ ", paste(paste0("back", n, choice_predictors), collapse = "+"))
-        choice_mod = glm(as.formula(choice_formula),
-                  family = "binomial",
-                  data = subj_dat)
-        choice_coefs = as.data.frame(summary(choice_mod)$coef)
-        choice_coefss = cbind(sID = subj, model_name = model, model = "leftRight", predictor = rownames(choice_coefs), back = n, data.frame(choice_coefs, row.names = NULL))
-    
-        ## Reward model (predictors: reward [left: -1, right: +1, none: 0], no reward [left: -1, right: +1, none: 0])
-        reward_formula = paste("selected_box ~ ", paste(paste0("back", n, reward_predictors), collapse = "+"))
-        reward_mod = glm(as.formula(reward_formula),
-                  family = "binomial",
-                  data = subj_dat)
-        reward_coefs = as.data.frame(summary(reward_mod)$coef)
-        reward_coefss = cbind(sID = subj, model_name = model, model = "rewardNoReward", predictor = rownames(reward_coefs), back = n, data.frame(reward_coefs, row.names = NULL))
-        
-        nback_regr_dat = rbind(nback_regr_dat, choice_coefss, reward_coefss, sel_rew_coefss)
       }
     }
   }
@@ -323,7 +335,13 @@ nback_regr_dat = merge(nback_regr_dat, ages, all.x = T)
 nback_regr_dat$predictor = gsub("back.", "", nback_regr_dat$predictor)
 nback_regr_dat$predictor = gsub("[0-99]", "", nback_regr_dat$predictor)
 nback_regr_dat$sig_Estimate = 1 / (1 + exp(-nback_regr_dat$Estimate / 2))  # transform so that I can see all
-# nback_regr_dat
+
+# Summarize over version (for simulated_humans)
+nback_regr_dat = ddply(nback_regr_dat,
+                       colnames(nback_regr_dat)[colnames(nback_regr_dat) != "version"],
+                       summarize,
+                       X = sID[1])
+nback_regr_dat
 ```
 ```{r Plot relationship between regressors and age}
 # Plot
@@ -403,7 +421,11 @@ ggsave(file.path(plot_dir, "gg_exp_coefs_agecat.png"), gg_exp_coefs_agecat)
 ```
 ```{r Relationship with age and puberty: Other measures}
 # Overall ACC
-sum_dat = ddply(all_files, .(sID, PreciseYrs, Gender, Category, PDS), summarize,
+sum_dat_pre = ddply(all_files, .(sID, block, version, PreciseYrs, Gender, Category, PDS), summarize,
+                ACC = mean(ACC, na.rm = T),
+                RT = median(RT, na.rm = T),
+                stay = mean(stay, na.rm = T))
+sum_dat = ddply(sum_dat_pre, .(sID, PreciseYrs, Gender, Category, PDS), summarize,
                 mean_ACC = mean(ACC, na.rm = T),
                 median_RT = median(RT, na.rm = T),
                 n_blocks = max(block, na.rm = T),
@@ -443,11 +465,13 @@ gg_age_wsls = ggplot(wsls, aes(PreciseYrs, stay, color = reward)) +
   geom_point() +
   geom_smooth()
 gg_PDS_wsls = gg_age_wsls + aes(x = PDS)
-
+```
+```{r}
 # Effect of reward history
-all_files
-rewhist_dat = ddply(all_files, .(sID, outcome_12_back), summarize,
+rewhist_dat_pre = ddply(all_files, .(sID, version, outcome_12_back), summarize,
                     stay = mean(same_choice_01_back, na.rm = T))
+rewhist_dat = ddply(rewhist_dat_pre, .(sID, outcome_12_back), summarize,
+                    stay = mean(stay))
 rewhist_dat = merge(rewhist_dat, ages, all.x = T)
 gg_age_rewhist =
   ggplot(subset(rewhist_dat, !is.na(outcome_12_back)), aes(PreciseYrs, stay, color = outcome_12_back)) +

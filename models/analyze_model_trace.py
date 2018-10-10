@@ -1,6 +1,7 @@
 # Model comparison: https://docs.pymc.io/notebooks/model_comparison.html
 
 import pickle
+import string
 import pandas as pd
 import seaborn as sns
 
@@ -8,33 +9,31 @@ import pymc3 as pm
 from theano.printing import pydotprint
 import matplotlib.pyplot as plt
 
-from shared_modeling_simulation import *
+from shared_modeling_simulation import get_paths
+from modeling_helpers import plot_gen_rec
 
 
 # Which models should be analyzed and compared?
 create_pairplot = False
-analyze_indiv_models = True
+analyze_indiv_models = False
 test_group_differences = False
 compare_models = True
 calculate_waic = True
+do_plot_gen_rec = False
+param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high']
 
-# file_names = ['RL_3groups/TestGroupDifferences/albenalcal_2018_7_27_21_19_humans_n_samples5000RL',
-              # 'Bayes_groups/rew_swi_eps20_2018_7_24_19_16_humans_n_samples5000Bayes'
-              # ]
-# model_names = ['albenalcal', 'rew_swi_eps']
 file_names = [
-    'albenal_2018_9_24_20_17_humans_n_samples500',
-    'albecal_2018_9_24_19_20_humans_n_samples500',
-    'albenalcal_2018_9_24_19_18_humans_n_samples500',
-    'albenalcal_2018_9_24_20_42_humans_n_samples500',
-              ]
-model_names = ['abn', 'abc', 'abnc', 'abnccn']
+    'Bayes_3groups/betswi1_2018_10_9_16_49_humans_n_samples5000',
+    'Bayes_3groups/betswirew_2018_10_9_16_42_humans_n_samples5000',
+    'Bayes_3groups/betswirew_2018_10_9_16_50_humans_n_samples5000'
+    ]
+model_names = ['betswi1', 'betswirew', 'betswirew']  # string.ascii_lowercase  # ['abn', 'abcncn']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)
 parameter_dir = paths['fitting results']
 save_dir = paths['fitting results']
-print("Workin on {0}.\n".format(file_names))
+print("Working on {0}.\n".format(file_names))
 
 model_dict = {}
 for file_name, model_name in zip(file_names, model_names):
@@ -47,7 +46,14 @@ for file_name, model_name in zip(file_names, model_names):
         model_summary = data['summary']
         model.name = model_name
 
-    # map_gen_rec = pd.read_csv(parameter_dir + file_name + 'map.csv', index_col=0, header=None)
+    if do_plot_gen_rec:
+        # map_gen_rec = pd.read_csv(save_dir + file_name + '_map_gen_rec.csv', index_col=0, header=0)
+        # plot_gen_rec(param_names=param_names, gen_rec=map_gen_rec,
+        #              save_name=save_dir + file_name + '_map_gen_rec_plot.png')
+
+        mcmc_gen_rec = pd.read_csv(save_dir + file_name + '_mcmc_gen_rec.csv', index_col=0, header=None)
+        plot_gen_rec(param_names=param_names, gen_rec=mcmc_gen_rec,
+                     save_name=save_dir + file_name + '_mcmc_gen_rec_plot.png')
 
     # Add model to model_dict
     model_dict.update({model: trace})
@@ -91,7 +97,6 @@ for file_name, model_name in zip(file_names, model_names):
         print('Saving summary of {0} model.'.format(model_name))
         pd.DataFrame(model_summary).to_csv(save_dir + file_name + 'model_summary.csv')
 
-        #
         # print(model.basic_RVs)
         # pm.pairplot(trace, sub_varnames=['alpha_sd', 'beta_sd'], divergences=True, color='C3',
         #             kwargs_divergence={'color': 'C2'})

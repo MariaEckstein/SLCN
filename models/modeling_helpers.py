@@ -101,61 +101,72 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
         n_subj = 50
 
     # Prepare things for loading data
+    print("Preparing to load {0} datasets with pattern {1} from {2}...\n".format(n_subj, file_name_pattern, data_dir))
     filenames = glob.glob(data_dir + file_name_pattern)[:n_subj]
     assert len(filenames) > 0, "Error: There are no files with pattern {0} in {1}".format(file_name_pattern, data_dir)
     choices = np.zeros((n_trials, len(filenames)))
     rewards = np.zeros(choices.shape)
-    age = np.full(n_subj, np.nan)
+    age = pd.DataFrame(np.full((n_subj, 2), np.nan), columns=['sID', 'age'])
 
     # Load data and bring in the right format
-    SLCNinfo = pd.read_csv(paths['ages file name'])
-    for file_idx, filename in enumerate(filenames):
+    SLCNinfo = pd.read_csv(paths['SLCN info'])
+    file_idx = 0
+    for filename in filenames:
         agent_data = pd.read_csv(filename)
         if agent_data.shape[0] > n_trials:
             choices[:, file_idx] = np.array(agent_data['selected_box'])[:n_trials]
             rewards[:, file_idx] = agent_data['reward'].tolist()[:n_trials]
             sID = agent_data['sID'][0]
-            age[file_idx] = SLCNinfo[SLCNinfo['ID'] == sID]['PreciseYrs'].values
+            subj_age = SLCNinfo[SLCNinfo['ID'] == sID]['PreciseYrs'].values
+            if not subj_age:
+                subj_age = [np.nan]
+            age.loc[file_idx, :] = [sID, *subj_age]
+            file_idx += 1
+        else:
+            print("file {0} has only {2} rows (minimum is {1}) and will be excluded from analyses!".
+                  format(filename, n_trials, agent_data.shape[0]))
 
     # Remove excess columns
-    rewards = np.delete(rewards, range(file_idx + 1, n_subj), 1)
-    choices = np.delete(choices, range(file_idx + 1, n_subj), 1)
-    age = age[:file_idx + 1]
-    # pd.DataFrame(age).to_csv('C:/Users/maria/MEGAsync/SLCNdata/age.csv')
+    rewards = np.delete(rewards, range(file_idx, n_subj), 1)
+    choices = np.delete(choices, range(file_idx, n_subj), 1)
+    age = age[:file_idx]
 
     # Delete kid/teen or adult data sets
     if kids_and_teens_only:
-        rewards = rewards[:, age <= 18]
-        choices = choices[:, age <= 18]
-        age = age[age <= 18]
+        rewards = rewards[age['age'] <= 18]
+        choices = choices[age['age'] <= 18]
+        age = age[age['age'] <= 18]
     elif adults_only:
-        rewards = rewards[:, age > 18]
-        choices = choices[:, age > 18]
-        age = age[age > 18]
+        rewards = rewards[age['age'] > 18]
+        choices = choices[age['age'] > 18]
+        age = age[age[:, 1] > 18]
 
     n_subj = choices.shape[1]
 
     # Get each participant's group assignment
     group = np.zeros(n_subj, dtype=int)
-    group[age > 12] = 1
-    group[age > 17] = 2
+    group[age['age'] > 12] = 1
+    group[age['age'] > 17] = 2
     n_groups = len(np.unique(group))
 
     # Remove subjects that are missing age
-    keep = np.invert(np.isnan(age))
+    idxs_without_age = np.isnan(age['age'])
+    print("Subjects {} are missing age and are removed from analyses!".format(age.loc[idxs_without_age, 'sID'].values))
+    keep = np.invert(idxs_without_age)
     n_subj = np.sum(keep)
+    print("Number of subjects after exluding: {}".format(n_subj))
     age = age[keep]
+    age = age.reset_index(drop=True)
     group = group[keep]
     rewards = rewards[:, keep]
     choices = choices[:, keep]
 
     # z-score age
     # age = (age - np.nanmean(age)) / np.nanstd(age)
-    pd.DataFrame(age).to_csv("ages.csv")
-    print('saved ages.csv!')
+    pd.DataFrame(age).to_csv(get_paths(run_on_cluster)['ages'])
+    print("Saved ages.csv to {}".format(get_paths(run_on_cluster)['ages']))
 
     # Look at data
-    print("Loaded {0} datasets with pattern {1} from {2}...\n".format(n_subj, file_name_pattern, data_dir))
     if verbose:
         print("Choices - shape: {0}\n{1}\n".format(choices.shape, choices))
         print("Rewards - shape: {0}\n{1}\n".format(rewards.shape, rewards))
@@ -198,6 +209,14 @@ def plot_gen_rec(param_names, gen_rec, save_name):
         y_max = np.max(gen_rec.loc['true_' + param_name])
         plt.plot((0, y_max), (0, y_max))
 
+    # Plot fitted alpha_high * beta_high against recovered alpha_high * beta_high
+    plt.subplot(3, 3, 7)
+    sns.regplot(gen_rec.loc['alpha_high'] * gen_rec.loc['beta_high'], gen_rec.loc['true_alpha_high'] * gen_rec.loc['true_beta_high'], fit_reg=False)
+    y_max = np.max(gen_rec.loc['true_alpha_high'] * gen_rec.loc['true_beta_high'])
+    plt.plot((0, y_max), (0, y_max))
+    plt.xlabel('alpha_high * beta_high')
+    plt.ylabel('true alpha_high * beta_high')
+
     # Plot fitted alpha * beta against recovered alpha * beta
     plt.subplot(3, 3, 8)
     sns.regplot(gen_rec.loc['alpha'] * gen_rec.loc['beta'], gen_rec.loc['true_alpha'] * gen_rec.loc['true_beta'], fit_reg=False)
@@ -209,4 +228,5 @@ def plot_gen_rec(param_names, gen_rec, save_name):
     # Plot fitted alpha against fitted beta
     plt.subplot(3, 3, 9)
     sns.regplot(gen_rec.loc['alpha'], gen_rec.loc['beta'], fit_reg=False)
-    plt.savefig(save_name)
+    if save_name:
+        plt.savefig(save_name)

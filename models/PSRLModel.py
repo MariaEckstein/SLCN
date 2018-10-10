@@ -1,19 +1,20 @@
 import pickle
 
 import theano
-from theano.printing import pydotprint
 import theano.tensor as T
 import matplotlib.pyplot as plt
 
-from shared_modeling_simulation import *
-from modeling_helpers import *
+from shared_modeling_simulation import update_Q, p_from_Q
+from modeling_helpers import load_data, get_save_dir_and_save_id, print_logp_info
+
 import pymc3 as pm
+import numpy as np
 
 # Switches for this script
 run_on_cluster = False
 verbose = False
 print_logps = False
-file_name_suff = 'albenalcaleps'
+file_name_suff = 'abncnc'
 upper = 1000
 
 # Which data should be fitted?
@@ -22,8 +23,8 @@ kids_and_teens_only = False
 adults_only = False
 
 # Sampling details
-n_samples = 500
-n_tune = 300
+n_samples = 100
+n_tune = 50
 n_cores = 1
 n_chains = 1
 target_accept = 0.8
@@ -45,12 +46,12 @@ print("Compiling models for {0} with {1} samples and {2} tuning steps...\n".form
 with pm.Model() as model:
 
     # Get population-level and individual parameters
-    alpha_a_a = pm.Uniform('alpha_a_a', lower=0, upper=upper)
-    alpha_a_b = pm.Uniform('alpha_a_b', lower=0, upper=upper)
-    alpha_b_a = pm.Uniform('alpha_b_a', lower=0, upper=upper)
-    alpha_b_b = pm.Uniform('alpha_b_b', lower=0, upper=upper)
-    alpha_a = pm.Gamma('alpha_a', alpha=alpha_a_a, beta=alpha_a_b, shape=n_groups)
-    alpha_b = pm.Gamma('alpha_b', alpha=alpha_b_a, beta=alpha_b_b, shape=n_groups)
+    # alpha_a_a = pm.Uniform('alpha_a_a', lower=0, upper=upper)
+    # alpha_a_b = pm.Uniform('alpha_a_b', lower=0, upper=upper)
+    # alpha_b_a = pm.Uniform('alpha_b_a', lower=0, upper=upper)
+    # alpha_b_b = pm.Uniform('alpha_b_b', lower=0, upper=upper)
+    # alpha_a = pm.Gamma('alpha_a', alpha=alpha_a_a, beta=alpha_a_b, shape=n_groups)
+    # alpha_b = pm.Gamma('alpha_b', alpha=alpha_b_a, beta=alpha_b_b, shape=n_groups)
 
     beta_a_a = pm.Uniform('beta_a_a', lower=0, upper=upper)
     beta_a_b = pm.Uniform('beta_a_b', lower=0, upper=upper)
@@ -76,29 +77,28 @@ with pm.Model() as model:
     calpha_sc = pm.Beta('calpha_sc', alpha=calpha_sc_a[group], beta=calpha_sc_b[group], shape=n_subj)
     # calpha_sc = pm.Deterministic('calpha_sc', T.as_tensor_variable(0))
 
-    # cnalpha_sc_a_a = pm.Uniform('cnalpha_sc_a_a', lower=0, upper=upper)
-    # cnalpha_sc_a_b = pm.Uniform('cnalpha_sc_a_b', lower=0, upper=upper)
-    # cnalpha_sc_b_a = pm.Uniform('cnalpha_sc_b_a', lower=0, upper=upper)
-    # cnalpha_sc_b_b = pm.Uniform('cnalpha_sc_b_b', lower=0, upper=upper)
-    # cnalpha_sc_a = pm.Gamma('cnalpha_sc_a', alpha=cnalpha_sc_a_a, beta=cnalpha_sc_a_b, shape=n_groups)
-    # cnalpha_sc_b = pm.Gamma('cnalpha_sc_b', alpha=cnalpha_sc_b_a, beta=cnalpha_sc_b_b, shape=n_groups)
-    # cnalpha_sc = pm.Beta('cnalpha_sc', alpha=cnalpha_sc_a[group], beta=cnalpha_sc_b[group], shape=n_subj)
-    cnalpha_sc = pm.Deterministic('cnalpha_sc', calpha_sc.copy())
+    cnalpha_sc_a_a = pm.Uniform('cnalpha_sc_a_a', lower=0, upper=upper)
+    cnalpha_sc_a_b = pm.Uniform('cnalpha_sc_a_b', lower=0, upper=upper)
+    cnalpha_sc_b_a = pm.Uniform('cnalpha_sc_b_a', lower=0, upper=upper)
+    cnalpha_sc_b_b = pm.Uniform('cnalpha_sc_b_b', lower=0, upper=upper)
+    cnalpha_sc_a = pm.Gamma('cnalpha_sc_a', alpha=cnalpha_sc_a_a, beta=cnalpha_sc_a_b, shape=n_groups)
+    cnalpha_sc_b = pm.Gamma('cnalpha_sc_b', alpha=cnalpha_sc_b_a, beta=cnalpha_sc_b_b, shape=n_groups)
+    cnalpha_sc = pm.Beta('cnalpha_sc', alpha=cnalpha_sc_a[group], beta=cnalpha_sc_b[group], shape=n_subj)
+    # cnalpha_sc = pm.Deterministic('cnalpha_sc', calpha_sc.copy())
 
     # Individual parameters
-    alpha = pm.Beta('alpha', alpha=alpha_a[group], beta=alpha_b[group], shape=n_subj)
-    # beta = T.as_tensor_variable(0)
+    alpha = pm.Deterministic('alpha', T.ones(n_subj))  # pm.Beta('alpha', alpha=alpha_a[group], beta=alpha_b[group], shape=n_subj)
     beta = pm.Gamma('beta', alpha=beta_a[group], beta=beta_b[group], shape=n_subj)
     nalpha = pm.Beta('nalpha', alpha=nalpha_a[group], beta=nalpha_b[group], shape=n_subj)
-    # nalpha = pm.Deterministic('nalpha', alpha.copy())
+    nalpha = pm.Deterministic('nalpha', alpha.copy())
     calpha = pm.Deterministic('calpha', alpha * calpha_sc)
     cnalpha = pm.Deterministic('cnalpha', nalpha * cnalpha_sc)
 
     # Get parameter means and variances
-    alpha_mu = pm.Deterministic(
-        'alpha_mu', 1 / (1 + alpha_b / alpha_a))
-    alpha_var = pm.Deterministic(
-        'alpha_var', (alpha_a * alpha_b) / (np.square(alpha_a + alpha_b) * (alpha_a + alpha_b + 1)))
+    # alpha_mu = pm.Deterministic(
+    #     'alpha_mu', 1 / (1 + alpha_b / alpha_a))
+    # alpha_var = pm.Deterministic(
+    #     'alpha_var', (alpha_a * alpha_b) / (np.square(alpha_a + alpha_b) * (alpha_a + alpha_b + 1)))
     beta_mu = pm.Deterministic(
         'beta_mu', beta_a / beta_b)
     beta_var = pm.Deterministic(
@@ -111,15 +111,15 @@ with pm.Model() as model:
         'calpha_sc_mu', 1 / (1 + calpha_sc_b / calpha_sc_a))
     calpha_sc_var = pm.Deterministic(
         'calpha_sc_var', (calpha_sc_a * calpha_sc_b) / (np.square(calpha_sc_a + calpha_sc_b) * (calpha_sc_a + calpha_sc_b + 1)))
-    # cnalpha_sc_mu = pm.Deterministic(
-    #     'cnalpha_sc_mu', 1 / (1 + cnalpha_sc_b / cnalpha_sc_a))
-    # cnalpha_sc_var = pm.Deterministic(
-    #     'cnalpha_sc_var', (cnalpha_sc_a * cnalpha_sc_b) / (np.square(cnalpha_sc_a + cnalpha_sc_b) * (cnalpha_sc_a + cnalpha_sc_b + 1)))
+    cnalpha_sc_mu = pm.Deterministic(
+        'cnalpha_sc_mu', 1 / (1 + cnalpha_sc_b / cnalpha_sc_a))
+    cnalpha_sc_var = pm.Deterministic(
+        'cnalpha_sc_var', (cnalpha_sc_a * cnalpha_sc_b) / (np.square(cnalpha_sc_a + cnalpha_sc_b) * (cnalpha_sc_a + cnalpha_sc_b + 1)))
 
     # Group differences?
-    alpha_mu_diff01 = pm.Deterministic('alpha_mu_diff01', alpha_a[0] - alpha_a[1])
-    alpha_mu_diff02 = pm.Deterministic('alpha_mu_diff02', alpha_a[0] - alpha_a[2])
-    alpha_mu_diff12 = pm.Deterministic('alpha_mu_diff12', alpha_a[1] - alpha_a[2])
+    # alpha_mu_diff01 = pm.Deterministic('alpha_mu_diff01', alpha_a[0] - alpha_a[1])
+    # alpha_mu_diff02 = pm.Deterministic('alpha_mu_diff02', alpha_a[0] - alpha_a[2])
+    # alpha_mu_diff12 = pm.Deterministic('alpha_mu_diff12', alpha_a[1] - alpha_a[2])
 
     beta_mu_diff01 = pm.Deterministic('beta_mu_diff01', beta_a[0] - beta_a[1])
     beta_mu_diff02 = pm.Deterministic('beta_mu_diff02', beta_a[0] - beta_a[2])
@@ -133,9 +133,9 @@ with pm.Model() as model:
     calpha_sc_mu_diff02 = pm.Deterministic('calpha_sc_mu_diff02', calpha_sc_a[0] - calpha_sc_a[2])
     calpha_sc_mu_diff12 = pm.Deterministic('calpha_sc_mu_diff12', calpha_sc_a[1] - calpha_sc_a[2])
 
-    # cnalpha_sc_mu_diff01 = pm.Deterministic('cnalpha_sc_mu_diff01', cnalpha_sc_a[0] - cnalpha_sc_a[1])
-    # cnalpha_sc_mu_diff02 = pm.Deterministic('cnalpha_sc_mu_diff02', cnalpha_sc_a[0] - cnalpha_sc_a[2])
-    # cnalpha_sc_mu_diff12 = pm.Deterministic('cnalpha_sc_mu_diff12', cnalpha_sc_a[1] - cnalpha_sc_a[2])
+    cnalpha_sc_mu_diff01 = pm.Deterministic('cnalpha_sc_mu_diff01', cnalpha_sc_a[0] - cnalpha_sc_a[1])
+    cnalpha_sc_mu_diff02 = pm.Deterministic('cnalpha_sc_mu_diff02', cnalpha_sc_a[0] - cnalpha_sc_a[2])
+    cnalpha_sc_mu_diff12 = pm.Deterministic('cnalpha_sc_mu_diff12', cnalpha_sc_a[1] - cnalpha_sc_a[2])
 
     # Calculate Q-values
     Q_left, Q_right = 0.5 * T.ones(n_subj, dtype='int32'), 0.5 * T.ones(n_subj, dtype='int32')
@@ -162,8 +162,8 @@ with pm.Model() as model:
     trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores, nuts_kwargs=dict(target_accept=target_accept))
 
 # Get results
-model_dict.update({model: trace})
 model_summary = pm.summary(trace)
+model_summary.to_csv(save_dir + save_id + '_summary.csv')
 
 if not run_on_cluster:
     pm.traceplot(trace)

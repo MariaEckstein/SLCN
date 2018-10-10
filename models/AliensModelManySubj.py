@@ -11,13 +11,6 @@ from shared_aliens import alien_initial_Q, update_Qs
 from modeling_helpers import load_aliens_data, get_save_dir_and_save_id, plot_gen_rec
 
 # TODO
-# sample TS rather than argmax
-# independent low & high parameters
-# more efficient?!?
-# respond to pymc3discourse
-# simulate
-# figure out which model makes good simulations and implement this one
-#
 # backend = pymc3.backends.sqlite.SQLite('aliens_trace')
 # sample from posterior predictive distribution
 # simulation = pm.sample_ppc(trace, samples=500)
@@ -32,23 +25,20 @@ from modeling_helpers import load_aliens_data, get_save_dir_and_save_id, plot_ge
 # figure out theano.config.floatX==float32 (http://deeplearning.net/software/theano/library/config.html)
 # debug theano: http://deeplearning.net/software/theano/cifarSC2011/advanced_theano.html#debugging
 
-# ISSUES
-# Exception: ('Compilation failed (return status=1): C:\\Users\\maria\\Anaconda3\\envs\\PYMC3\\libs/python36.lib: error adding symbols: File in wrong format\r. collect2.exe: error: ld returned 1 exit status\r. ', '[Shape(v)]') -> conda install mingw libpython
-
 # Switches for this script
 verbose = False
 run_on_cluster = False
 print_logps = False
-file_name_suff = 'h_softmax_abfabf'
+file_name_suff = 'f_abf'
 param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high']
 use_fake_data = False
 
 # Which data should be fitted?
-fitted_data_name = 'simulations'  # 'humans', 'simulations'
+fitted_data_name = 'humans'  # 'humans', 'simulations'
 n_seasons, n_TS, n_aliens, n_actions = 3, 3, 4, 3
 
 # Sampling details
-max_n_subj = 30  # set > 31 to include all subjects
+max_n_subj = 20  # set > 31 to include all subjects
 max_n_trials = 440  # 440 / 960
 if run_on_cluster:
     n_cores = 4
@@ -56,9 +46,9 @@ if run_on_cluster:
     n_tune = 2000
 else:
     n_cores = 1
-    n_samples = 100
-    n_tune = 100
-n_chains = 1
+    n_samples = 10
+    n_tune = 5
+n_chains = n_cores
 
 if use_fake_data:
     n_subj, n_trials = 2, 5
@@ -67,20 +57,21 @@ if use_fake_data:
     actions = np.ones([n_trials, n_subj], dtype=int)  # np.random.choice(range(n_actions), size=[n_trials, n_subj])
     rewards = 10 * np.ones([n_trials, n_subj])  # np.random.rand(n_trials * n_subj).reshape([n_trials, n_subj]).round(2)
 else:
-    n_subj, n_trials, seasons, aliens, actions, rewards, true_params =\
-        load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_suff, max_n_subj, max_n_trials, verbose)
+    n_subj, n_trials, seasons, aliens, actions, rewards, true_params = \
+        load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_suff, max_n_subj, max_n_trials,
+                         verbose)
 
-    pd.DataFrame(seasons).to_csv("seasons.csv", index=False)
-    pd.DataFrame(aliens).to_csv("aliens.csv", index=False)
-    pd.DataFrame(actions).to_csv("actions.csv", index=False)
-    pd.DataFrame(rewards).to_csv("rewards.csv", index=False)
-    pd.DataFrame(true_params).to_csv("true_params.csv")
-    seasons = pd.read_csv("seasons.csv")
-    aliens = pd.read_csv("aliens.csv")
-    actions = pd.read_csv("actions.csv")
-    rewards = pd.read_csv("rewards.csv")
-    n_trials = seasons.shape[0]
-    n_subj = seasons.shape[1]
+    # pd.DataFrame(seasons).to_csv("seasons.csv", index=False)
+    # pd.DataFrame(aliens).to_csv("aliens.csv", index=False)
+    # pd.DataFrame(actions).to_csv("actions.csv", index=False)
+    # pd.DataFrame(rewards).to_csv("rewards.csv", index=False)
+    # pd.DataFrame(true_params).to_csv("true_params.csv")
+    # seasons = pd.read_csv("seasons.csv")
+    # aliens = pd.read_csv("aliens.csv")
+    # actions = pd.read_csv("actions.csv")
+    # rewards = pd.read_csv("rewards.csv")
+    # n_trials = seasons.shape[0]
+    # n_subj = seasons.shape[1]
 
 if 'fs' in file_name_suff:
     seasons = np.zeros(seasons.shape, dtype=int)
@@ -117,12 +108,12 @@ with pm.Model() as model:
     forget_mu = pm.HalfNormal('forget_mu', sd=0.05)
     forget_sd = pm.HalfNormal('forget_sd', sd=0.05)
 
-    alpha_high_mu = pm.HalfNormal('alpha_high_mu', sd=0.1)
-    alpha_high_sd = pm.HalfNormal('alpha_high_sd', sd=0.1)
-    beta_high_mu = pm.Bound(pm.Normal, lower=0)('beta_high_mu', mu=1, sd=2)
-    beta_high_sd = pm.HalfNormal('beta_high_sd', sd=1)
-    forget_high_mu = pm.HalfNormal('forget_high_mu', sd=0.05)
-    forget_high_sd = pm.HalfNormal('forget_high_sd', sd=0.05)
+    # alpha_high_mu = pm.HalfNormal('alpha_high_mu', sd=0.1)
+    # alpha_high_sd = pm.HalfNormal('alpha_high_sd', sd=0.1)
+    # beta_high_mu = pm.Bound(pm.Normal, lower=0)('beta_high_mu', mu=1, sd=2)
+    # beta_high_sd = pm.HalfNormal('beta_high_sd', sd=1)
+    # forget_high_mu = pm.HalfNormal('forget_high_mu', sd=0.05)
+    # forget_high_sd = pm.HalfNormal('forget_high_sd', sd=0.05)
 
     alpha = pm.Beta('alpha', mu=alpha_mu, sd=alpha_sd, shape=n_subj)
     beta = pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu, sd=beta_sd, shape=beta_shape)
@@ -131,15 +122,15 @@ with pm.Model() as model:
     # beta = pm.Bound(pm.Normal, lower=0)('beta', mu=1, sd=2, shape=beta_shape)
     # forget = pm.HalfNormal('forget', sd=0.05, shape=forget_shape)
 
-    alpha_high = pm.Beta('alpha_high', mu=alpha_high_mu, sd=alpha_high_sd, shape=n_subj)
-    beta_high = pm.Bound(pm.Normal, lower=0)('beta_high', mu=beta_high_mu, sd=beta_high_sd, shape=beta_shape)
-    forget_high = pm.Beta('forget_high', mu=forget_high_mu, sd=forget_high_sd, shape=forget_high_shape)
+    # alpha_high = pm.Beta('alpha_high', mu=alpha_high_mu, sd=alpha_high_sd, shape=n_subj)
+    # beta_high = pm.Bound(pm.Normal, lower=0)('beta_high', mu=beta_high_mu, sd=beta_high_sd, shape=beta_shape)
+    # forget_high = pm.Beta('forget_high', mu=forget_high_mu, sd=forget_high_sd, shape=forget_high_shape)
     # alpha_high = pm.HalfNormal('alpha_high', sd=0.1, shape=n_subj)
     # beta_high = pm.Bound(pm.Normal, lower=0)('beta_high', mu=1, sd=2, shape=beta_high_shape)
     # forget_high = pm.HalfNormal('forget_high', sd=0.05, shape=forget_high_shape)
-    # alpha_high = pm.Deterministic('alpha_high', 0.2 * T.ones(n_subj))  # Flat agent
-    # beta_high = pm.Deterministic('beta_high', 2 * T.ones(beta_high_shape))
-    # forget_high = pm.Deterministic('forget_high', T.zeros(forget_high_shape))
+    alpha_high = pm.Deterministic('alpha_high', 0.2 * T.ones(n_subj))  # Flat agent
+    beta_high = pm.Deterministic('beta_high', 2 * T.ones(beta_high_shape))
+    forget_high = pm.Deterministic('forget_high', T.zeros(forget_high_shape))
 
     # Calculate Q_high and Q_low for each trial
     Q_low0 = alien_initial_Q * T.ones([n_subj, n_TS, n_aliens, n_actions])
@@ -158,30 +149,31 @@ with pm.Model() as model:
     map_estimate = pm.find_MAP()
 
 map_gen_rec = true_params.append(pd.DataFrame([map_estimate[param_name].flatten() for param_name in param_names], index=param_names))
-map_gen_rec.to_csv(save_dir + save_id + file_name_suff + '_map_gen_rec_plot.csv')
+map_gen_rec.to_csv(save_dir + save_id + '_map_gen_rec.csv')
 if not run_on_cluster:
-    plot_gen_rec(param_names=param_names, gen_rec=map_gen_rec, save_name=save_dir + save_id + file_name_suff + 'map_gen_rec_plot.png')
+    plot_gen_rec(param_names=param_names, gen_rec=map_gen_rec, save_name=save_dir + save_id + '_map_gen_rec_plot.png')
 
 with model:
-    MCMC_trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores)
+    MCMC_trace = pm.sample(n_samples, tune=n_tune, start=map_estimate, chains=n_chains, cores=n_cores)
 
 print("WAIC: {0}".format(pm.waic(MCMC_trace, model).WAIC))
 MCMC_model_summary = pm.summary(MCMC_trace)
-pd.DataFrame(MCMC_model_summary).to_csv(save_dir + save_id + file_name_suff + 'MCMC_model_summary.csv')
+pd.DataFrame(MCMC_model_summary).to_csv(save_dir + save_id + '_MCMC_model_summary.csv')
 mcmc_params = np.full((len(param_names), n_subj), np.nan)
 for i, param_name in enumerate(param_names):
     idxs = MCMC_model_summary.index.str.contains(param_name + '__')
     mcmc_params[i] = np.array(MCMC_model_summary.loc[idxs, 'mean'])
 mcmc_params = pd.DataFrame(mcmc_params, index=param_names)
 mcmc_gen_rec = true_params.append(mcmc_params)
+mcmc_gen_rec.to_csv(save_dir + save_id + '_mcmc_gen_rec.csv')
 
 if not run_on_cluster:
     pm.traceplot(MCMC_trace)
-    plt.savefig(save_dir + save_id + file_name_suff + 'trace_plot.png')
-    plot_gen_rec(param_names=param_names, gen_rec=mcmc_gen_rec, save_name=save_dir + save_id + file_name_suff + '_mcmc_gen_rec_plot.png')
+    plt.savefig(save_dir + save_id + 'trace_plot.png')
+    plot_gen_rec(param_names=param_names, gen_rec=mcmc_gen_rec, save_name=save_dir + save_id + '_mcmc_gen_rec_plot.png')
 
-# # Save results
-# print('Saving trace, trace plot, model, and model summary to {0}{1}...\n'.format(save_dir, save_id + model.name))
-# with open(save_dir + save_id + model.name + '.pickle', 'wb') as handle:
-#     pickle.dump({'trace': trace, 'model': model, 'summary': model_summary},
-#                 handle, protocol=pickle.HIGHEST_PROTOCOL)
+# Save results
+print('Saving trace, trace plot, model, and model summary to {0}{1}...\n'.format(save_dir, save_id + model.name))
+with open(save_dir + save_id + model.name + '.pickle', 'wb') as handle:
+    pickle.dump({'trace': MCMC_trace, 'model': model, 'summary': MCMC_model_summary},
+                handle, protocol=pickle.HIGHEST_PROTOCOL)

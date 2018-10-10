@@ -123,7 +123,7 @@ for trial in range(np.sum(n_trials)):
         update_Qs_sim(season, alien,
                            Q_low, Q_high,
                            beta, beta_high, alpha, alpha_high, forget, forget_high,
-                           n_subj, n_actions, task, verbose=verbose)
+                           n_subj, n_actions, n_TS, task, verbose=verbose)
 
     # Store trial data
     seasons[trial] = season
