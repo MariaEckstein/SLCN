@@ -15,7 +15,7 @@ from modeling_helpers import plot_gen_rec
 
 # Which models should be analyzed and compared?
 create_pairplot = False
-analyze_indiv_models = False
+analyze_indiv_models = True
 test_group_differences = False
 compare_models = True
 calculate_waic = True
@@ -23,11 +23,15 @@ do_plot_gen_rec = False
 param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high']
 
 file_names = [
-    'Bayes_3groups/betswi1_2018_10_9_16_49_humans_n_samples5000',
-    'Bayes_3groups/betswirew_2018_10_9_16_42_humans_n_samples5000',
-    'Bayes_3groups/betswirew_2018_10_9_16_50_humans_n_samples5000'
+    # 'Bayes_3groups/betswirew_2018_10_10_12_1_humans_n_samples100',
+    # 'Bayes_3groups/betswirew_2018_10_9_16_42_humans_n_samples5000',
+    # 'Bayes_3groups/betswirew_2018_10_9_16_50_humans_n_samples5000'
+    'Aliens/f_abf_2018_10_11_11_31_humans_n_samples1000',
+    'Aliens/fs_abf_2018_10_10_17_52_humans_n_samples1000',
+    'Aliens/max_abf_2018_10_10_18_9_humans_n_samples1000',
+    'Aliens/soft_abf_2018_10_11_11_36_humans_n_samples100'
     ]
-model_names = ['betswi1', 'betswirew', 'betswirew']  # string.ascii_lowercase  # ['abn', 'abcncn']
+model_names = ['f', 'fs', 'max', 'soft']  # ['betswirew', 'swirew', 'betswirew']  # string.ascii_lowercase  # ['abn', 'abcncn']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)
@@ -95,7 +99,7 @@ for file_name, model_name in zip(file_names, model_names):
 
         # Rhat should be close to one; number of effective samples > 200
         print('Saving summary of {0} model.'.format(model_name))
-        pd.DataFrame(model_summary).to_csv(save_dir + file_name + 'model_summary.csv')
+        pd.DataFrame(model_summary).to_csv(save_dir + file_name + '_summary.csv')
 
         # print(model.basic_RVs)
         # pm.pairplot(trace, sub_varnames=['alpha_sd', 'beta_sd'], divergences=True, color='C3',

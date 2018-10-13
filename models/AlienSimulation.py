@@ -9,13 +9,15 @@ from shared_aliens import alien_initial_Q, update_Qs_sim
 from AlienTask import Task
 
 # Switches for this script
-model_name = "h_softmax_abfabf"
-verbose = False
-max_n_subj = 30  # must be > 1
+model_name = "max_abf"
+verbose = True
+n_subj = 31
+n_sim_per_subj = 1
 start_id = 0
+max_n_subj = n_subj * n_sim_per_subj
+param_names = np.array(['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high'])
 fake_data = False
-# model_to_be_simulated = 'AliensFlat/flat_tilde_ta80_abf_2018_8_10_13_52_humans_n_samples300aliens'
-model_to_be_simulated = 'none'
+model_to_be_simulated = 'Aliens/max_abf_2018_10_10_18_7_humans_n_samples10'  # 'none'
 
 # Get save path
 save_dir = get_paths(False)['simulations']
@@ -28,66 +30,50 @@ beta_high_shape = (max_n_subj, 1)  # Q_high_sub.shape -> [n_subj, n_TS]
 forget_high_shape = (max_n_subj, 1, 1)  # -> [n_subj, n_seasons, n_TS]
 forget_shape = (max_n_subj, 1, 1, 1)  # Q_low[0].shape -> [n_subj, n_TS, n_aliens, n_actions]
 
+parameters = pd.DataFrame(columns=np.append(param_names, ['sID']))
+
 if model_to_be_simulated == 'none':
     n_subj = max_n_subj
 
-    alpha = 0.2 * np.random.rand(n_subj)  # 0 < alpha < 0.2
-    beta = 1 + 4 * np.random.rand(np.prod(beta_shape)).reshape(beta_shape)  # 1 < beta < 2
-    forget = 0.1 * np.random.rand(np.prod(forget_shape)).reshape(forget_shape)  # 0 < forget < 0.1
+    parameters['alpha'] = 0.2 * np.random.rand(n_subj)  # 0 < alpha < 0.2
+    parameters['beta'] = 1 + 4 * np.random.rand(n_subj)  # 1 < beta < 2
+    parameters['forget'] = 0.1 * np.random.rand(n_subj)  # 0 < forget < 0.1
 
-    alpha_high = 0.2 * np.random.rand(n_subj)  # 0 < alpha_high < 0.2
-    beta_high = 1 + 4 * np.random.rand(np.prod(beta_high_shape)).reshape(beta_high_shape)  # 1 < beta < 2
-    forget_high = 0.1 * np.random.rand(np.prod(forget_high_shape)).reshape(forget_high_shape)
+    parameters['alpha_high'] = 0.2 * np.random.rand(n_subj)  # 0 < alpha_high < 0.2
+    parameters['beta_high'] = 1 + 4 * np.random.rand(n_subj)  # 1 < beta < 2
+    parameters['forget_high'] = 0.1 * np.random.rand(n_subj)
+
+    parameters['sID'] = range(n_subj)
 
 # Load fitted parameters
 else:
     parameter_dir = get_paths(run_on_cluster=False)['fitting results']
-    print('Loading {0}{1}...\n'.format(parameter_dir, model_to_be_simulated))
+    print('Loading {0}{1}.\n'.format(parameter_dir, model_to_be_simulated))
     with open(parameter_dir + model_to_be_simulated + '.pickle', 'rb') as handle:
         data = pickle.load(handle)
         model_summary = data['summary']
         model = data['model']
 
-    alpha_idx = [idx for idx in model_summary.index if 'alpha' in idx
-                 and '_mu' not in idx and 'sd' not in idx and 'high' not in idx and 'matt' not in idx]
-    alpha = model_summary.loc[alpha_idx[:max_n_subj], 'mean'].values
-    alpha_high_idx = [idx for idx in model_summary.index if 'alpha_high' in idx
-                      and '_mu' not in idx and 'sd' not in idx and 'matt' not in idx]
-    alpha_high = model_summary.loc[alpha_high_idx[:max_n_subj], 'mean'].values
-
-    beta_idx = [idx for idx in model_summary.index if 'beta' in idx
-                and '_mu' not in idx and 'sd' not in idx and 'high' not in idx and 'matt' not in idx]
-    beta = model_summary.loc[beta_idx[:max_n_subj], 'mean'].values
-    beta_high_idx = [idx for idx in model_summary.index if 'beta_high' in idx
-                     and '_mu' not in idx and 'sd' not in idx and 'matt' not in idx]
-    beta_high = model_summary.loc[beta_high_idx[:max_n_subj], 'mean'].values
-
-    forget_idx = [idx for idx in model_summary.index if 'forget' in idx
-                  and '_mu' not in idx and 'sd' not in idx and 'high' not in idx and 'matt' not in idx]
-    forget = model_summary.loc[forget_idx[:max_n_subj], 'mean'].values
-    forget_high_idx = [idx for idx in model_summary.index if 'forget_high' in idx
-                       and '_mu' not in idx and '_sd' not in idx and 'matt' not in idx]
-    forget_high = model_summary.loc[forget_high_idx[:max_n_subj], 'mean'].values
-    if not forget_high:
-        forget_high = forget.copy()
+    model_summary = pd.read_csv(parameter_dir + model_to_be_simulated + '_summary.csv', index_col=0)
+    for param_name in param_names:
+        param_idx = [idx for idx in model_summary.index if param_name + '__' in idx]
+        parameters[param_name] = model_summary.loc[param_idx[:n_subj], 'mean'].values
+    parameters['sID'] = range(n_subj)
+    parameters = pd.DataFrame(np.tile(parameters, (n_sim_per_subj, 1)))
+    parameters = pd.DataFrame(np.array(parameters, dtype=float))
+    parameters.columns = np.append(param_names, ['sID'])
 
 if verbose:
-    print("Alpha: {0}".format(alpha.round(3)))
-    print("Alpha_high: {0}".format(alpha_high.round(3)))
-    print("Beta: {0}".format(beta.round(3)))
-    print("Beta_high: {0}".format(beta_high.round(3)))
-    print("Forget: {0}".format(forget.round(3)))
-    print("Forget_high: {0}".format(forget_high.round(3)))
+    print("Parameters: {}".format(parameters.round(3)))
 
 # Get numbers of things
-n_subj = len(alpha)
 n_seasons, n_aliens, n_actions = 3, 4, 3
 n_TS = n_seasons
 n_alien_repetitions = np.array([13, 7, 7])  # InitialLearning, Refresher2, Refresher3
 n_season_repetitions = np.array([3, 2, 2])  # InitialLearning, Refresher2, Refresher3
 
 # Initialize task
-task = Task(n_subj)
+task = Task(max_n_subj)
 n_trials = task.get_trial_sequence("C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/", n_subj, fake_data)
 print("n_trials", n_trials)
 
@@ -106,6 +92,14 @@ print('Simulating {0} {2} agents on {1} trials.\n'.format(n_subj, n_trials, mode
 
 Q_low = alien_initial_Q * np.ones([n_subj, n_TS, n_aliens, n_actions])
 Q_high = alien_initial_Q * np.ones([n_subj, n_seasons, n_TS])
+
+# Bring parameters into the right shape
+alpha = parameters['alpha'].values
+beta = parameters['beta'].values.reshape(beta_shape)
+forget = parameters['forget'].values.reshape(forget_shape)
+alpha_high = parameters['alpha_high'].values
+beta_high = parameters['beta_high'].values.reshape(beta_high_shape)
+forget_high = parameters['forget_high'].values.reshape(forget_high_shape)
 
 for trial in range(np.sum(n_trials)):
 
@@ -155,8 +149,10 @@ for sID in range(n_subj):
     subj_data["sID"] = agent_ID
     subj_data["block.type"] = "normal"
     subj_data["model_name"] = model_name
-    subj_data["alpha"], subj_data["beta"], subj_data["forget"] = alpha[sID], beta.flatten()[sID], forget.flatten()[sID]
-    subj_data["alpha_high"], subj_data["beta_high"], subj_data["forget_high"] = alpha_high[sID], beta_high.flatten()[sID], forget_high.flatten()[sID]
+    for param_name in param_names:
+        subj_data[param_name] = np.array(parameters.loc[sID, param_name])
+    # subj_data["alpha"], subj_data["beta"], subj_data["forget"] = alpha[sID], beta.flatten()[sID], forget.flatten()[sID]
+    # subj_data["alpha_high"], subj_data["beta_high"], subj_data["forget_high"] = alpha_high[sID], beta_high.flatten()[sID], forget_high.flatten()[sID]
     # subj_data["Q_low"] = Q_lows[:, sID]
     subj_data["Q_TS"] = Q_highs[:, sID]
 

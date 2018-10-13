@@ -16,12 +16,15 @@ library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2");
 if (data == "human") {
   # data_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData"
   data_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch"
+  patt = "*.mat"
 } else if (data == "fitted_human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSGenRec"
+  patt = ".csv"
 } else if (data == "simulated_human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSsimulations" # "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
+  patt = "PSBayes.*csv"
 }
-plot_dir = file.path(data_dir, "PS_plots_abcncn_samples")
+plot_dir = file.path(data_dir, "PS_plots_Bayes_samples")
 
 if (!dir.exists(plot_dir)) {
   dir.create(plot_dir)
@@ -50,7 +53,7 @@ ages
 ```{r Read in data}
 all_files = data.frame()
 
-filenames = list.files(data_dir, pattern = ifelse(data == "human", "*.mat", "PSRL*"))
+filenames = list.files(data_dir, pattern = patt)
 print(paste(length(filenames), "filenames on the list."))
 filename = filenames[1]  # debugging
 

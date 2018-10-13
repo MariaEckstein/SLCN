@@ -73,7 +73,7 @@ class PlotMinimizerHeatmap(object):
             # Specify subplot
             ax = plt.subplot(n, n, pos)
 
-            # Find index for the two paratemers
+            # Find index for the two parameters
             xi = fit_par_names.index(xname)
             yi = fit_par_names.index(yname)
 
