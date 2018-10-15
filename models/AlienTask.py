@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import glob
 import os
+import re
 
 
 class Task(object):
@@ -25,24 +26,28 @@ class Task(object):
                              [1, 3, 1],
                              [2, 1, 1]]])
 
-    def get_trial_sequence(self, file_path, n_subj, n_sim_per_subj, fake=False):
+    def get_trial_sequence(self, file_path, n_subj, n_sim_per_subj, subset_of_subj, fake=False,
+                           phases=("1InitialLearning", "Refresher2", "Refresher3")):
         '''
         Get trial sequences of human participants.
         Read in datafiles of all participants, select InitialLearning, Refresher2, and Refresher3,
         and get seasons and aliens in each trial.
         :param file_path: path to human datafiles
         :param n_subj: number of files to be read in
+        :param n_sim_per_subj: number of simulations per subject (duplicates season and alien sequences)
+        :param fake: create season & alien sequences rather than using humans' (default: False, i.e., use humans')
+        :param phases: data from which task phases should be used when reading in humans' season & alien sequences?
+        (defaults to ("1InitialLearning", "Refresher2", "Refresher3"))
         :return: n_trials: number of trials in each file
         '''
 
         filenames = glob.glob(os.path.join(file_path, '*.csv'))
         n_trials = 100000
-        for filename in filenames[:n_subj]:
+        for filename in np.array(filenames)[subset_of_subj][:n_subj]:
             agent_data = pd.read_csv(filename)
 
             # Remove all rows that do not contain 1InitialLearning data (-> jsPysch format)
             TS_names = [str(TS) for TS in range(3)]
-            phases = ["1InitialLearning", "Refresher2", "Refresher3"]
             agent_data = agent_data.loc[(agent_data['TS'].isin(TS_names)) &
                                         (agent_data['phase'].isin(phases))]
 
@@ -62,8 +67,8 @@ class Task(object):
         # Bring into right shape
         seasons = np.tile(seasons, n_sim_per_subj)
         aliens = np.tile(aliens, n_sim_per_subj)
-        self.seasons = seasons.reshape([n_subj * n_sim_per_subj, n_trials]).astype(int).T
-        self.aliens = aliens.reshape([n_subj * n_sim_per_subj, n_trials]).astype(int).T
+        self.seasons = seasons.reshape([int(len(seasons) / n_trials), n_trials]).astype(int).T
+        self.aliens = aliens.reshape([int(len(aliens) / n_trials), n_trials]).astype(int).T
         self.phase = np.tile(agent_data["phase"], n_sim_per_subj)
 
         if fake:
@@ -72,7 +77,7 @@ class Task(object):
             n_trials = self.seasons.shape[0]
             self.phase = '1InitialLearning'
 
-        return n_trials, correct.reshape([n_subj, n_trials]).astype(int).T
+        return n_trials, correct.reshape([int(len(correct) / n_trials), n_trials]).astype(int).T
 
     def present_stimulus(self, trial):
 

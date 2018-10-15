@@ -60,11 +60,11 @@ def update_Qs_sim(season, alien,
                   n_subj, n_actions, n_TS, task, verbose=False):
 
     # Select TS
-    Q_high_sub = Q_high[np.arange(n_subj), season]  # Q_high_sub.shape -> (n_subj, n_TS)
+    # Q_high_sub = Q_high[np.arange(n_subj), season]  # Q_high_sub.shape -> (n_subj, n_TS)
     # p_high = softmax(beta_high * Q_high_sub, axis=1)
     # TS = season  # Flat
-    # TS = 0  # fs
-    TS = Q_high_sub.argmax(axis=1)  # Hierarchical deterministic
+    TS = 0  # fs
+    # TS = Q_high_sub.argmax(axis=1)  # Hierarchical deterministic
     # TS = np.array([np.random.choice(a=n_TS, p=p_high_subj) for p_high_subj in p_high])  # Hierarchical softmax
 
     # Calculate action probabilities based on TS and select action
@@ -108,13 +108,13 @@ def update_Qs(season, alien, action, reward,
               beta, beta_high, alpha, alpha_high, forget, forget_high, n_subj, n_TS):
 
     # Select TS
-    Q_high_sub = Q_high[T.arange(n_subj), season]  # Q_high_sub.shape -> [n_subj, n_TS]
-    # TS = season  # Flat
+    # Q_high_sub = Q_high[T.arange(n_subj), season]  # Q_high_sub.shape -> [n_subj, n_TS]
+    TS = season  # Flat
     # TS = T.argmax(Q_high_sub, axis=1)  # Hierarchical deterministic
-    p_high = T.nnet.softmax(beta_high * Q_high_sub)
-    rand = rs.uniform(size=(n_subj, 1))
-    cumsum = T.extra_ops.cumsum(p_high, axis=1)
-    TS = n_TS - T.sum(rand < cumsum, axis=1)
+    # p_high = T.nnet.softmax(beta_high * Q_high_sub)
+    # rand = rs.uniform(size=(n_subj, 1))
+    # cumsum = T.extra_ops.cumsum(p_high, axis=1)
+    # TS = n_TS - T.sum(rand < cumsum, axis=1)
 
     # Calculate action probabilities based on TS
     Q_low_sub = Q_low[T.arange(n_subj), TS, alien]  # Q_low_sub.shape -> [n_subj, n_actions]

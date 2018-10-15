@@ -29,8 +29,8 @@ from modeling_helpers import load_aliens_data, get_save_dir_and_save_id, plot_ge
 verbose = False
 run_on_cluster = False
 print_logps = False
-file_name_suff = 'soft_abf_lowishigh'
-param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high']
+file_name_suff = 'f_abf'
+param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high']  # Don't change
 use_fake_data = False
 
 # Which data should be fitted?
@@ -123,18 +123,18 @@ with pm.Model() as model:
     # beta = pm.Bound(pm.Normal, lower=0)('beta', mu=1, sd=2, shape=beta_shape)
     # forget = pm.HalfNormal('forget', sd=0.05, shape=forget_shape)
 
-    alpha_high = pm.Deterministic('alpha_high', alpha.copy())
-    beta_high = pm.Deterministic('beta_high', beta.flatten().reshape(beta_shape))
-    forget_high = pm.Deterministic('forget_high', forget.flatten().reshape(forget_high_shape))
+    # alpha_high = pm.Deterministic('alpha_high', alpha.copy())
+    # beta_high = pm.Deterministic('beta_high', beta.flatten().reshape(beta_shape))
+    # forget_high = pm.Deterministic('forget_high', forget.flatten().reshape(forget_high_shape))
     # alpha_high = pm.Beta('alpha_high', mu=alpha_high_mu, sd=alpha_high_sd, shape=n_subj)
     # beta_high = pm.Bound(pm.Normal, lower=0)('beta_high', mu=beta_high_mu, sd=beta_high_sd, shape=beta_shape)
     # forget_high = pm.Beta('forget_high', mu=forget_high_mu, sd=forget_high_sd, shape=forget_high_shape)
     # alpha_high = pm.HalfNormal('alpha_high', sd=0.1, shape=n_subj)
     # beta_high = pm.Bound(pm.Normal, lower=0)('beta_high', mu=1, sd=2, shape=beta_high_shape)
     # forget_high = pm.HalfNormal('forget_high', sd=0.05, shape=forget_high_shape)
-    # alpha_high = pm.Deterministic('alpha_high', 0.2 * T.ones(n_subj))  # Flat agent
-    # beta_high = pm.Deterministic('beta_high', 2 * T.ones(beta_high_shape))
-    # forget_high = pm.Deterministic('forget_high', T.zeros(forget_high_shape))
+    alpha_high = pm.Deterministic('alpha_high', 0.2 * T.ones(n_subj))  # Flat agent
+    beta_high = pm.Deterministic('beta_high', 2 * T.ones(beta_high_shape))
+    forget_high = pm.Deterministic('forget_high', T.zeros(forget_high_shape))
 
     # Calculate Q_high and Q_low for each trial
     Q_low0 = alien_initial_Q * T.ones([n_subj, n_TS, n_aliens, n_actions])
