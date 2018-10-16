@@ -31,15 +31,10 @@ target_accept = 0.8
 
 # Load to-be-fitted data
 n_subj, rewards, choices, group, n_groups = load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only, verbose)
-stay = np.diff(choices, axis=0) == 0
-stay = np.vstack([np.zeros((1, stay.shape[1])), stay])  # add a row of 0's for trial 0
-left_choices = 1 - choices
-persev_bonus = stay * choices - stay * left_choices
 
 rewards = theano.shared(np.asarray(rewards, dtype='int32'))
 choices = theano.shared(np.asarray(choices, dtype='int32'))
 group = theano.shared(np.asarray(group, dtype='int32'))
-persev_bonus = theano.shared(np.asarray(persev_bonus, dtype='int32'))
 
 # Prepare things for saving
 save_dir, save_id = get_save_dir_and_save_id(run_on_cluster, file_name_suff, fitted_data_name, n_samples)
@@ -61,10 +56,6 @@ with pm.Model() as model:
     beta_a = pm.Gamma('beta_a', alpha=beta_a_a, beta=beta_a_b, shape=n_groups)
     beta_b = pm.Gamma('beta_b', alpha=beta_b_a, beta=beta_b_b, shape=n_groups)
 
-    persev_mu_mu = pm.Uniform('persev_mu_mu', lower=-1, upper=1)
-    persev_mu_sd = pm.HalfNormal('persev_mu_sd', sd=0.5)
-    persev_sd_sd = pm.HalfNormal('persev_sd_sd', sd=0.1)
-
     p_switch_a_a = pm.Uniform('p_switch_a_a', lower=0, upper=upper)
     p_switch_a_b = pm.Uniform('p_switch_a_b', lower=0, upper=upper)
     p_switch_b_a = pm.Uniform('p_switch_b_a', lower=0, upper=upper)
@@ -79,35 +70,27 @@ with pm.Model() as model:
     p_reward_a = pm.Gamma('p_reward_a', alpha=p_reward_a_a, beta=p_reward_a_b, shape=n_groups)
     p_reward_b = pm.Gamma('p_reward_b', alpha=p_reward_b_a, beta=p_reward_b_b, shape=n_groups)
 
-    # Parameters' mu and var
-    beta_mu = pm.Deterministic('beta_mu', beta_a / beta_b)
-    beta_sd = pm.Deterministic('beta_sd', beta_a / np.square(beta_b))
-    persev_mu = pm.Bound(pm.Normal, lower=-1, upper=1)('persev_mu', mu=persev_mu_mu, sd=persev_mu_sd, shape=n_groups)
-    persev_sd = pm.HalfNormal('persev_sd', sd=persev_sd_sd, shape=n_groups)
-    p_switch_mu = pm.Deterministic('p_switch_mu', p_switch_a / p_switch_b)
-    p_switch_sd = pm.Deterministic('p_switch_sd', p_switch_a / np.square(p_switch_b))
-    p_reward_mu = pm.Deterministic('p_reward_mu', p_reward_a / p_reward_b)
-    p_reward_sd = pm.Deterministic('p_reward_sd', p_reward_a / np.square(p_reward_b))
-
-    # Individual parameters
     beta = pm.Gamma('beta', alpha=beta_a[group], beta=beta_b[group], shape=n_subj)
-    persev = pm.Bound(pm.Normal, lower=-1, upper=1)('persev', mu=persev_mu[group], sd=persev_sd[group], shape=n_subj)
-    p_switch = pm.Beta('p_switch', alpha=p_switch_a[group], beta=p_switch_b[group], shape=(1, n_subj))
+    p_switch = pm.Beta('p_switch', alpha=p_switch_a[group], beta=p_switch_b[group], shape=n_subj)
     p_reward = pm.Beta('p_reward', alpha=p_reward_a[group], beta=p_reward_b[group], shape=n_subj)
 
-    # Group differences
-    beta_mu_diff01 = pm.Deterministic('beta_mu_diff01', beta_mu[0] - beta_mu[1])
-    beta_mu_diff02 = pm.Deterministic('beta_mu_diff02', beta_mu[0] - beta_mu[2])
-    beta_mu_diff12 = pm.Deterministic('beta_mu_diff12', beta_mu[1] - beta_mu[2])
-    persev_mu_diff01 = pm.Deterministic('persev_mu_diff01', persev_mu[0] - persev_mu[1])
-    persev_mu_diff02 = pm.Deterministic('persev_mu_diff02', persev_mu[0] - persev_mu[2])
-    persev_mu_diff12 = pm.Deterministic('persev_mu_diff12', persev_mu[1] - persev_mu[2])
-    p_switch_mu_diff01 = pm.Deterministic('p_switch_mu_diff01', p_switch_mu[0] - p_switch_mu[1])
-    p_switch_mu_diff02 = pm.Deterministic('p_switch_mu_diff02', p_switch_mu[0] - p_switch_mu[2])
-    p_switch_mu_diff12 = pm.Deterministic('p_switch_mu_diff12', p_switch_mu[1] - p_switch_mu[2])
-    p_reward_mu_diff01 = pm.Deterministic('p_reward_mu_diff01', p_reward_mu[0] - p_reward_mu[1])
-    p_reward_mu_diff02 = pm.Deterministic('p_reward_mu_diff02', p_reward_mu[0] - p_reward_mu[2])
-    p_reward_mu_diff12 = pm.Deterministic('p_reward_mu_diff12', p_reward_mu[1] - p_reward_mu[2])
+    # Parameter mu and var and group differences
+    beta_mu = pm.Deterministic('beta_mu', beta_a / beta_b)
+    beta_var = pm.Deterministic('beta_var', beta_a / np.square(beta_b))
+    p_switch_mu = pm.Deterministic('p_switch_mu', p_switch_a / p_switch_b)
+    p_switch_var = pm.Deterministic('p_switch_var', p_switch_a / np.square(p_switch_b))
+    p_reward_mu = pm.Deterministic('p_reward_mu', p_reward_a / p_reward_b)
+    p_reward_var = pm.Deterministic('p_reward_var', p_reward_a / np.square(p_reward_b))
+
+    beta_mu_diff01 = pm.Deterministic('beta_mu_diff01', beta_a[0] - beta_a[1])
+    beta_mu_diff02 = pm.Deterministic('beta_mu_diff02', beta_a[0] - beta_a[2])
+    beta_mu_diff12 = pm.Deterministic('beta_mu_diff12', beta_a[1] - beta_a[2])
+    p_switch_mu_diff01 = pm.Deterministic('p_switch_mu_diff01', p_switch_a[0] - p_switch_a[1])
+    p_switch_mu_diff02 = pm.Deterministic('p_switch_mu_diff02', p_switch_a[0] - p_switch_a[2])
+    p_switch_mu_diff12 = pm.Deterministic('p_switch_mu_diff12', p_switch_a[1] - p_switch_a[2])
+    p_reward_mu_diff01 = pm.Deterministic('p_reward_mu_diff01', p_reward_a[0] - p_reward_a[1])
+    p_reward_mu_diff02 = pm.Deterministic('p_reward_mu_diff02', p_reward_a[0] - p_reward_a[2])
+    p_reward_mu_diff12 = pm.Deterministic('p_reward_mu_diff12', p_reward_a[1] - p_reward_a[2])
 
     # Get likelihoods
     lik_cor, lik_inc = get_likelihoods(rewards, choices, p_reward, p_noisy)
@@ -115,9 +98,9 @@ with pm.Model() as model:
     # Get posterior, calculate probability of subsequent trial, add eps noise
     p_right = 0.5 * T.ones(n_subj, dtype='int32')
     p_right, _ = theano.scan(fn=post_from_lik,
-                             sequences=[lik_cor, lik_inc],#, persev_bonus
+                             sequences=[lik_cor, lik_inc],
                              outputs_info=[p_right],
-                             non_sequences=[p_switch, eps, beta])#, persev
+                             non_sequences=[p_switch, eps, beta])
 
     # Add initial p=0.5 at the beginning of p_right
     initial_p = 0.5 * T.ones((1, n_subj))
