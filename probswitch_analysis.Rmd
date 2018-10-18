@@ -24,7 +24,7 @@ if (data == "human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSsimulations" # "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
   patt = "PSBayes.*csv"
 }
-plot_dir = file.path(data_dir, "PS_plots_Bayes_samples")
+plot_dir = file.path(data_dir, "PS_plots_Bayes_samples_betswi")
 
 if (!dir.exists(plot_dir)) {
   dir.create(plot_dir)

@@ -9,31 +9,26 @@ from shared_aliens import alien_initial_Q, update_Qs_sim
 from AlienTask import Task
 
 # Switches for this script
-model_name = "max_abf"
-verbose = True
+model_name = "fs"
+verbose = False
 n_subj = 31
 n_sim_per_subj = 1
-start_id = 0
-max_n_subj = n_subj * n_sim_per_subj
+start_id = 31
+n_sim = n_subj * n_sim_per_subj
 param_names = np.array(['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high'])
-fake_data = False
-model_to_be_simulated = 'Aliens/max_abf_2018_10_10_18_7_humans_n_samples10'  # 'none'
-
+fake_data = True
+model_to_be_simulated = "MSE"  # "MCMC" "random"
+# model_name = "/AliensMSEFitting/18-10-14/f_['alpha' 'beta' 'forget']_[[ 1 10  1]]_2018_10_14_9_47"  # 'Aliens/max_abf_2018_10_10_18_7_humans_n_samples10'  #
 # Get save path
 save_dir = get_paths(False)['simulations']
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
 # Get parameters
-beta_shape = (max_n_subj, 1)  # Q_low_sub.shape -> [n_subj, n_actions]
-beta_high_shape = (max_n_subj, 1)  # Q_high_sub.shape -> [n_subj, n_TS]
-forget_high_shape = (max_n_subj, 1, 1)  # -> [n_subj, n_seasons, n_TS]
-forget_shape = (max_n_subj, 1, 1, 1)  # Q_low[0].shape -> [n_subj, n_TS, n_aliens, n_actions]
-
 parameters = pd.DataFrame(columns=np.append(param_names, ['sID']))
+parameter_dir = get_paths(run_on_cluster=False)['fitting results']
 
-if model_to_be_simulated == 'none':
-    n_subj = max_n_subj
+if model_to_be_simulated == 'random':
 
     parameters['alpha'] = 0.2 * np.random.rand(n_subj)  # 0 < alpha < 0.2
     parameters['beta'] = 1 + 4 * np.random.rand(n_subj)  # 1 < beta < 2
@@ -46,15 +41,34 @@ if model_to_be_simulated == 'none':
     parameters['sID'] = range(n_subj)
 
 # Load fitted parameters
-else:
-    parameter_dir = get_paths(run_on_cluster=False)['fitting results']
-    print('Loading {0}{1}.\n'.format(parameter_dir, model_to_be_simulated))
-    with open(parameter_dir + model_to_be_simulated + '.pickle', 'rb') as handle:
+elif model_to_be_simulated == 'MSE':
+
+    # print('Loading {0}{1}.\n'.format(parameter_dir, model_name))
+    # with open(parameter_dir + model_name + '.pickle', 'rb') as handle:
+    #     brute_results = pickle.load(handle)
+
+    # parameters['alpha'] = brute_results[0][0] * np.ones(n_sim)
+    # parameters['beta'] = brute_results[0][1] * np.ones(n_sim)
+    # parameters['forget'] = brute_results[0][2] * np.ones(n_sim)
+
+    parameters['alpha'] = 0.33 * np.ones(n_sim)
+    parameters['beta'] = 1.12 * np.ones(n_sim)
+    parameters['forget'] = 0.11 * np.ones(n_sim)
+
+    # TODO: Use indices 3, 4, 5 that actually correspond to these parameters!
+    parameters['alpha_high'] = parameters['alpha'].copy()  # brute_results[0][0] * np.ones(n_sim)
+    parameters['beta_high'] = parameters['beta'].copy()  # brute_results[0][1] * np.ones(n_sim)
+    parameters['forget_high'] = parameters['forget'].copy()  # brute_results[0][2] * np.ones(n_sim)
+
+elif model_to_be_simulated == 'MCMC':
+
+    print('Loading {0}{1}.\n'.format(parameter_dir, model_name))
+    with open(parameter_dir + model_name + '.pickle', 'rb') as handle:
         data = pickle.load(handle)
         model_summary = data['summary']
         model = data['model']
 
-    model_summary = pd.read_csv(parameter_dir + model_to_be_simulated + '_summary.csv', index_col=0)
+    model_summary = pd.read_csv(parameter_dir + model_name + '_summary.csv', index_col=0)
     for param_name in param_names:
         param_idx = [idx for idx in model_summary.index if param_name + '__' in idx]
         parameters[param_name] = model_summary.loc[param_idx[:n_subj], 'mean'].values
@@ -63,8 +77,16 @@ else:
     parameters = pd.DataFrame(np.array(parameters, dtype=float))
     parameters.columns = np.append(param_names, ['sID'])
 
+    n_sim = n_subj
+
 if verbose:
     print("Parameters: {}".format(parameters.round(3)))
+
+# Parameter shapes
+beta_shape = (n_sim, 1)  # Q_low_sub.shape -> [n_subj, n_actions]
+beta_high_shape = (n_sim, 1)  # Q_high_sub.shape -> [n_subj, n_TS]
+forget_high_shape = (n_sim, 1, 1)  # -> [n_subj, n_seasons, n_TS]
+forget_shape = (n_sim, 1, 1, 1)  # Q_low[0].shape -> [n_subj, n_TS, n_aliens, n_actions]
 
 # Get numbers of things
 n_seasons, n_aliens, n_actions = 3, 4, 3
@@ -73,25 +95,26 @@ n_alien_repetitions = np.array([13, 7, 7])  # InitialLearning, Refresher2, Refre
 n_season_repetitions = np.array([3, 2, 2])  # InitialLearning, Refresher2, Refresher3
 
 # Initialize task
-task = Task(max_n_subj)
-n_trials = task.get_trial_sequence("C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/", n_subj, fake_data)
+task = Task(n_subj)
+n_trials, _ = task.get_trial_sequence("C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/",
+                                      n_subj, fake_data, range(n_subj))
 print("n_trials", n_trials)
 
 # For saving data
-seasons = np.zeros([n_trials, n_subj], dtype=int)
-TSs = np.zeros([n_trials, n_subj], dtype=int)
-aliens = np.zeros([n_trials, n_subj], dtype=int)
-actions = np.zeros([n_trials, n_subj], dtype=int)
-rewards = np.zeros([n_trials, n_subj])
-corrects = np.zeros([n_trials, n_subj])
-p_lows = np.zeros([n_trials, n_subj, n_actions])
-# Q_lows = np.zeros([n_trials, n_subj, n_TS, n_aliens, n_actions])
-Q_highs = np.zeros([n_trials, n_subj])
+seasons = np.zeros([n_trials, n_sim], dtype=int)
+TSs = np.zeros([n_trials, n_sim], dtype=int)
+aliens = np.zeros([n_trials, n_sim], dtype=int)
+actions = np.zeros([n_trials, n_sim], dtype=int)
+rewards = np.zeros([n_trials, n_sim])
+corrects = np.zeros([n_trials, n_sim])
+p_lows = np.zeros([n_trials, n_sim, n_actions])
+# Q_lows = np.zeros([n_trials, n_sim, n_TS, n_aliens, n_actions])
+Q_highs = np.zeros([n_trials, n_sim])
 
-print('Simulating {0} {2} agents on {1} trials.\n'.format(n_subj, n_trials, model_name))
+print('Simulating {0} {2} agents on {1} trials.\n'.format(n_sim, n_trials, model_name))
 
-Q_low = alien_initial_Q * np.ones([n_subj, n_TS, n_aliens, n_actions])
-Q_high = alien_initial_Q * np.ones([n_subj, n_seasons, n_TS])
+Q_low = alien_initial_Q * np.ones([n_sim, n_TS, n_aliens, n_actions])
+Q_high = alien_initial_Q * np.ones([n_sim, n_seasons, n_TS])
 
 # Bring parameters into the right shape
 alpha = parameters['alpha'].values
@@ -117,7 +140,7 @@ for trial in range(np.sum(n_trials)):
         update_Qs_sim(season, alien,
                            Q_low, Q_high,
                            beta, beta_high, alpha, alpha_high, forget, forget_high,
-                           n_subj, n_actions, n_TS, task, verbose=verbose)
+                           n_sim, n_actions, n_TS, task, verbose=verbose)
 
     # Store trial data
     seasons[trial] = season
@@ -127,11 +150,11 @@ for trial in range(np.sum(n_trials)):
     rewards[trial] = reward
     corrects[trial] = correct
     # Q_lows[trial] = Q_low
-    Q_highs[trial] = Q_high[np.arange(n_subj), season, TS]
+    Q_highs[trial] = Q_high[np.arange(n_sim), season, TS]
     p_lows[trial] = p_low
 
 # Save data
-for sID in range(n_subj):
+for sID in range(n_sim):
 
     agent_ID = sID + start_id
     # Create pandas DataFrame
@@ -157,6 +180,6 @@ for sID in range(n_subj):
     subj_data["Q_TS"] = Q_highs[:, sID]
 
     # Save to disc
-    file_name = save_dir + "aliens_" + model_name + str(agent_ID) + ".csv"
+    file_name = save_dir + "aliens_" + model_name + '_' + str(agent_ID) + ".csv"
     print('Saving file {0}'.format(file_name))
     subj_data.to_csv(file_name)

@@ -11,12 +11,12 @@ from PStask import Task
 verbose = False
 n_trials = 128  # humans: 128
 n_sim_per_subj = 2
-param_names = np.array(['beta', 'p_switch', 'p_reward'])
-n_subj = 233  # 233 as of 2018-10-03
+param_names = np.array(['beta', 'p_switch', 'p_reward', 'persev'])
+n_subj = 20  # 233 as of 2018-10-03
 n_sim = n_sim_per_subj * n_subj
 # TODO: comment out `p_right = 1 / (1 + np.exp(-beta * (p_right - (1 - p_right))))`
 # TODO: in shared_mod_sim when running swirew model (no beta)!
-model_to_be_simulated = 'Bayes_3groups/swirew_2018_10_10_17_29_humans_n_samples5000'  # 'none'  #
+model_to_be_simulated = 'none'  # 'Bayes_3groups/swirew_2018_10_10_17_29_humans_n_samples5000'  # 'none'  #
 ages = pd.read_csv(get_paths(False)['ages'], index_col=0)
 
 # Get save path
@@ -31,6 +31,7 @@ if model_to_be_simulated == 'none':
     parameters['beta'] = 1 + 3 * np.random.rand(n_sim)
     parameters['p_switch'] = 0.3 * np.random.rand(n_sim)
     parameters['p_reward'] = 0.5 + 0.5 * np.random.rand(n_sim)
+    parameters['persev'] = 0.3 * np.random.rand(n_sim) - 0.1
     parameters['sID'] = range(n_sim)
 
 # Load fitted parameters
@@ -93,7 +94,11 @@ for trial in range(n_trials):
 
     try:
         lik_cor, lik_inc = get_likelihoods(reward, choice, parameters['p_reward'], parameters['p_noisy'])
-        p_right = post_from_lik(lik_cor, lik_inc, p_right, parameters['p_switch'], parameters['eps'], parameters['beta'], verbose=verbose)
+        persev_bonus = 2 * choice - 1  # recode as -1 for left and +1 for right
+        persev_bonus = parameters['persev'] * persev_bonus
+        p_right = post_from_lik(lik_cor, lik_inc, persev_bonus,
+                                p_right,
+                                parameters['p_switch'], parameters['eps'], parameters['beta'], verbose=verbose)
     except NameError:  # if p_right has not been defined yet
         print('Using p=0.5!')
         lik_cor = np.nan

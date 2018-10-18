@@ -138,6 +138,15 @@ def update_Qs(season, alien, action, reward,
     return [Q_low, Q_high, TS, p_low]
 
 
+def split_subj_in_half(n_subj):
+
+    half_of_subj = np.arange(0, n_subj, 2)  # np.random.choice(range(n_subj), size=int(np.ceil(n_subj / 2)), replace=False)
+    other_half = [i for i in range(n_subj) if i not in half_of_subj]
+    half_of_subj = half_of_subj[:len(other_half)]
+
+    return half_of_subj, other_half
+
+
 def softmax(X, axis=None):
     """
     Compute the softmax of each element along an axis of X.

@@ -38,8 +38,8 @@ def get_alien_paths(run_on_cluster):
 
     else:
         base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
-        return {'human data': base_path + '/Data/version3.1/',
-                'fitting results': base_path + '/Data/version3.1/fitting/',
+        return {'human data': base_path + '/Data/versions1.0and3.1/',
+                'fitting results': base_path + '/AliensFitting/',
                 'simulations': 'C:/Users/maria/MEGAsync/SLCN/PSsimulations/'}
 
 
@@ -95,7 +95,7 @@ def get_likelihoods(rewards, choices, p_reward, p_noisy):
     return lik_cor, lik_inc
 
 
-def post_from_lik(lik_cor, lik_inc, p_right, p_switch, eps, beta, verbose=False):
+def post_from_lik(lik_cor, lik_inc, scaled_persev_bonus, p_right, p_switch, eps, beta, verbose=False):
 
     # Apply Bayes rule: Posterior prob. that right action is correct, based on likelihood (i.e., received feedback)
     p_right = lik_cor * p_right / (lik_cor * p_right + lik_inc * (1 - p_right))
@@ -106,6 +106,11 @@ def post_from_lik(lik_cor, lik_inc, p_right, p_switch, eps, beta, verbose=False)
     p_right = (1 - p_switch) * p_right + p_switch * (1 - p_right)
     if verbose:
         print('p_right: {0} (after taking switch into account)'.format(p_right.round(3)))
+
+    # Add perseveration bonus
+    p_right += scaled_persev_bonus
+    if verbose:
+        print('p_right: {0} (after adding perseveration bonus)'.format(p_right.round(3)))
 
     # Log-transform probabilities
     p_right = 1 / (1 + np.exp(-beta * (p_right - (1 - p_right))))
