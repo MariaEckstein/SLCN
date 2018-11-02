@@ -4,61 +4,56 @@ import os
 import pandas as pd
 import numpy as np
 
-from shared_modeling_simulation import get_paths
+from shared_modeling_simulation import get_alien_paths
 from shared_aliens import alien_initial_Q, update_Qs_sim
 from AlienTask import Task
 
+
 # Switches for this script
-model_name = "fs"
+model_name = "soft"
 verbose = False
 n_subj = 31
 n_sim_per_subj = 1
-start_id = 31
-n_sim = n_subj * n_sim_per_subj
+start_id = 0
 param_names = np.array(['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high'])
-fake_data = True
-model_to_be_simulated = "MSE"  # "MCMC" "random"
+fake_data = False
+model_to_be_simulated = "specify"  # "MSE"  # "MCMC" "specify"
 # model_name = "/AliensMSEFitting/18-10-14/f_['alpha' 'beta' 'forget']_[[ 1 10  1]]_2018_10_14_9_47"  # 'Aliens/max_abf_2018_10_10_18_7_humans_n_samples10'  #
 # Get save path
-save_dir = get_paths(False)['simulations']
+save_dir = get_alien_paths(False)['simulations']
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
 # Get parameters
 parameters = pd.DataFrame(columns=np.append(param_names, ['sID']))
-parameter_dir = get_paths(run_on_cluster=False)['fitting results']
+parameter_dir = get_alien_paths(run_on_cluster=False)['fitting results']
 
-if model_to_be_simulated == 'random':
+if model_to_be_simulated == 'specify':
 
-    parameters['alpha'] = 0.2 * np.random.rand(n_subj)  # 0 < alpha < 0.2
-    parameters['beta'] = 1 + 4 * np.random.rand(n_subj)  # 1 < beta < 2
-    parameters['forget'] = 0.1 * np.random.rand(n_subj)  # 0 < forget < 0.1
+    parameters['alpha'] = 0.01 + 0.05 * np.random.rand(n_subj)  # 0 < alpha < 0.2
+    parameters['beta'] = 6.5 + np.random.rand(n_subj)  # 1 < beta < 2
+    parameters['forget'] = 0.005 + 0.01 * np.random.rand(n_subj)  # 0 < forget < 0.1
 
-    parameters['alpha_high'] = 0.2 * np.random.rand(n_subj)  # 0 < alpha_high < 0.2
-    parameters['beta_high'] = 1 + 4 * np.random.rand(n_subj)  # 1 < beta < 2
-    parameters['forget_high'] = 0.1 * np.random.rand(n_subj)
+    parameters['alpha_high'] = 0.3 + 0.1 * np.random.rand(n_subj)  # 0 < alpha_high < 0.2
+    parameters['beta_high'] = 4.5 + np.random.rand(n_subj)  # 1 < beta < 2
+    parameters['forget_high'] = 0.2 + 0.1 * np.random.rand(n_subj)
 
     parameters['sID'] = range(n_subj)
 
 # Load fitted parameters
 elif model_to_be_simulated == 'MSE':
 
-    # print('Loading {0}{1}.\n'.format(parameter_dir, model_name))
-    # with open(parameter_dir + model_name + '.pickle', 'rb') as handle:
-    #     brute_results = pickle.load(handle)
+    parameters = pd.read_csv(parameter_dir + '/ten_best_{}.csv'.format(model_name), index_col=0)
+    n_subj = min(n_subj, parameters.shape[0])
+    parameters = parameters[:n_subj]
+    parameters['sID'] = range(n_subj)
 
-    # parameters['alpha'] = brute_results[0][0] * np.ones(n_sim)
-    # parameters['beta'] = brute_results[0][1] * np.ones(n_sim)
-    # parameters['forget'] = brute_results[0][2] * np.ones(n_sim)
-
-    parameters['alpha'] = 0.33 * np.ones(n_sim)
-    parameters['beta'] = 1.12 * np.ones(n_sim)
-    parameters['forget'] = 0.11 * np.ones(n_sim)
-
-    # TODO: Use indices 3, 4, 5 that actually correspond to these parameters!
-    parameters['alpha_high'] = parameters['alpha'].copy()  # brute_results[0][0] * np.ones(n_sim)
-    parameters['beta_high'] = parameters['beta'].copy()  # brute_results[0][1] * np.ones(n_sim)
-    parameters['forget_high'] = parameters['forget'].copy()  # brute_results[0][2] * np.ones(n_sim)
+    if 'alpha_high' not in parameters:
+        parameters['alpha_high'] = parameters['alpha'].copy()
+    if 'beta_high' not in parameters:
+        parameters['beta_high'] = parameters['beta'].copy()
+    if 'forget_high' not in parameters:
+        parameters['forget_high'] = parameters['forget'].copy()
 
 elif model_to_be_simulated == 'MCMC':
 
@@ -77,12 +72,11 @@ elif model_to_be_simulated == 'MCMC':
     parameters = pd.DataFrame(np.array(parameters, dtype=float))
     parameters.columns = np.append(param_names, ['sID'])
 
-    n_sim = n_subj
-
 if verbose:
     print("Parameters: {}".format(parameters.round(3)))
 
 # Parameter shapes
+n_sim = n_subj * n_sim_per_subj
 beta_shape = (n_sim, 1)  # Q_low_sub.shape -> [n_subj, n_actions]
 beta_high_shape = (n_sim, 1)  # Q_high_sub.shape -> [n_subj, n_TS]
 forget_high_shape = (n_sim, 1, 1)  # -> [n_subj, n_seasons, n_TS]
@@ -96,8 +90,8 @@ n_season_repetitions = np.array([3, 2, 2])  # InitialLearning, Refresher2, Refre
 
 # Initialize task
 task = Task(n_subj)
-n_trials, _ = task.get_trial_sequence("C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/",
-                                      n_subj, fake_data, range(n_subj))
+n_trials, _, _ = task.get_trial_sequence("C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/",
+                                         n_subj, n_sim_per_subj, range(n_subj), fake_data)
 print("n_trials", n_trials)
 
 # For saving data

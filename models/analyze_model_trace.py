@@ -24,7 +24,7 @@ param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_hig
 
 file_names = [
     # 'Bayes_3groups/betswirew_2018_10_10_12_1_humans_n_samples5000',
-    'Bayes_3groups/betperswirew_2018_10_17_16_52_humans_n_samples50',
+    'Bayes_3groups/betperswirew_2018_10_17_16_38_humans_n_samples5000',
     # 'Bayes_3groups/swirew_2018_10_10_17_29_humans_n_samples5000',
     # 'Aliens/soft_abf_lowishigh_2018_10_13_13_53_humans_n_samples100',
     # 'Aliens/soft_abf_lowishigh_2018_10_13_13_52_humans_n_samples100',

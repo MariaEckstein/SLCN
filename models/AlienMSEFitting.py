@@ -13,17 +13,21 @@ from AlienTask import Task
 
 
 run_on_cluster = False
-n_subj = 82  # 31 in version3.1; 82 in version1.0 and version3.1 combined
-n_sim_per_subj = 20
+n_subj = 5  # 31 in version3.1; 82 in version1.0 and version3.1 combined
+n_sim_per_subj = 2000
 n_TS, n_seasons, n_aliens, n_actions = 3, 3, 4, 3  # 3, 3, 4, 3
-model_name = 'soft'
+model_name = 'f'  #[ 1.  10.   0.5  1.  10.   0.5]'
 param_scalers = pd.DataFrame.from_dict(
-    {'alpha': [0, 1], 'beta': [0, 10], 'forget': [0, 1]})  # , 'alpha_high': [0.3]})  # , 'beta_high': [10], 'forget_high': [0.1]})
+    {'alpha': [0, 1], 'beta': [0, 10], 'forget': [0, 0.5]#, 'alpha_high': [0, 1], 'beta_high': [0, 10], 'forget_high': [0, 0.5]
+     })
 param_names = np.array(param_scalers.columns.values)
 plot_dir = get_alien_paths(run_on_cluster)["fitting results"]
-n_iter = 3
+n_iter = 500
 run_brute = False
-pickle_path = "C:/Users/maria/MEGAsync/Berkeley/TaskSets/AliensFitting/AliensMSEFitting/soft_['alpha' 'beta' 'forget']_['[0 0 0]', '[ 1 10  1]']_2018_10_16_0_34"
+run_random = True
+run_same_params = True
+pickle_path = get_alien_paths(run_on_cluster)["fitting results"] + "/AliensMSEFitting/" \
+   "soft_['alpha' 'beta' 'forget' 'alpha_high' 'beta_high' 'forget_high']_['[0. 0. 0. 0. 0. 0.]', '[ 1.  10.   0.5  1.  10.   0.5]']_2018_10_17_22_49"
 
 # Split subjects into half
 # half_of_subj, other_half = split_subj_in_half(n_subj)
@@ -31,10 +35,10 @@ n_sim = n_subj * n_sim_per_subj  # len(half_of_subj) * n_sim_per_subj  #
 
 # Make save_id
 now = datetime.datetime.now()
-if not run_brute:
-    save_id = model_name
-else:
-    save_id = '{0}_{1}_{2}_{3}'.format(model_name, param_names, [str(i) for i in np.asarray(param_scalers)], '_'.join([str(i) for i in [now.year, now.month, now.day, now.hour, now.minute]]))
+# if not run_brute:
+#     save_id = model_name
+# else:
+save_id = '{0}_{1}_{2}_{3}'.format(model_name, param_names, [str(i) for i in np.asarray(param_scalers)], '_'.join([str(i) for i in [now.year, now.month, now.day, now.hour, now.minute]]))
 print("running {}".format(save_id))
 
 # Parameter shapes
@@ -45,12 +49,15 @@ forget_high_shape = (n_sim, 1, 1)  # -> [n_sim, n_seasons, n_TS]
 
 # Initialize stuff
 task = Task(n_subj)
-n_trials, hum_corrects = task.get_trial_sequence(get_alien_paths(run_on_cluster)["human data"],
+n_trials, hum_corrects, hum_actions = task.get_trial_sequence(get_alien_paths(run_on_cluster)["human data prepr"],
                                                  n_subj, n_sim_per_subj, range(n_subj),
                                                  phases=("1InitialLearning", ""))
+missed_trials = hum_actions < 0
+hum_actions[missed_trials] = 0
+trials, subj = np.meshgrid(range(n_trials), range(n_sim))
 
 
-def calculate_mse(parameters, param_scalers, make_plot=False):
+def calculate_mse(parameters, param_scalers, return_MSE=False, make_plot=False):
 
     # Rescale parameters
     parameters = param_scalers.loc[0] + param_scalers.loc[1] * parameters
@@ -86,6 +93,7 @@ def calculate_mse(parameters, param_scalers, make_plot=False):
         forget_high = forget.flatten().reshape(forget_high_shape)
 
     sim_corrects = np.zeros([n_trials, n_sim])
+    sim_actions = np.zeros([n_trials, n_sim])
 
     Q_low = alien_initial_Q * np.ones([n_sim, n_TS, n_aliens, n_actions])
     Q_high = alien_initial_Q * np.ones([n_sim, n_seasons, n_TS])
@@ -104,17 +112,39 @@ def calculate_mse(parameters, param_scalers, make_plot=False):
 
         # Get data for learning curves
         sim_corrects[trial] = correct
+        sim_actions[trial] = action
+
+    sim_actions_chosen = np.full((n_subj, n_trials, n_actions), np.nan)
+    for subj in range(n_subj):
+        subj_dat = sim_actions[:, range(subj, n_sim, n_subj)]
+        sim_actions_chosen[subj] = np.array([np.sum(subj_dat == a, axis=1) for a in range(n_actions)]).T
+
+    # Calculate likelihoods of human actions
+    sim_actions_chosen /= n_sim_per_subj  # normalize -> get % for each action
+    liks = np.full((n_trials, n_subj), np.nan)
+    for subj in range(n_subj):
+        for trial in range(n_trials):
+            liks[trial, subj] = sim_actions_chosen[subj, trial, int(hum_actions[trial, subj])]
+
+    liks[missed_trials] = 1/3
+    liks[liks == 0] = 0.001
+    log_lik = np.cumsum(np.log(liks), axis=0)
 
     # Calculate group learning curves and MSE
     sim_learning_curve = np.mean(sim_corrects, axis=1)
     hum_learning_curve = np.mean(hum_corrects, axis=1)
     MSE = np.mean((hum_learning_curve - sim_learning_curve) ** 2)
 
-    # To check minimizer convergence
-    print("{0}\nMSE: {1}".format(parameters.round(3), MSE.round(5)))
-
-    # Plot learning curves
     if make_plot:
+        # Plot likelihoods
+        plt.figure()
+        for subj in range(n_subj):
+            plt.plot(np.arange(n_trials), -log_lik[:, subj])
+            plt.xlabel('trial')
+            plt.ylabel('negative log likelihood')
+
+        # Plot learning curves
+        plt.figure()
         plt.subplot(3, 1, 1)
         plt.errorbar(x=np.arange(n_trials),
                      y=sim_learning_curve,
@@ -135,7 +165,16 @@ def calculate_mse(parameters, param_scalers, make_plot=False):
         plt.ylim((-0.5, 0.5))
         plt.tight_layout()
 
-    return MSE
+    if return_MSE:
+        print("{0}\nMSE: {1}".format(parameters.round(3), MSE.round(5)))
+        return MSE
+    else:
+        print("{0}\nNLL: {1}".format(parameters.round(3), log_lik[-1].round(5)))
+        return np.mean(log_lik[-1])
+
+
+# NLL = calculate_mse((0.2, 0.2, 0.05), param_scalers, return_MSE=False, make_plot=True)
+# plt.show()
 
 
 if run_brute:
@@ -153,12 +192,51 @@ if run_brute:
     print('Saving brute_results to {0}/{1}.\n'.format(plot_dir, save_id))
     with open(plot_dir + '/' + save_id + '.pickle', 'wb') as handle:
         pickle.dump(brute_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+# # Plot relationship between MSE and NLL
+# plt.figure()
+# plt.plot()
+
+elif run_random:
+
+    # Minimize function using random search
+    print("Starting random search with {} iterations!".format(n_iter))
+
+    random_results = pd.DataFrame(columns=np.append(param_names, ['MSE']), index=range(n_iter))
+    for iter in range(n_iter):
+        params = np.random.rand(len(param_names))
+        MSE = calculate_mse(params, param_scalers)
+        random_results.loc[iter] = np.append(params, [MSE])
+
+    print('Saving random_results to {0}/{1}.\n'.format(plot_dir, save_id))
+    param_scalers['MSE'] = [0, 1]
+    random_results = param_scalers.loc[0] + param_scalers.loc[1] * random_results
+    random_results.to_csv(plot_dir + save_id + 'random.csv')
+
+elif run_same_params:
+
+    print("Testing consistency!")
+
+    param_scalers.loc[0] = 0
+    param_scalers.loc[1] = 1
+    consist_results = pd.DataFrame(columns=np.append(param_names, ['MSE']), index=range(n_iter))
+    for iter in range(n_iter):
+        params = np.array([0.749080, 1.144666, 0.155407, 0.181850, 5.433470, 0.195208])
+        MSE = calculate_mse(params, param_scalers)
+        consist_results.loc[iter] = np.append(params, [MSE])
+
+    print('Saving consist_results to {0}/{1}.\n'.format(plot_dir, save_id))
+    param_scalers['MSE'] = [0, 1]
+    consist_results = param_scalers.loc[0] + param_scalers.loc[1] * consist_results
+    consist_results.to_csv(plot_dir + save_id + 'consist.csv')
+
+
 else:
     with open(pickle_path + ".pickle", 'rb') as handle:
         brute_results = pickle.load(handle)
 
 # Plot learning curve at minimum
-if not run_on_cluster:
+if not run_on_cluster and run_brute:
     plt.figure()
     calculate_mse(brute_results[0], param_scalers, make_plot=True)
     save_dir = plot_dir + '/MSE_{}.png'.format(save_id)
@@ -172,9 +250,11 @@ if not run_on_cluster:
     positions = tril_pos[tril_pos != 0]
 
     # Find the 10 best parameter sets
-    ten_best = sorted(brute_results[3].flatten())[15]
-    all_mins = np.argwhere(brute_results[3] < ten_best) / brute_results[3].shape[0]
-    all_mins = pd.DataFrame(all_mins, columns=param_names)
+    tenth_best = sorted(brute_results[3].flatten())[15]
+    ten_best = np.argwhere(brute_results[3] < tenth_best) / brute_results[3].shape[0]
+    ten_best = pd.DataFrame(ten_best, columns=param_names)
+    ten_best_rescaled = param_scalers.loc[0] + param_scalers.loc[1] * ten_best
+    pd.DataFrame(ten_best_rescaled).to_csv(plot_dir + '/ten_best_{}.csv'.format(save_id))
 
     plt.figure()
     for (xname, yname), pos in zip(combos, positions):
@@ -202,8 +282,8 @@ if not run_on_cluster:
         ax.pcolormesh(min_xgrid, min_ygrid, min_jout)
 
         # Add minima
-        ax.scatter(all_mins[xname] + 0.03, all_mins[yname] + 0.03, marker='*', s=20, color='red')  # star 10 smallest
-        plt.text(0.5, 0.5, 'MSE <= {}'.format(ten_best.round(4)), color='red',
+        ax.scatter(ten_best[xname] + 0.03, ten_best[yname] + 0.03, marker='*', s=20, color='red')  # star 10 smallest
+        plt.text(0.5, 0.5, 'MSE <= {}'.format(tenth_best.round(4)), color='red',
                  horizontalalignment='center', verticalalignment='center')
 
         # Add labels to edge only
@@ -214,7 +294,6 @@ if not run_on_cluster:
 
     plt.tight_layout()
     plt.savefig(plot_dir + '/heatmap_{}.png'.format(save_id))
-    pd.DataFrame(all_mins).to_csv(plot_dir + '/ten_best_{}.csv'.format(save_id))
 
 # # Minimizer options
 # from basinhopping_specifics import MyBounds, MyTakeStep

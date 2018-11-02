@@ -39,6 +39,7 @@ def get_alien_paths(run_on_cluster):
     else:
         base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
         return {'human data': base_path + '/Data/versions1.0and3.1/',
+                'human data prepr': base_path + '/Data/version3.1preprocessed/',
                 'fitting results': base_path + '/AliensFitting/',
                 'simulations': 'C:/Users/maria/MEGAsync/SLCN/PSsimulations/'}
 

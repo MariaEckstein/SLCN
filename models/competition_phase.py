@@ -26,12 +26,14 @@ class CompetitionPhase(object):
         self.block_trial = 0
 
     def prepare_trial(self, trial):
+
         # Look up current phase
         new_phase_index = np.argwhere(trial == np.array(self.switch_trials))
         if new_phase_index:
             self.current_phase = self.phases[new_phase_index]
             self.current_stimuli = self.stimuli[self.current_phase]
             self.block_trial = 0
+
         # Shuffle stimuli at the beginning of every block (3 per phase)
         if self.block_trial % len(self.current_stimuli) == 0:
             shuffled_indices = np.random.choice(range(len(self.current_stimuli)), size=len(self.current_stimuli), replace=False)

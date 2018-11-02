@@ -57,11 +57,13 @@ class Task(object):
                 aliens = np.hstack([aliens, agent_data["sad_alien"]])
                 phase = np.hstack([phase, agent_data["phase"]])
                 correct = np.hstack([correct, agent_data["correct"]])
+                actions = np.hstack([actions, agent_data["item_chosen"]])
             except NameError:
                 seasons = agent_data["TS"]
                 aliens = agent_data["sad_alien"]
                 phase = agent_data["phase"]
                 correct = agent_data["correct"]
+                actions = agent_data["item_chosen"]
             n_trials = np.min([n_trials, agent_data.shape[0]])
 
         # Bring into right shape
@@ -77,7 +79,9 @@ class Task(object):
             n_trials = self.seasons.shape[0]
             self.phase = '1InitialLearning'
 
-        return n_trials, correct.reshape([int(len(correct) / n_trials), n_trials]).astype(int).T
+        return (n_trials,
+                correct.reshape([int(len(correct) / n_trials), n_trials]).astype(int).T,
+                actions.reshape([int(len(correct) / n_trials), n_trials]).astype(int).T)
 
     def present_stimulus(self, trial):
 
