@@ -10,13 +10,13 @@ from PStask import Task
 # Switches for this script
 verbose = False
 n_trials = 128  # humans: 128
+param_names = np.array(['beta', 'p_switch', 'p_reward', 'persev'])  #
+n_subj = 233  # 233 as of 2018-10-03
 n_sim_per_subj = 2
-param_names = np.array(['beta', 'p_switch', 'p_reward', 'persev'])
-n_subj = 20  # 233 as of 2018-10-03
 n_sim = n_sim_per_subj * n_subj
 # TODO: comment out `p_right = 1 / (1 + np.exp(-beta * (p_right - (1 - p_right))))`
 # TODO: in shared_mod_sim when running swirew model (no beta)!
-model_to_be_simulated = 'none'  # 'Bayes_3groups/swirew_2018_10_10_17_29_humans_n_samples5000'  # 'none'  #
+model_to_be_simulated = 'Bayes_3groups/betperswirew_2018_11_13_16_26_humans_n_samples5000'  # 'Bayes_add_persev/betperswirew_2018_11_13_16_26_humans_n_samples5000'  # 'Bayes_3groups/swirew_2018_10_10_17_29_humans_n_samples5000'  # 'none'  #
 ages = pd.read_csv(get_paths(False)['ages'], index_col=0)
 
 # Get save path
@@ -28,10 +28,10 @@ parameters = pd.DataFrame(columns=np.append(param_names, ['sID']))
 
 # Type in some parameters
 if model_to_be_simulated == 'none':
-    parameters['beta'] = 1 + 3 * np.random.rand(n_sim)
-    parameters['p_switch'] = 0.3 * np.random.rand(n_sim)
-    parameters['p_reward'] = 0.5 + 0.5 * np.random.rand(n_sim)
-    parameters['persev'] = 0.3 * np.random.rand(n_sim) - 0.1
+    parameters['beta'] = 10 * np.ones(n_sim)  # 1 + 3 * np.random.rand(n_sim)
+    parameters['p_switch'] = 0.1 * np.random.rand(n_sim)
+    parameters['p_reward'] = 0.75 * np.ones(n_sim)  # 0.5 + 0.5 * np.random.rand(n_sim)
+    parameters['persev'] = 0 * np.random.rand(n_sim)  # - 0.15
     parameters['sID'] = range(n_sim)
 
 # Load fitted parameters
@@ -56,9 +56,13 @@ else:
 
     for sim_id in range(n_sim_per_subj):
         rand_idx = np.random.randint(0, trace[param_names[0]].shape[0])
-        sample_params = pd.DataFrame(np.array([trace[param_name][rand_idx] for param_name in param_names]).T, columns=param_names)
+        sample_params = pd.DataFrame(np.array([trace[param_name].squeeze()[rand_idx] for param_name in param_names]).T,
+                                     columns=param_names)
         sample_params['sID'] = ages['sID']  # index of ages == PyMC's file order == samples_params' order
         parameters = pd.concat([parameters, sample_params], axis=0)
+
+    if 'persev' not in parameters:
+        parameters['persev'] = 0
 
     print('Model contains {0} participants, ages.csv contains {1}.'
           .format(trace[param_names[0]].shape[1], ages.shape[0]))
@@ -66,8 +70,7 @@ else:
 parameters['eps'] = 0
 parameters['p_noisy'] = 1e-5
 
-if verbose:
-    print("Parameters: {0}".format(parameters.round(3)))
+print("Parameters: {0}".format(parameters.round(3)))
 
 # Make sure that simulated agents get the same reward versions as humans
 reward_versions = pd.read_csv(get_paths(run_on_cluster=False)['PS reward versions'], index_col=0)
@@ -92,25 +95,29 @@ for trial in range(n_trials):
         print("\tTRIAL {0}".format(trial))
     task.prepare_trial()
 
+    # Get p_right (prob that right box is rewarded) and p_choice (prob to choose right) for trials after first trial
     try:
         lik_cor, lik_inc = get_likelihoods(reward, choice, parameters['p_reward'], parameters['p_noisy'])
         persev_bonus = 2 * choice - 1  # recode as -1 for left and +1 for right
-        persev_bonus = parameters['persev'] * persev_bonus
-        p_right = post_from_lik(lik_cor, lik_inc, persev_bonus,
-                                p_right,
-                                parameters['p_switch'], parameters['eps'], parameters['beta'], verbose=verbose)
-    except NameError:  # if p_right has not been defined yet
+        persev_bonus *= parameters['persev']
+        [p_right, p_choice] = post_from_lik(lik_cor, lik_inc, persev_bonus,
+                                            p_right,
+                                            parameters['p_switch'], parameters['eps'], parameters['beta'], verbose=verbose)
+    # For first trial
+    except NameError:
         print('Using p=0.5!')
         lik_cor = np.nan
         p_right = 0.5 * np.ones(n_sim)
+        p_choice = 0.5 * np.ones(n_sim)
 
-    choice = np.random.binomial(n=1, p=p_right)
+    choice = np.random.binomial(n=1, p=p_choice)
     reward = task.produce_reward(choice)
-    LL += np.log(p_right * choice + (1 - p_right) * (1 - choice))
+    LL += np.log(p_choice * choice + (1 - p_choice) * (1 - choice))
 
     if verbose:
         print("lik_cor:", lik_cor)
         print("p_right:", p_right.round(3))
+        print("p_choice:", p_choice.round(3))
         print("Choice:", choice)
         print("Reward:", reward)
         print("LL:", LL.round(3))

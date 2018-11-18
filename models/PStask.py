@@ -11,7 +11,6 @@ class Task(object):
             self.subj_ids = np.array(subj_ids, dtype=int)
         else:
             self.subj_ids = range(n_subj)
-        print(self.subj_ids)
         self.correct_box = np.random.binomial(1, 0.5, n_subj)
         self.n_rewards = np.zeros(n_subj, dtype=int)
         self.n_correct = np.zeros(n_subj, dtype=int)

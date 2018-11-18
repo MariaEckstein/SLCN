@@ -133,14 +133,13 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
 
     # Delete kid/teen or adult data sets
     if kids_and_teens_only:
-        rewards = rewards[age['age'] <= 18]
-        choices = choices[age['age'] <= 18]
+        rewards = rewards[:, age['age'] <= 18]
+        choices = choices[:, age['age'] <= 18]
         age = age[age['age'] <= 18]
     elif adults_only:
-        rewards = rewards[age['age'] > 18]
-        choices = choices[age['age'] > 18]
-        age = age[age[:, 1] > 18]
-
+        rewards = rewards[:, age['age'] > 18]
+        choices = choices[:, age['age'] > 18]
+        age = age[age['age'] > 18]
     n_subj = choices.shape[1]
 
     # Get each participant's group assignment
@@ -162,16 +161,16 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
     choices = choices[:, keep]
 
     # z-score age
-    # age = (age - np.nanmean(age)) / np.nanstd(age)
-    pd.DataFrame(age).to_csv(get_paths(run_on_cluster)['ages'])
-    print("Saved ages.csv to {}".format(get_paths(run_on_cluster)['ages']))
+    age['age'] = (age['age'] - np.nanmean(age['age'])) / np.nanstd(age['age'])
+    # pd.DataFrame(age).to_csv(get_paths(run_on_cluster)['ages'])
+    # print("Saved ages.csv to {}".format(get_paths(run_on_cluster)['ages']))
 
     # Look at data
     if verbose:
         print("Choices - shape: {0}\n{1}\n".format(choices.shape, choices))
         print("Rewards - shape: {0}\n{1}\n".format(rewards.shape, rewards))
 
-    return [n_subj, rewards, choices, group, n_groups]
+    return [n_subj, rewards, choices, group, n_groups, age['age']]
 
 
 def get_save_dir_and_save_id(run_on_cluster, file_name_suff, fitted_data_name, n_samples):

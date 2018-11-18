@@ -15,23 +15,32 @@ from modeling_helpers import plot_gen_rec
 
 # Which models should be analyzed and compared?
 create_pairplot = False
-analyze_indiv_models = True
+analyze_indiv_models = False
 test_group_differences = False
-compare_models = False
-calculate_waic = True
+compare_models = True
+calculate_waic = False
 do_plot_gen_rec = False
-param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high']
+param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high']  # necessary for do_plot_genrec
+model_names = ['Bsr', 'Bbsr', 'Bbpsr', 'Rab', 'Rabc', 'Rabn', 'Rabnp', 'Rabcn', 'Rabcncn', 'Rabcnp', 'Rabcncnp']  # for compare_models
 
 file_names = [
-    # 'Bayes_3groups/betswirew_2018_10_10_12_1_humans_n_samples5000',
-    'Bayes_3groups/betperswirew_2018_10_17_16_38_humans_n_samples5000',
-    # 'Bayes_3groups/swirew_2018_10_10_17_29_humans_n_samples5000',
+    'Bayes_3groups/swirew_2018_11_15_11_31_humans_n_samples5000',
+    'Bayes_3groups/betswirew_2018_11_15_11_24_humans_n_samples5000',
+    'Bayes_3groups/betperswirew_2018_11_13_16_26_humans_n_samples5000',
+    'RL_3groups/ab_2018_11_16_14_6_humans_n_samples5000',
+    'RL_3groups/abc_2018_10_3_19_28_humans_n_samples5000',
+    'RL_3groups/abn_2018_10_3_19_34_humans_n_samples5000',
+    'RL_3groups/abnp_2018_11_15_11_17_humans_n_samples5000',
+    'RL_3groups/abcn_2018_10_3_19_35_humans_n_samples5000',
+    'RL_3groups/abcncn_2018_10_3_19_36_humans_n_samples5000',
+    'RL_3groups/abcnp_2018_11_15_11_21_humans_n_samples5000',
+    'RL_3groups/abncncper_2018_11_13_19_21_humans_n_samples5000',
+
     # 'Aliens/soft_abf_lowishigh_2018_10_13_13_53_humans_n_samples100',
     # 'Aliens/soft_abf_lowishigh_2018_10_13_13_52_humans_n_samples100',
     # 'Aliens/f_abf_2018_10_13_14_58_humans_n_samples1000',
     # 'Aliens/f_abf_2018_10_13_14_57_humans_n_samples100'
     ]
-model_names = ['betswirew', 'betswirew', 'swirew', 'soft']  # ['betswirew', 'swirew', 'betswirew']  # string.ascii_lowercase  # ['abn', 'abcncn']
 
 # Load fitted parameters
 paths = get_paths(run_on_cluster=False)
@@ -42,7 +51,7 @@ print("Working on {0}.\n".format(file_names))
 model_dict = {}
 for file_name, model_name in zip(file_names, model_names):
 
-    print('\n\tMODEL {0}'.format(model_name))
+    print('\n\tMODEL {0}'.format(file_name))
     with open(parameter_dir + file_name + '.pickle', 'rb') as handle:
         data = pickle.load(handle)
         trace = data['trace']
@@ -98,7 +107,7 @@ for file_name, model_name in zip(file_names, model_names):
         print('Number of Divergent %d' % divergent.nonzero()[0].size)
 
         # Rhat should be close to one; number of effective samples > 200
-        print('Saving summary of {0} model.'.format(model_name))
+        print('Saving summary of {0} model.'.format(file_name))
         pd.DataFrame(model_summary).to_csv(save_dir + file_name + '_summary.csv')
 
         # print(model.basic_RVs)
@@ -111,12 +120,12 @@ for file_name, model_name in zip(file_names, model_names):
         plt.savefig(save_dir + file_name + '_traceplot.png')
         # pm.forestplot(trace)
         # plt.savefig(save_dir + file_name + '_forestplot.png')
-        print("Saved traces for {0} model to {1}{2}.".format(model_name, save_dir, file_name))
+        print("Saved traces for {0} model to {1}{2}.".format(file_name, save_dir, file_name))
 
-        # Get model WAICs
-        if calculate_waic:
-            waic = pm.waic(trace, model)
-            print("WAIC of {0} model: {1}".format(model_name, waic.WAIC))
+    # Get model WAICs
+    if calculate_waic:
+        waic = pm.waic(trace, model)
+        print("WAIC of {0} model: {1}".format(file_name, waic.WAIC))
 
     # Plot divergent samples to identify problematic neighborhoods in parameter space
     if create_pairplot:
@@ -145,9 +154,11 @@ for file_name, model_name in zip(file_names, model_names):
 
 # Compare WAIC scores
 if compare_models:
+    print("\nComparing model WAICs...")
     model_comparison_summary = pm.compare(model_dict)
     pd.DataFrame(model_comparison_summary).to_csv(save_dir + file_name + '_model_comparison_summary.csv')
 
     pm.compareplot(model_comparison_summary)
-    plt.savefig(save_dir + file_name + 'compareplot_WAIC' + '_'.join(model_names) + '.png')
-    print("Compared WAICs of {0} models; saved figure to {1}...\n".format(model_names, save_dir))
+    save_path = save_dir + file_name + 'compareplot_WAIC.png'
+    plt.savefig(save_path)
+    print("Compared WAICs; saved figure to {}.\n".format(save_path))

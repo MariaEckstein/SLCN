@@ -10,11 +10,11 @@ from PStask import Task
 # Switches for this script
 verbose = False
 n_trials = 128  # humans: 128
-n_sim_per_subj = 10
-param_names = np.array(['alpha', 'beta', 'nalpha', 'calpha', 'cnalpha'])
+param_names = np.array(['alpha', 'beta', 'nalpha', 'calpha', 'cnalpha', 'persev'])  #
 n_subj = 233  # 233 as of 2018-10-03
-max_n_subj = n_sim_per_subj * n_subj
-model_to_be_simulated = 'RL_3groups/abcn_2018_10_3_19_35_humans_n_samples5000'  # 'none'  #
+n_sim_per_subj = 2
+n_sim = n_sim_per_subj * n_subj
+model_to_be_simulated = 'RL_3groups/abcnp_2018_11_15_11_21_humans_n_samples5000'
 ages = pd.read_csv(get_paths(False)['ages'], index_col=0)
 
 # Get save path
@@ -26,15 +26,16 @@ parameters = pd.DataFrame(columns=np.append(param_names, ['sID']))
 
 # Type in some parameters
 if model_to_be_simulated == 'none':
-    parameters['alpha'] = np.random.rand(n_subj)
-    parameters['eps'] = 0 * np.ones(n_subj)
-    parameters['beta'] = 1 + 3 * np.random.rand(n_subj)
-    parameters['nalpha'] = np.random.rand(n_subj)
-    parameters['calpha_sc'] = 0 * np.ones(n_subj)
+    parameters['alpha'] = 0.5 + 0.1 * np.random.rand(n_sim)
+    parameters['eps'] = 0 * np.ones(n_sim)
+    parameters['beta'] = 1 + 3 * np.random.rand(n_sim)
+    parameters['persev'] = 0.05 * np.random.rand(n_sim)
+    parameters['nalpha'] = 0.4 + 0.1 * np.random.rand(n_sim)
+    parameters['calpha_sc'] = 0.9 * np.ones(n_sim)
     parameters['calpha'] = parameters['alpha'] * parameters['calpha_sc']
-    parameters['cnalpha_sc'] = 0 * np.ones(n_subj)
+    parameters['cnalpha_sc'] = 0.9 * np.ones(n_sim)
     parameters['cnalpha'] = parameters['nalpha'] * parameters['cnalpha_sc']
-    parameters['sID'] = range(n_subj)
+    parameters['sID'] = range(n_sim)
 
 # Load fitted parameters
 else:
@@ -50,9 +51,12 @@ else:
 
     for sim_id in range(n_sim_per_subj):
         rand_idx = np.random.randint(0, trace[param_names[0]].shape[0])
-        sample_params = pd.DataFrame(np.array([trace[param_name][rand_idx] for param_name in param_names]).T, columns=param_names)
+        sample_params = pd.DataFrame(np.array([trace[param_name].squeeze()[rand_idx] for param_name in param_names]).T, columns=param_names)
         sample_params['sID'] = ages['sID']  # index of ages == PyMC's file order == samples_params' order
         parameters = pd.concat([parameters, sample_params], axis=0)
+
+    if 'persev' not in parameters:
+        parameters['persev'] = 0
 
     print('Model contains {0} participants, ages.csv {1}.'
           .format(trace[param_names[0]].shape[1], ages.shape[0]))
@@ -65,8 +69,7 @@ else:
     # parameters = pd.DataFrame(np.array(parameters, dtype=float))
     # parameters.columns = param_names
 
-if verbose:
-    print("Parameters: {0}".format(parameters.round(3)))
+print("Parameters: {0}".format(parameters.round(3)))
 
 # Make sure that simulated agents get the same reward versions as humans
 reward_versions = pd.read_csv(get_paths(run_on_cluster=False)['PS reward versions'], index_col=0)
@@ -74,11 +77,10 @@ assert np.all((reward_versions["sID"] % 4) == (reward_versions["rewardversion"])
 
 # Set up data frames
 rewards = np.zeros((n_trials, n_sim_per_subj * n_subj))
-choices = np.zeros(rewards.shape)
-correct_boxes = np.zeros(rewards.shape)
+choices = np.zeros(rewards.shape)  # human data: left choice==0; right choice==1 (verified in R script 18/11/17)
+correct_boxes = np.zeros(rewards.shape)  # human data: left choice==0; right choice==1 (verified in R script 18/11/17)
 ps_right = np.zeros(rewards.shape)
 LLs = np.zeros(rewards.shape)
-
 Qs_left = np.zeros(rewards.shape)
 Qs_right = np.zeros(rewards.shape)
 
@@ -96,22 +98,26 @@ for trial in range(n_trials):
 
     # Translate Q-values into action probabilities, make a choice, obtain reward, update Q-values
     try:
-        Q_left, Q_right = update_Q(reward, choice, Q_left, Q_right, parameters['alpha'], parameters['nalpha'], parameters['calpha'], parameters['cnalpha'])
+        Q_left, Q_right = update_Q(reward, choice,
+                                   Q_left, Q_right,
+                                   parameters['alpha'], parameters['nalpha'], parameters['calpha'], parameters['cnalpha'])
+        persev_bonus_right = parameters['persev'] * choice
+        persev_bonus_left = parameters['persev'] * (1 - choice)
     except NameError:
         print('Initializing Q to 0.5!')
-        Q_left, Q_right = 0.5 * np.ones(n_sim_per_subj * n_subj), 0.5 * np.ones(n_sim_per_subj * n_subj)
+        Q_left, Q_right = 0.5 * np.ones(n_sim), 0.5 * np.ones(n_sim)
+        persev_bonus_left, persev_bonus_right = np.zeros(n_sim), np.zeros(n_sim)
 
-    p_right = p_from_Q(Q_left, Q_right, parameters['beta'], np.zeros(max_n_subj))
-    choice = np.random.binomial(n=1, p=p_right)
+    p_right = p_from_Q(Q_left, Q_right,
+                       persev_bonus_left, persev_bonus_right,
+                       parameters['beta'], np.zeros(n_sim), verbose)
+    choice = np.random.binomial(n=1, p=p_right)  # produces "1" with p_right, and "0" with (1 - p_right)
     reward = task.produce_reward(choice)
     LL += np.log(p_right * choice + (1 - p_right) * (1 - choice))
 
     if verbose:
-        print("p_right:", p_right.round(3))
         print("Choice:", choice)
         print("Reward:", reward)
-        print("Q_left:", Q_left.round(3))
-        print("Q_right:", Q_right.round(3))
         print("LL:", LL)
 
     # Store trial data
