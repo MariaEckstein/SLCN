@@ -22,9 +22,9 @@ if (data == "human") {
   patt = ".csv"
 } else if (data == "simulated_human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSsimulations" # "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
-  patt = "PSBayes.*csv"
+  patt = "PSRL.*csv"
 }
-plot_dir = file.path(data_dir, "PS_plots_Bayes_samples_betswi")
+plot_dir = file.path(data_dir, "PS_plots_RL_ab")
 
 if (!dir.exists(plot_dir)) {
   dir.create(plot_dir)
@@ -62,12 +62,11 @@ for(filename in filenames) {
   if (data == "human") {
     mat_file = readMat(file.path(data_dir, filename))$exp[,,1]$PROBSWITCHdata[,,1]
     subj_file = data.frame(RT = t(mat_file$RT))
-    subj_file$selected_box = (t(mat_file$key) - 10) / 2
-    subj_file$reward = t(mat_file$reward)
-    subj_file$correct_box = 1 - t(mat_file$better.box.left)  # left: 0; right: 1
-    sID = as.numeric(strsplit(strsplit(filename, split = "PROBSWITCH_")[[1]][2], ".mat")[[1]])
-    subj_file$sID = sID
-    subj_file = subset(subj_file, !is.nan(reward) & selected_box %in% c(0, 1))
+    subj_file$selected_box = (t(mat_file$key) - 10) / 2  # recode to make key left==0 and key right==1 (initially key right==12; key left==10)
+    subj_file$reward = t(mat_file$reward)  # reward==1, no reward==0
+    subj_file$correct_box = 1 - t(mat_file$better.box.left)  # recode to make left==0 and right==1 (initially the opposite)
+    subj_file$sID = as.numeric(strsplit(strsplit(filename, split = "PROBSWITCH_")[[1]][2], ".mat")[[1]])
+    subj_file = subset(subj_file, !is.nan(reward) & selected_box %in% c(0, 1))  # remove no-response trials
     subj_file = subj_file[47:nrow(subj_file),]  # needs to be changed for future participants - 51
   } else {
     subj_file = read.csv(file.path(data_dir, filename))

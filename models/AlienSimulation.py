@@ -10,14 +10,14 @@ from AlienTask import Task
 
 
 # Switches for this script
-model_name = "soft"
+model_name = "hier"
 verbose = False
 n_subj = 31
 n_sim_per_subj = 1
 start_id = 0
 param_names = np.array(['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high'])
 fake_data = False
-model_to_be_simulated = "specify"  # "MSE"  # "MCMC" "specify"
+model_to_be_simulated = "MSE"  # "MSE"  # "MCMC" "specify"
 # model_name = "/AliensMSEFitting/18-10-14/f_['alpha' 'beta' 'forget']_[[ 1 10  1]]_2018_10_14_9_47"  # 'Aliens/max_abf_2018_10_10_18_7_humans_n_samples10'  #
 # Get save path
 save_dir = get_alien_paths(False)['simulations']
@@ -43,7 +43,9 @@ if model_to_be_simulated == 'specify':
 # Load fitted parameters
 elif model_to_be_simulated == 'MSE':
 
-    parameters = pd.read_csv(parameter_dir + '/ten_best_{}.csv'.format(model_name), index_col=0)
+    read_dir = parameter_dir + '/AliensMSEFitting/ten_best_indiv_{}.csv'.format(model_name)
+    print("Reading in {}".format(read_dir))
+    parameters = pd.read_csv(read_dir, index_col=0)
     n_subj = min(n_subj, parameters.shape[0])
     parameters = parameters[:n_subj]
     parameters['sID'] = range(n_subj)
@@ -106,6 +108,7 @@ p_lows = np.zeros([n_trials, n_sim, n_actions])
 Q_highs = np.zeros([n_trials, n_sim])
 
 print('Simulating {0} {2} agents on {1} trials.\n'.format(n_sim, n_trials, model_name))
+print('Parameters:\n{}'.format(parameters[np.append(param_names, ['total_NLL'])].round(2)))
 
 Q_low = alien_initial_Q * np.ones([n_sim, n_TS, n_aliens, n_actions])
 Q_high = alien_initial_Q * np.ones([n_sim, n_seasons, n_TS])
@@ -168,8 +171,6 @@ for sID in range(n_sim):
     subj_data["model_name"] = model_name
     for param_name in param_names:
         subj_data[param_name] = np.array(parameters.loc[sID, param_name])
-    # subj_data["alpha"], subj_data["beta"], subj_data["forget"] = alpha[sID], beta.flatten()[sID], forget.flatten()[sID]
-    # subj_data["alpha_high"], subj_data["beta_high"], subj_data["forget_high"] = alpha_high[sID], beta_high.flatten()[sID], forget_high.flatten()[sID]
     # subj_data["Q_low"] = Q_lows[:, sID]
     subj_data["Q_TS"] = Q_highs[:, sID]
 

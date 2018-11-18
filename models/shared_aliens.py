@@ -61,7 +61,7 @@ def update_Qs_sim(season, alien,
 
     # Select TS
     Q_high_sub = Q_high[np.arange(n_subj), season]  # Q_high_sub.shape -> (n_subj, n_TS)
-    p_high = softmax(beta_high * Q_high_sub, axis=1)
+    p_high = softmax(beta_high * Q_high_sub, axis=1)   # p_high.shape -> (n_subj, n_TS)
     # TS = season  # Flat
     # TS = 0  # fs
     # TS = Q_high_sub.argmax(axis=1)  # Hierarchical deterministic
@@ -70,7 +70,7 @@ def update_Qs_sim(season, alien,
     # Calculate action probabilities based on TS and select action
     Q_low_sub = Q_low[np.arange(n_subj), TS, alien]  # Q_low_sub.shape -> [n_subj, n_actions]
     p_low = softmax(beta * Q_low_sub, axis=1)
-    action = [np.random.choice(range(n_actions), p=p_low_subj) for p_low_subj in p_low]
+    action = np.array([np.random.choice(a=n_actions, p=p_low_subj) for p_low_subj in p_low])
     reward, correct = task.produce_reward(action)
 
     # Forget Q-values a little bit
@@ -87,8 +87,8 @@ def update_Qs_sim(season, alien,
     Q_low[current_trial_low] += alpha * RPE_low
 
     if verbose:
-        # print("Q_high_sub:\n", Q_high_sub.round(3))
-        # print("p_high:\n", p_high.round(3))
+        print("Q_high_sub:\n", Q_high_sub.round(3))
+        print("p_high:\n", p_high.round(3))
         print("TS:", TS)
         print("Q_low_sub:\n", Q_low_sub.round(3))
         print("p_low:\n", p_low.round(3))

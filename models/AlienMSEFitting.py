@@ -5,6 +5,7 @@ import pickle
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import minimize, brute, basinhopping
 
 from shared_aliens import alien_initial_Q, update_Qs_sim, split_subj_in_half
@@ -13,19 +14,22 @@ from AlienTask import Task
 
 
 run_on_cluster = False
-n_subj = 5  # 31 in version3.1; 82 in version1.0 and version3.1 combined
-n_sim_per_subj = 2000
+verbose = False
+n_subj = 31  # 31 in version3.1; 82 in version1.0 and version3.1 combined
+n_sim_per_subj = 100
 n_TS, n_seasons, n_aliens, n_actions = 3, 3, 4, 3  # 3, 3, 4, 3
-model_name = 'f'  #[ 1.  10.   0.5  1.  10.   0.5]'
-param_scalers = pd.DataFrame.from_dict(
-    {'alpha': [0, 1], 'beta': [0, 10], 'forget': [0, 0.5]#, 'alpha_high': [0, 1], 'beta_high': [0, 10], 'forget_high': [0, 0.5]
+model_name = 'hier'  #[ 1.  10.   0.5  1.  10.   0.5]'
+param_ranges = pd.DataFrame.from_dict(
+    {'alpha': [0, 1], 'beta': [1, 20], 'forget': [0, 1],
+     'alpha_high': [0, 1], 'beta_high': [1, 20], 'forget_high': [0, 1]
      })
-param_names = np.array(param_scalers.columns.values)
+# param_ranges = pd.DataFrame.from_dict({'alpha': [0, 1], 'beta': [1, 20], 'forget': [0, 0.5]})
+param_names = np.array(param_ranges.columns.values)
 plot_dir = get_alien_paths(run_on_cluster)["fitting results"]
-n_iter = 500
+n_iter = 100
 run_brute = False
 run_random = True
-run_same_params = True
+run_same_params = False
 pickle_path = get_alien_paths(run_on_cluster)["fitting results"] + "/AliensMSEFitting/" \
    "soft_['alpha' 'beta' 'forget' 'alpha_high' 'beta_high' 'forget_high']_['[0. 0. 0. 0. 0. 0.]', '[ 1.  10.   0.5  1.  10.   0.5]']_2018_10_17_22_49"
 
@@ -38,7 +42,7 @@ now = datetime.datetime.now()
 # if not run_brute:
 #     save_id = model_name
 # else:
-save_id = '{0}_{1}_{2}_{3}'.format(model_name, param_names, [str(i) for i in np.asarray(param_scalers)], '_'.join([str(i) for i in [now.year, now.month, now.day, now.hour, now.minute]]))
+save_id = '{0}_{1}_{2}_{3}'.format(model_name, param_names, [str(i) for i in np.asarray(param_ranges)], '_'.join([str(i) for i in [now.year, now.month, now.day, now.hour, now.minute]]))
 print("running {}".format(save_id))
 
 # Parameter shapes
@@ -57,10 +61,12 @@ hum_actions[missed_trials] = 0
 trials, subj = np.meshgrid(range(n_trials), range(n_sim))
 
 
-def calculate_mse(parameters, param_scalers, return_MSE=False, make_plot=False):
+def calculate_mse(parameters, param_ranges, return_MSE=False, make_plot=False, indiv_subj=False):
 
     # Rescale parameters
-    parameters = param_scalers.loc[0] + param_scalers.loc[1] * parameters
+    parameters = param_ranges.loc[0] + (param_ranges.loc[1] - param_ranges.loc[0]) * parameters
+    if verbose:
+        print("Parameters: \n{}".format(parameters))
 
     if 'alpha' in parameters:
         alpha = parameters['alpha'] * np.ones(n_sim)
@@ -100,6 +106,8 @@ def calculate_mse(parameters, param_scalers, return_MSE=False, make_plot=False):
 
     for trial in range(n_trials):
 
+        if verbose:
+            print("\n\t TRIAL {}".format(trial))
         # Observe stimuli
         season, alien = task.present_stimulus(trial)
 
@@ -108,7 +116,7 @@ def calculate_mse(parameters, param_scalers, return_MSE=False, make_plot=False):
             update_Qs_sim(season, alien,
                           Q_low, Q_high,
                           beta, beta_high, alpha, alpha_high, forget, forget_high,
-                          n_sim, n_actions, n_TS, task, verbose=False)
+                          n_sim, n_actions, n_TS, task, verbose=verbose)
 
         # Get data for learning curves
         sim_corrects[trial] = correct
@@ -120,14 +128,14 @@ def calculate_mse(parameters, param_scalers, return_MSE=False, make_plot=False):
         sim_actions_chosen[subj] = np.array([np.sum(subj_dat == a, axis=1) for a in range(n_actions)]).T
 
     # Calculate likelihoods of human actions
-    sim_actions_chosen /= n_sim_per_subj  # normalize -> get % for each action
+    sim_actions_chosen[sim_actions_chosen == 0] = 0.1  # if no simulation chose the action, pretend 0.1 did
+    sim_actions_chosen /= np.sum(sim_actions_chosen, axis=2, keepdims=True)  # normalize -> get % for each action
     liks = np.full((n_trials, n_subj), np.nan)
     for subj in range(n_subj):
         for trial in range(n_trials):
             liks[trial, subj] = sim_actions_chosen[subj, trial, int(hum_actions[trial, subj])]
 
-    liks[missed_trials] = 1/3
-    liks[liks == 0] = 0.001
+    liks[missed_trials] = 1 / n_actions
     log_lik = np.cumsum(np.log(liks), axis=0)
 
     # Calculate group learning curves and MSE
@@ -170,11 +178,14 @@ def calculate_mse(parameters, param_scalers, return_MSE=False, make_plot=False):
         return MSE
     else:
         print("{0}\nNLL: {1}".format(parameters.round(3), log_lik[-1].round(5)))
-        return np.mean(log_lik[-1])
+        if indiv_subj:
+            return log_lik[-1]
+        else:
+            return np.mean(log_lik[-1])
 
-
-# NLL = calculate_mse((0.2, 0.2, 0.05), param_scalers, return_MSE=False, make_plot=True)
-# plt.show()
+plt.figure()
+calculate_mse([0.1, 5, 0.01, 0.3, 5, 0.01], param_ranges, make_plot=True)
+plt.show()
 
 
 if run_brute:
@@ -183,51 +194,70 @@ if run_brute:
     # Needs >= 3 param_names; speed up for debugging: set n_subj=2 and n_sim_per_subj=2
     brute_results = brute(func=calculate_mse,
                           ranges=([(0, 1) for param in param_names]),
-                          args=([param_scalers]),
+                          args=([param_ranges]),
                           Ns=n_iter,
                           full_output=True,
                           finish=None,
-                          disp=True)
+                          disp=False)
 
     print('Saving brute_results to {0}/{1}.\n'.format(plot_dir, save_id))
     with open(plot_dir + '/' + save_id + '.pickle', 'wb') as handle:
         pickle.dump(brute_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-# # Plot relationship between MSE and NLL
-# plt.figure()
-# plt.plot()
 
 elif run_random:
 
     # Minimize function using random search
     print("Starting random search with {} iterations!".format(n_iter))
 
-    random_results = pd.DataFrame(columns=np.append(param_names, ['MSE']), index=range(n_iter))
+    random_results = pd.DataFrame(columns=np.append(param_names, ['NLL{}'.format(subj) for subj in range(n_subj)]),
+                                  index=range(n_iter))
     for iter in range(n_iter):
+        print("Iteration {}".format(iter))
         params = np.random.rand(len(param_names))
-        MSE = calculate_mse(params, param_scalers)
-        random_results.loc[iter] = np.append(params, [MSE])
+        MSE = calculate_mse(params, param_ranges, indiv_subj=True)
+        transformed_params = param_ranges.loc[0] + (param_ranges.loc[1] - param_ranges.loc[0]) * params
+        random_results.loc[iter] = np.append(transformed_params, [MSE])
 
-    print('Saving random_results to {0}/{1}.\n'.format(plot_dir, save_id))
-    param_scalers['MSE'] = [0, 1]
-    random_results = param_scalers.loc[0] + param_scalers.loc[1] * random_results
-    random_results.to_csv(plot_dir + save_id + 'random.csv')
+        print('Saving random_results to {0}/{1}.\n'.format(plot_dir, save_id))
+        random_results.to_csv(plot_dir + save_id + 'random.csv')
+
+    NLL_columns = ['NLL{}'.format(subj) for subj in range(n_subj)]
+    random_results['total_NLL'] = np.mean(random_results[NLL_columns], axis=1)
+
+    if not run_on_cluster:
+        # Plot "heatmap"
+        fig = plt.figure()
+
+        ax = fig.add_subplot(221, projection='3d')
+        ax.scatter(random_results['alpha'], random_results['beta'], random_results['forget'], c=random_results['total_NLL'], label=random_results['total_NLL'], marker='.')
+        ax.set_title(model_name)
+        ax.set_xlabel('alpha')
+        ax.set_ylabel('beta')
+        ax.set_zlabel('forget')
+
+        ax = fig.add_subplot(222, projection='3d')
+        ax.scatter(random_results['alpha_high'], random_results['beta_high'], random_results['forget_high'], c=random_results['total_NLL'], label=random_results['total_NLL'], marker='.')
+        ax.set_xlabel('alpha_high')
+        ax.set_ylabel('beta_high')
+        ax.set_zlabel('forget_high')
+
+        plt.show()
 
 elif run_same_params:
 
     print("Testing consistency!")
 
-    param_scalers.loc[0] = 0
-    param_scalers.loc[1] = 1
+    param_ranges.loc[0] = 0
+    param_ranges.loc[1] = 1
     consist_results = pd.DataFrame(columns=np.append(param_names, ['MSE']), index=range(n_iter))
     for iter in range(n_iter):
         params = np.array([0.749080, 1.144666, 0.155407, 0.181850, 5.433470, 0.195208])
-        MSE = calculate_mse(params, param_scalers)
+        MSE = calculate_mse(params, param_ranges)
         consist_results.loc[iter] = np.append(params, [MSE])
 
     print('Saving consist_results to {0}/{1}.\n'.format(plot_dir, save_id))
-    param_scalers['MSE'] = [0, 1]
-    consist_results = param_scalers.loc[0] + param_scalers.loc[1] * consist_results
+    param_ranges['MSE'] = [0, 1]
+    consist_results = param_ranges.loc[0] + param_ranges.loc[1] * consist_results
     consist_results.to_csv(plot_dir + save_id + 'consist.csv')
 
 
@@ -238,7 +268,7 @@ else:
 # Plot learning curve at minimum
 if not run_on_cluster and run_brute:
     plt.figure()
-    calculate_mse(brute_results[0], param_scalers, make_plot=True)
+    calculate_mse(brute_results[0], param_ranges, make_plot=True)
     save_dir = plot_dir + '/MSE_{}.png'.format(save_id)
     plt.savefig(save_dir)
     print("Saving figure to {}".format(save_dir))
@@ -253,7 +283,7 @@ if not run_on_cluster and run_brute:
     tenth_best = sorted(brute_results[3].flatten())[15]
     ten_best = np.argwhere(brute_results[3] < tenth_best) / brute_results[3].shape[0]
     ten_best = pd.DataFrame(ten_best, columns=param_names)
-    ten_best_rescaled = param_scalers.loc[0] + param_scalers.loc[1] * ten_best
+    ten_best_rescaled = param_ranges.loc[0] + param_ranges.loc[1] * ten_best
     pd.DataFrame(ten_best_rescaled).to_csv(plot_dir + '/ten_best_{}.csv'.format(save_id))
 
     plt.figure()
@@ -313,7 +343,7 @@ if not run_on_cluster and run_brute:
 #                               # T: The “temperature” parameter for the accept or reject criterion. Higher “temperatures” mean that larger jumps in function value will be accepted. For best results T should be comparable to the separation (in function value) between local minima.
 #                               T=0.01,
 #                               minimizer_kwargs={'method': 'Nelder-Mead',
-#                                                 'args': param_scalers,
+#                                                 'args': param_ranges,
 #                                                 'options': nelder_mead_options
 #                                                 },
 #                               take_step=takestep,
@@ -321,7 +351,7 @@ if not run_on_cluster and run_brute:
 #                               disp=True)
 # hoppin_fit_par, hoppin_MSE = [hoppin_results.x, hoppin_results.fun]
 # print("Found minimum {0} with MSE {1} through basinhopping!".format(hoppin_fit_par.round(2), hoppin_MSE.round(4)))
-# calculate_mse(hoppin_fit_par, param_scalers, make_plot=True)
+# calculate_mse(hoppin_fit_par, param_ranges, make_plot=True)
 
 # print("Starting minimize!")
 # # Needs many n_subj and n_sim_per_subj to be able to find a minimum; n_iter needs to be >= 2
@@ -331,13 +361,13 @@ if not run_on_cluster and run_brute:
 #     random_start_values = np.random.rand(len(param_names))
 #     minimize_res = minimize(fun=calculate_mse,
 #                             x0=random_start_values,
-#                             args=param_scalers,
+#                             args=param_ranges,
 #                             tol=0.01,
 #                             method='Nelder-Mead',
 #                             options=nelder_mead_options)
 #     all_minimize_res[i] = np.concatenate([[calculate_mse(minimize_res.x, param_names)], minimize_res.x])
 #
 # minimize_results = all_minimize_res[all_minimize_res[:, 0] == np.min(all_minimize_res[:, 0])].flatten()
-# calculate_mse(minimize_results[1:], param_scalers, make_plot=True)
+# calculate_mse(minimize_results[1:], param_ranges, make_plot=True)
 # print("Found minimum {0} with MSE {1} through minimize!".
 #       format(minimize_results[1:].round(3), minimize_results[0].round(4)))

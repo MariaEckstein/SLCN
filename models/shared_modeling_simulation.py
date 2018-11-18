@@ -33,6 +33,7 @@ def get_alien_paths(run_on_cluster):
     if run_on_cluster:
         base_path = '/home/bunge/maria/Desktop/'
         return {'human data': base_path + '/AlienshumanData/',
+                'human data prepr': base_path + '/AlienshumanData/prepr/',
                 'fitting results': base_path + '/AliensPyMC3/fitting/',
                 'simulations': base_path + 'AliensPyMC3/Aliensimulations/'}
 
@@ -44,25 +45,44 @@ def get_alien_paths(run_on_cluster):
                 'simulations': 'C:/Users/maria/MEGAsync/SLCN/PSsimulations/'}
 
 
-def p_from_Q(Q_left, Q_right, beta, eps):
+def p_from_Q(Q_left, Q_right, persev_bonus_left, persev_bonus_right, beta, eps, verbose=False):
+
+    if verbose:
+        print('Q_right:\n{}'.format(Q_right.round(3)))
+        print('Q_left:\n{}'.format(Q_left.round(3)))
+
+    # Add perseverance bonus
+    Q_right_ = Q_right + persev_bonus_right  # perseverance only lasts for 1 trial
+    Q_left_ = Q_left + persev_bonus_left
+    # Q_right += persev_bonus_right  # perseverance persists across multiple trials
+    # Q_left += persev_bonus_left
+    # Q_right_ = Q_right.copy()
+    # Q_left_ = Q_left.copy()
+    if verbose:
+        print('Q_right after adding perseveration bonus:\n{}'.format(Q_right_.round(3)))
+        print('Q_left after adding perseveration bonus:\n{}'.format(Q_left_.round(3)))
 
     # translate Q-values into probabilities using softmax
-    p_right = 1 / (1 + np.exp(-beta * (Q_right - Q_left)))
+    p_right = 1 / (1 + np.exp(beta * (Q_left_ - Q_right_)))
+    if verbose:
+        print('p_right after softmax:\n{}'.format(p_right.round(3)))
 
     # add eps noise
     return eps * 0.5 + (1 - eps) * p_right
 
 
-def update_Q(reward, choice, Q_left, Q_right, alpha, nalpha, calpha, cnalpha):
+def update_Q(reward, choice,
+             Q_left, Q_right,
+             alpha, nalpha, calpha, cnalpha):
 
     # Counter-factual learning: Weigh RPE with alpha for chosen action, and with calpha for unchosen action
     # Reward-sensitive learning: Different learning rates for positive (rew1) and negative (rew0) outcomes
     RPE = reward - choice * Q_right - (1 - choice) * Q_left  # RPE = reward - Q[chosen]
-    alpha_right_rew1 = choice * alpha - (1 - choice) * calpha   # choice==0: weight=alpha; choice==1; weight=-calpha
-    alpha_right_rew0 = choice * nalpha - (1 - choice) * cnalpha   # sim.
+    alpha_right_rew1 = choice * alpha - (1 - choice) * calpha   # choice==1 -> alpha; choice==0 -> -calpha
+    alpha_right_rew0 = choice * nalpha - (1 - choice) * cnalpha   # choice==1 -> nalpha; choice==0 -> -cnalpha
 
-    alpha_left_rew1 = (1 - choice) * alpha - choice * calpha  # sim.
-    alpha_left_rew0 = (1 - choice) * nalpha - choice * cnalpha  # sim.
+    alpha_left_rew1 = (1 - choice) * alpha - choice * calpha  # choice==0 -> alpha; choice==1 -> -calpha
+    alpha_left_rew0 = (1 - choice) * nalpha - choice * cnalpha  # choice==0 -> nalpha; choice==1 -> -cnalpha
 
     alpha_right = reward * alpha_right_rew1 + (1 - reward) * alpha_right_rew0
     alpha_left = reward * alpha_left_rew1 + (1 - reward) * alpha_left_rew0
@@ -96,7 +116,9 @@ def get_likelihoods(rewards, choices, p_reward, p_noisy):
     return lik_cor, lik_inc
 
 
-def post_from_lik(lik_cor, lik_inc, scaled_persev_bonus, p_right, p_switch, eps, beta, verbose=False):
+def post_from_lik(lik_cor, lik_inc, scaled_persev_bonus,
+                  p_right,
+                  p_switch, eps, beta, verbose=False):
 
     # Apply Bayes rule: Posterior prob. that right action is correct, based on likelihood (i.e., received feedback)
     p_right = lik_cor * p_right / (lik_cor * p_right + lik_inc * (1 - p_right))
@@ -108,22 +130,22 @@ def post_from_lik(lik_cor, lik_inc, scaled_persev_bonus, p_right, p_switch, eps,
     if verbose:
         print('p_right: {0} (after taking switch into account)'.format(p_right.round(3)))
 
-    # Add perseveration bonus
-    p_right += scaled_persev_bonus
+    # Add perseverance bonus
+    p_choice = p_right + scaled_persev_bonus
     if verbose:
-        print('p_right: {0} (after adding perseveration bonus)'.format(p_right.round(3)))
+        print('p_choice: {0} (after adding perseveration bonus)'.format(p_choice.round(3)))
 
     # Log-transform probabilities
-    p_right = 1 / (1 + np.exp(-beta * (p_right - (1 - p_right))))
+    p_choice = 1 / (1 + np.exp(-beta * (p_choice - (1 - p_choice))))
     if verbose:
-        print('p_right: {0} (after sigmoid transform)'.format(p_right.round(3)))
+        print('p_choice: {0} (after sigmoid transform)'.format(p_choice.round(3)))
 
     # Add epsilon noise
-    p_right = eps * 0.5 + (1 - eps) * p_right
+    p_choice = eps * 0.5 + (1 - eps) * p_choice
     if verbose:
-        print('p_right: {0} (after adding epsilon noise)'.format(p_right.round(3)))
+        print('p_choice: {0} (after adding epsilon noise)'.format(p_choice.round(3)))
 
-    return p_right
+    return p_right, p_choice
 
 
 def softmax(X, axis=None):
