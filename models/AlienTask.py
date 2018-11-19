@@ -27,7 +27,7 @@ class Task(object):
                              [2, 1, 1]]])
 
     def get_trial_sequence(self, file_path, n_subj, n_sim_per_subj, subset_of_subj, fake=False,
-                           phases=("1InitialLearning", "Refresher2", "Refresher3")):
+                           phases=("1InitialLearning", "2CloudySeason", "Refresher2", "Refresher3")):
         '''
         Get trial sequences of human participants.
         Read in datafiles of all participants, select InitialLearning, Refresher2, and Refresher3,
@@ -78,6 +78,7 @@ class Task(object):
             self.aliens = np.tile(np.arange(4), int(n_subj * 80 * 3)).reshape([n_subj, 3 * 80 * 4]).astype(int).T
             n_trials = self.seasons.shape[0]
             self.phase = '1InitialLearning'
+            self.phase[n_trials/2:] = '2CloudySeason'
 
         return (n_trials,
                 correct.reshape([int(len(correct) / n_trials), n_trials]).astype(int).T,
