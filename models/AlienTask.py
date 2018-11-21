@@ -71,7 +71,8 @@ class Task(object):
         aliens = np.tile(aliens, n_sim_per_subj)
         self.seasons = seasons.reshape([int(len(seasons) / n_trials), n_trials]).astype(int).T
         self.aliens = aliens.reshape([int(len(aliens) / n_trials), n_trials]).astype(int).T
-        self.phase = np.tile(agent_data["phase"], n_sim_per_subj)
+        # self.phase = np.tile(agent_data["phase"], n_sim_per_subj * n_subj).reshape([int(len(seasons) / n_trials), n_trials])
+        self.phase = agent_data['phase']
 
         if fake:
             self.seasons = np.tile(np.tile(np.repeat(np.arange(3), 80), 4), n_subj).reshape([n_subj, 3 * 80 * 4]).T  # np.zeros([n_subj, n_trials], dtype=int).T

@@ -8,8 +8,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import minimize, brute, basinhopping
 
-from shared_aliens import alien_initial_Q, update_Qs_sim, split_subj_in_half
-from shared_modeling_simulation import get_alien_paths
+from shared_aliens import alien_initial_Q, update_Qs_sim, split_subj_in_half, get_alien_paths
 from AlienTask import Task
 
 
@@ -54,10 +53,10 @@ forget_high_shape = (n_sim, 1, 1)  # -> [n_sim, n_seasons, n_TS]
 # Initialize stuff
 task = Task(n_subj)
 n_trials, hum_corrects, hum_actions = task.get_trial_sequence(get_alien_paths(run_on_cluster)["human data prepr"],
-                                                 n_subj, n_sim_per_subj, range(n_subj),
-                                                 phases=("1InitialLearning", ""))
+                                                              n_subj, n_sim_per_subj, range(n_subj),
+                                                              phases=("1InitialLearning", ""))
 missed_trials = hum_actions < 0
-hum_actions[missed_trials] = 0
+hum_actions[missed_trials] = 0  # TODO: Fix this at some point!
 trials, subj = np.meshgrid(range(n_trials), range(n_sim))
 
 

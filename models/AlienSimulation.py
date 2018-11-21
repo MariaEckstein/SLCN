@@ -7,24 +7,29 @@ import pandas as pd
 
 from AlienTask import Task
 from competition_phase import CompetitionPhase
-from shared_aliens import alien_initial_Q, update_Qs_sim, softmax
-from shared_modeling_simulation import get_alien_paths
+from shared_aliens import alien_initial_Q, update_Qs_sim, softmax, get_alien_paths,\
+    simulate_competition_phase, simulate_rainbow_phase, get_summary_rainbow
 
 
 # TODO:
-# Implement flat agent in competition phase (old code: alien_agens.py, get_Q_for_stimulus() & get_p_from_Q())
+# Implement flat agent in competition & rainbow (old code: alien_agens.py, get_Q_for_stimulus() & get_p_from_Q())
 # Plot competition phase
+# add beta's in all softmax's
+# cloudy won't work because version1.0 and version3.1 have different numbers of trials
 
 # Switches for this script
 model_name = "hier"
 verbose = False
 n_subj = 31
 n_sim_per_subj = 1
+n_sim = n_subj * n_sim_per_subj
 start_id = 0
 param_names = np.array(['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high'])
 fake_data = False
-model_to_be_simulated = "specify"  # "MSE"  # "MCMC" "specify"
+human_data_path = get_alien_paths()["human data prepr"]  # "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/",  # note: human data prepr works for analyzing human behavior, the direct path works just for simulating agents
+model_to_be_simulated = "specify"  # "MSE" "MCMC" "specify"
 # model_name = "/AliensMSEFitting/18-10-14/f_['alpha' 'beta' 'forget']_[[ 1 10  1]]_2018_10_14_9_47"  # 'Aliens/max_abf_2018_10_10_18_7_humans_n_samples10'  #
+
 # Get save path
 save_dir = get_alien_paths(False)['simulations']
 if not os.path.exists(save_dir):
@@ -42,7 +47,7 @@ if model_to_be_simulated == 'specify':
 
     parameters['alpha_high'] = 0.3 + 0.1 * np.random.rand(n_subj)  # 0 < alpha_high < 0.2
     parameters['beta_high'] = 4.5 + np.random.rand(n_subj)  # 1 < beta < 2
-    parameters['forget_high'] = 0.002 + 0.01 * np.random.rand(n_subj)
+    parameters['forget_high'] = 0.2 + 0.1 * np.random.rand(n_subj)
 
     parameters['sID'] = range(n_subj)
     parameters['total_NLL'] = np.nan
@@ -85,7 +90,6 @@ if verbose:
     print("Parameters: {}".format(parameters.round(3)))
 
 # Parameter shapes
-n_sim = n_subj * n_sim_per_subj
 beta_shape = (n_sim, 1)  # Q_low_sub.shape -> [n_subj, n_actions]
 beta_high_shape = (n_sim, 1)  # Q_high_sub.shape -> [n_subj, n_TS]
 forget_high_shape = (n_sim, 1, 1)  # -> [n_subj, n_seasons, n_TS]
@@ -94,19 +98,20 @@ forget_shape = (n_sim, 1, 1, 1)  # Q_low[0].shape -> [n_subj, n_TS, n_aliens, n_
 # Get numbers of things
 n_seasons, n_aliens, n_actions = 3, 4, 3
 n_TS = n_seasons
-n_alien_repetitions = np.array([13, 7, 7])  # InitialLearning, Refresher2, Refresher3
-n_season_repetitions = np.array([3, 2, 2])  # InitialLearning, Refresher2, Refresher3
 
 # Initialize task
 task = Task(n_subj)
-n_trials, _, _ = task.get_trial_sequence("C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/",
-                                         n_subj, n_sim_per_subj, range(n_subj), fake_data)
+n_trials, _, _ = task.get_trial_sequence(human_data_path,
+                                         n_subj, n_sim_per_subj, range(n_subj), fake_data,
+                                         phases=['1InitialLearning', '2CloudySeason'])  #
 print("n_trials", n_trials)
 
 n_trials_ = {'1InitialLearn': np.sum(task.phase=='1InitialLearning'),
-            '2CloudySeason': np.sum(task.phase=='2CloudySeason')}
+             '2CloudySeason': np.sum(task.phase=='2CloudySeason'),
+             '4RainbowSeason': 4 * n_aliens}
 trials = {'1InitialLearn': range(n_trials_['1InitialLearn']),
-          '2CloudySeason': range(n_trials_['1InitialLearn'], n_trials_['1InitialLearn'] + n_trials_['2CloudySeason'])}
+          '2CloudySeason': range(n_trials_['1InitialLearn'], n_trials_['1InitialLearn'] + n_trials_['2CloudySeason']),
+          '4RainbowSeason': range(n_trials_['2CloudySeason'], n_trials_['2CloudySeason'] + n_trials_['4RainbowSeason'])}
 
 # For saving data
 seasons = np.zeros([n_trials, n_sim], dtype=int)
@@ -141,13 +146,7 @@ for trial in trials['1InitialLearn']:
     # Observe stimuli
     season, alien = task.present_stimulus(trial)
 
-    # Print info
-    if verbose:
-        print("\n\tTRIAL {0}".format(trial))
-        print("season:", season)
-        print("alien:", alien)
-
-    # Update Q-values
+    # Respond and update Q-values
     [Q_low, Q_high, TS, action, correct, reward, p_low] =\
         update_Qs_sim(season, alien,
                       Q_low, Q_high,
@@ -218,72 +217,163 @@ for trial in trials['2CloudySeason']:
     Q_highs[trial] = Q_high[np.arange(n_sim), season, TS]
     p_lows[trial] = p_low
 
+# Read in human data
+print("Reading in human data from {}!".format(human_data_path))
+
+file_names = os.listdir(human_data_path)
+n_hum = len(file_names)
+
+# Get human data
+hum_seasons = np.zeros([n_trials, n_hum], dtype=int)
+hum_aliens = np.zeros([n_trials, n_hum], dtype=int)
+hum_actions = np.zeros([n_trials, n_hum], dtype=int)
+hum_rewards = np.zeros([n_trials, n_hum])
+hum_corrects = np.zeros([n_trials, n_hum])
+hum_phase = np.zeros(seasons.shape)
+hum_rainbow_dat = np.zeros((n_aliens, n_actions))
+
+for i, file_name in enumerate(file_names):
+    subj_file = pd.read_csv(human_data_path + '/' + file_name, index_col=0).reset_index(drop=True)
+
+    # Get feed-aliens phases
+    feed_aliens_file = subj_file[(subj_file['phase'] == '1InitialLearning') + (subj_file['phase'] == '2CloudySeason')]
+    hum_seasons[:, i] = feed_aliens_file['TS']
+    hum_aliens[:, i] = feed_aliens_file['sad_alien']
+    hum_actions[:, i] = feed_aliens_file['item_chosen']
+    hum_rewards[:, i] = feed_aliens_file['reward']
+    hum_corrects[:, i] = feed_aliens_file['correct']
+    hum_phase[:, i] = [int(ph[0]) for ph in feed_aliens_file['phase']]
+
+    # Get rainbow data
+    rainbow_file = subj_file[(subj_file['phase'] == '5RainbowSeason')].reset_index(drop=True)
+    for i in range(rainbow_file.shape[0]):
+        alien, item = rainbow_file['sad_alien'][i], rainbow_file['item_chosen'][i]
+        if not np.isnan(item):
+            hum_rainbow_dat[int(alien), int(item)] += 1
+
+assert np.all(hum_seasons == seasons)
+assert np.all(hum_aliens == aliens)
+
 # Plot learning curves
 plt.figure()
 for i, phase in enumerate(['1InitialLearn', '2CloudySeason']):
     learning_curve = np.mean(corrects[trials[phase]], axis=1)
+    hum_learning_curve = np.mean(hum_corrects[trials[phase]], axis=1)
     plt.subplot(2, 1, i+1)
-    plt.plot(trials[phase], learning_curve)
     plt.title(phase)
+    plt.plot(trials[phase], learning_curve, label='Simulation')
+    plt.plot(trials[phase], hum_learning_curve, label='Humans')
+    plt.legend()
     plt.ylim(0, 1)
     plt.xlabel('Trial')
     plt.ylabel('% correct')
 plt.tight_layout()
-# plt.show()
 
 # Plot repetition learning curves
 plt.figure()
-for i, phase in enumerate(['1InitialLearn', '2CloudySeason']):
-    season_changes = np.array([seasons[i, 0] != seasons[i+1, 0] for i in trials[phase]])
+for phase in ['1InitialLearn', '2CloudySeason']:
+    season_changes = np.array([seasons[i, 0] != seasons[i+1, 0] for i in list(trials[phase])[:-1]])
     season_changes = np.insert(season_changes, 0, False)
     season_presentation = np.cumsum(season_changes)
     repetition = season_presentation // n_seasons
     n_trials_per_rep = np.sum(repetition==0)
+    n_rep_rep = np.sum(season_presentation==0)
+
+    # Prepare simulated data
     corrects_rep = corrects[trials[phase]].reshape((3, n_trials_per_rep, n_sim))
     learning_curve_rep = np.mean(corrects_rep, axis=2)
+    rep_rep = learning_curve_rep.reshape((3, 3, n_rep_rep))
+    rep_rep = np.mean(rep_rep, axis=1)
+    learning = np.mean(rep_rep[-1] - rep_rep[0])  # Average increase from first to last repetition
 
-    plt.subplot(2, 1, i+1)
+    # Prepare human data
+    hum_corrects_rep = hum_corrects[trials[phase]].reshape((3, n_trials_per_rep, n_hum))
+    hum_learning_curve_rep = np.mean(hum_corrects_rep, axis=2)
+    hum_rep_rep = hum_learning_curve_rep.reshape((3, 3, n_rep_rep))
+    hum_rep_rep = np.mean(hum_rep_rep, axis=1)
+    hum_learning = np.mean(hum_rep_rep[-1] - hum_rep_rep[0])  # Average increase from first to last repetition
+
+    plt.figure()
+    plt.subplot(2, 2, 1)  # Plot simulations
+    plt.title('Simulations')
     for rep in range(3):
         plt.plot(range(n_trials_per_rep), learning_curve_rep[rep], label=rep)
     plt.ylim(0, 1)
-    plt.title(phase)
-    plt.legend()
+    plt.ylabel('% correct ({})'.format(phase))
     plt.xlabel('Trial in repetition')
-    plt.ylabel('% correct')
-plt.tight_layout()
-# plt.show()
+    plt.legend()
 
+    plt.subplot(2, 2, 2)  # Plot simulations
+    plt.title('Simulations')
+    for rep in range(3):
+        plt.plot(range(n_rep_rep), rep_rep[rep], label=rep)
+    plt.ylim(0, 1)
+    plt.ylabel('% correct ({})'.format(phase))
+    plt.xlabel('Trial in repetition')
+    plt.legend()
+
+    plt.subplot(2, 2, 3)  # Plot humans
+    plt.title('Humans')
+    for rep in range(3):
+        plt.plot(range(n_trials_per_rep), hum_learning_curve_rep[rep], label=rep)
+    plt.ylim(0, 1)
+    plt.ylabel('% correct ({})'.format(phase))
+    plt.xlabel('Trial in repetition')
+    plt.legend()
+
+    plt.subplot(2, 2, 4)  # Plot simulations
+    plt.title('Humans')
+    for rep in range(3):
+        plt.plot(range(n_rep_rep), hum_rep_rep[rep], label=rep)
+    plt.ylim(0, 1)
+    plt.ylabel('% correct ({})'.format(phase))
+    plt.xlabel('Trial in repetition')
+    plt.legend()
+    plt.tight_layout()
 
 # Competition phase
 print("Working on Competition Phase!")
-n_blocks_comp = 3
-comp_data = pd.DataFrame(np.full((1, 3), np.nan),
-                         columns=['perc_selected_better', 'choice', 'phase'])
-
-# Select between two seasons
-season_values = np.max(final_Q_high, axis=2)  # value of highest-valued TS for each season
-for i, season_pair in enumerate(combinations(range(n_seasons), 2)):
-    season_probs = softmax(season_values[:, season_pair], axis=1)  # prob. of selecting each season in the pair
-    season_choice = np.array([np.random.choice(a=season_pair, size=n_blocks_comp, p=sim_p) for sim_p in season_probs])
-    percent_selected_better = np.mean(season_choice == min(season_pair))
-    comp_data.loc[i] = [percent_selected_better, str(season_pair), 'season']
-
-# Select between two aliens in the same season
-selected_TS = np.argmax(final_Q_high, axis=2)  # TS with the single highest value in each season
-alien_value = np.max(final_Q_low, axis=3)  # value of alien in each TS, when selecting the best action
-for season in range(n_seasons):
-    TS = selected_TS[np.arange(n_sim), season]
-    for alien_pair in combinations(range(n_aliens), 2):
-        alien_values = np.array([alien_value[np.arange(n_sim), TS, alien] for alien in alien_pair])
-        alien_probs = softmax(alien_values, axis=0)
-        alien_choice = np.array([np.random.choice(a=alien_pair, size=n_blocks_comp, p=sim_p) for sim_p in alien_probs.T])
-        true_alien_values = np.max(task.TS[season], axis=1)[list(alien_pair)]
-        better_alien = alien_pair[np.argmax(true_alien_values)]
-        percent_selected_better = np.mean(alien_choice == better_alien)
-        comp_data.loc[i+1] = [percent_selected_better, str(alien_pair), 'season-alien']
-        i += 1
+comp_data = simulate_competition_phase(model_name, final_Q_high, final_Q_low, task,
+                                       n_seasons, n_aliens, n_sim, beta_high)
 
 # Plot competition results
+plt.figure()
+plt.subplot(2, 1, 1)
+plt.axhline(y=0.5, color='grey', linestyle='--')
+plt.bar(comp_data['phase'] + comp_data['choice'], comp_data['perc_selected_better'], yerr=comp_data['se'])
+plt.xticks(rotation=15)
+plt.ylim(0, 1)
+plt.ylabel("frac. selected better option")
+plt.subplot(2, 1, 2)
+sum_dat = comp_data.groupby('phase').aggregate('mean')
+plt.axhline(y=0.5, color='grey', linestyle='--')
+plt.bar(sum_dat.index, sum_dat['perc_selected_better'], yerr=sum_dat['se'])
+plt.ylim(0, 1)
+plt.ylabel("frac. selected better option")
+plt.tight_layout()
+plt.show()
+
+# Rainbow phase
+print("Working on Rainbow Phase!")
+rainbow_dat = simulate_rainbow_phase(n_aliens, n_actions, n_TS,
+                           model_name, n_sim,
+                           beta, beta_high, final_Q_low, final_Q_high)
+
+# Summary (this INCLUDES choices that are correct in multiple TS!)
+TS_choices = get_summary_rainbow(n_aliens, n_seasons, rainbow_dat, task)
+hum_TS_choices = get_summary_rainbow(n_aliens, n_seasons, hum_rainbow_dat, task)
+
+# plot rainbow phase (this INCLUDES choices that are correct in multiple TS!)
+fig = plt.figure()
+ax = fig.add_subplot(111)
+plt.title('Rainbow phase')
+ax.bar(np.arange(4)+0.15, np.sum(TS_choices, axis=1), 0.3, label='Simulatinos')
+ax.bar(np.arange(4)-0.15, np.sum(hum_TS_choices, axis=1), 0.3, label='Humans')
+ax.set_ylabel('TS chosen (count)')
+ax.set_xticks(range(4))
+ax.set_xticklabels(['TS0', 'TS1', 'TS2', 'noTS'])
+ax.legend()
+plt.show()
 
 # Save simulation data
 for sID in range(n_sim):

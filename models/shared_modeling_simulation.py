@@ -28,23 +28,6 @@ def get_paths(run_on_cluster):
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
 
-def get_alien_paths(run_on_cluster):
-
-    if run_on_cluster:
-        base_path = '/home/bunge/maria/Desktop/'
-        return {'human data': base_path + '/AlienshumanData/',
-                'human data prepr': base_path + '/AlienshumanData/prepr/',
-                'fitting results': base_path + '/AliensPyMC3/fitting/',
-                'simulations': base_path + 'AliensPyMC3/Aliensimulations/'}
-
-    else:
-        base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
-        return {'human data': base_path + '/Data/versions1.0and3.1/',
-                'human data prepr': base_path + '/Data/version3.1preprocessed/',
-                'fitting results': base_path + '/AliensFitting/',
-                'simulations': 'C:/Users/maria/MEGAsync/SLCN/PSsimulations/'}
-
-
 def p_from_Q(Q_left, Q_right, persev_bonus_left, persev_bonus_right, beta, eps, verbose=False):
 
     if verbose:
@@ -54,10 +37,6 @@ def p_from_Q(Q_left, Q_right, persev_bonus_left, persev_bonus_right, beta, eps, 
     # Add perseverance bonus
     Q_right_ = Q_right + persev_bonus_right  # perseverance only lasts for 1 trial
     Q_left_ = Q_left + persev_bonus_left
-    # Q_right += persev_bonus_right  # perseverance persists across multiple trials
-    # Q_left += persev_bonus_left
-    # Q_right_ = Q_right.copy()
-    # Q_left_ = Q_left.copy()
     if verbose:
         print('Q_right after adding perseveration bonus:\n{}'.format(Q_right_.round(3)))
         print('Q_left after adding perseveration bonus:\n{}'.format(Q_left_.round(3)))
