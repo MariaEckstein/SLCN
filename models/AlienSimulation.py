@@ -8,7 +8,7 @@ import pandas as pd
 from AlienTask import Task
 from competition_phase import CompetitionPhase
 from shared_aliens import alien_initial_Q, update_Qs_sim, softmax, get_alien_paths,\
-    simulate_competition_phase, simulate_rainbow_phase, get_summary_rainbow
+    simulate_competition_phase, simulate_rainbow_phase, get_summary_rainbow, read_in_human_data
 
 
 # TODO:
@@ -218,38 +218,7 @@ for trial in trials['2CloudySeason']:
     p_lows[trial] = p_low
 
 # Read in human data
-print("Reading in human data from {}!".format(human_data_path))
-
-file_names = os.listdir(human_data_path)
-n_hum = len(file_names)
-
-# Get human data
-hum_seasons = np.zeros([n_trials, n_hum], dtype=int)
-hum_aliens = np.zeros([n_trials, n_hum], dtype=int)
-hum_actions = np.zeros([n_trials, n_hum], dtype=int)
-hum_rewards = np.zeros([n_trials, n_hum])
-hum_corrects = np.zeros([n_trials, n_hum])
-hum_phase = np.zeros(seasons.shape)
-hum_rainbow_dat = np.zeros((n_aliens, n_actions))
-
-for i, file_name in enumerate(file_names):
-    subj_file = pd.read_csv(human_data_path + '/' + file_name, index_col=0).reset_index(drop=True)
-
-    # Get feed-aliens phases
-    feed_aliens_file = subj_file[(subj_file['phase'] == '1InitialLearning') + (subj_file['phase'] == '2CloudySeason')]
-    hum_seasons[:, i] = feed_aliens_file['TS']
-    hum_aliens[:, i] = feed_aliens_file['sad_alien']
-    hum_actions[:, i] = feed_aliens_file['item_chosen']
-    hum_rewards[:, i] = feed_aliens_file['reward']
-    hum_corrects[:, i] = feed_aliens_file['correct']
-    hum_phase[:, i] = [int(ph[0]) for ph in feed_aliens_file['phase']]
-
-    # Get rainbow data
-    rainbow_file = subj_file[(subj_file['phase'] == '5RainbowSeason')].reset_index(drop=True)
-    for i in range(rainbow_file.shape[0]):
-        alien, item = rainbow_file['sad_alien'][i], rainbow_file['item_chosen'][i]
-        if not np.isnan(item):
-            hum_rainbow_dat[int(alien), int(item)] += 1
+n_hum, hum_aliens, hum_seasons, hum_corrects, hum_rainbow_dat = read_in_human_data(human_data_path, n_trials, n_aliens, n_actions)
 
 assert np.all(hum_seasons == seasons)
 assert np.all(hum_aliens == aliens)

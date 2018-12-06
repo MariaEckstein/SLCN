@@ -88,8 +88,8 @@ class Task(object):
     def present_stimulus(self, trial):
 
         # Look up alien and context for current trial
-        self.alien = self.aliens[trial]  # , :self.n_subj * ]
-        self.season = self.seasons[trial]  # , :self.n_subj]
+        self.alien = self.aliens[trial]
+        self.season = self.seasons[trial]
 
         return self.season, self.alien
 

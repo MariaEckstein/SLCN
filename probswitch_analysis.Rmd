@@ -22,9 +22,9 @@ if (data == "human") {
   patt = ".csv"
 } else if (data == "simulated_human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSsimulations" # "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
-  patt = "PSRL.*csv"
+  patt = "PSBayes.*csv"
 }
-plot_dir = file.path(data_dir, "PS_plots_RL_ab")
+plot_dir = file.path(data_dir, "PS_plots_Bayes_sim_p_rew0.4")
 
 if (!dir.exists(plot_dir)) {
   dir.create(plot_dir)

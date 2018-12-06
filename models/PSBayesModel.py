@@ -23,14 +23,14 @@ kids_and_teens_only = False
 adults_only = False
 
 # Sampling details
-n_samples = 50
-n_tune = 10
+n_samples = 150
+n_tune = 50
 n_cores = 1
 n_chains = 1
 target_accept = 0.8
 
 # Load to-be-fitted data
-n_subj, rewards, choices, group, n_groups = load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only, verbose)
+n_subj, rewards, choices, group, n_groups, age_z = load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only, verbose)
 persev_bonus = 2 * choices - 1  # recode as -1 for choice==0 (right?) and +1 for choice==1 (left?)
 persev_bonus = np.concatenate([np.zeros((1, n_subj)), persev_bonus])  # add 0 bonus for first trial
 
@@ -92,7 +92,6 @@ with pm.Model() as model:
     # beta = T.ones(n_subj)  # TODO: COMMENT OUT `p_choice = 1 / (1 + np.exp(-beta * (p_choice - (1 - p_choice))))` FOR MODEL WITHOUT BETA (MODEL WITHOUT BETA CAN'T HAVE PERSEVERANCE)!
     persev = pm.Bound(pm.Normal, lower=-1, upper=1)('persev', mu=persev_mu[group], sd=persev_sd[group], shape=(1, n_subj), testval=0.1 * T.ones((1, n_subj)))
     scaled_persev_bonus = persev_bonus * persev
-    # scaled_persev_bonus = persev_bonus * 0
     p_switch = pm.Beta('p_switch', alpha=p_switch_a[group], beta=p_switch_b[group], shape=n_subj)
     p_reward = pm.Beta('p_reward', alpha=p_reward_a[group], beta=p_reward_b[group], shape=n_subj)
 

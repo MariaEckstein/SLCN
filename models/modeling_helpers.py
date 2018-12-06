@@ -9,7 +9,8 @@ import theano.tensor as T
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from shared_modeling_simulation import get_paths, get_alien_paths
+from shared_modeling_simulation import get_paths
+from shared_aliens import get_alien_paths
 
 
 def load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_suff, n_subj, n_trials, verbose):

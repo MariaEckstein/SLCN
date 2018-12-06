@@ -30,7 +30,7 @@ n_chains = 1
 target_accept = 0.8
 
 # Load to-be-fitted data
-n_subj, rewards, choices, group, n_groups = load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only, verbose)
+n_subj, rewards, choices, group, n_groups, age_z = load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only, verbose)
 
 persev_bonus_right = np.concatenate([np.zeros((1, n_subj)), choices])[:-1]  # add 0 in first row, remove last row
 persev_bonus_left = np.concatenate([np.zeros((1, n_subj)), 1 - choices])[:-1]  # add 0 in first row, remove last row

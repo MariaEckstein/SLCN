@@ -16,7 +16,7 @@ n_sim_per_subj = 2
 n_sim = n_sim_per_subj * n_subj
 # TODO: comment out `p_right = 1 / (1 + np.exp(-beta * (p_right - (1 - p_right))))`
 # TODO: in shared_mod_sim when running swirew model (no beta)!
-model_to_be_simulated = 'Bayes_3groups/betperswirew_2018_11_13_16_26_humans_n_samples5000'  # 'Bayes_add_persev/betperswirew_2018_11_13_16_26_humans_n_samples5000'  # 'Bayes_3groups/swirew_2018_10_10_17_29_humans_n_samples5000'  # 'none'  #
+model_to_be_simulated = 'none'  # 'Bayes_3groups/betperswirew_2018_11_13_16_26_humans_n_samples5000'  # 'Bayes_add_persev/betperswirew_2018_11_13_16_26_humans_n_samples5000'  # 'Bayes_3groups/swirew_2018_10_10_17_29_humans_n_samples5000'  # 'none'  #
 ages = pd.read_csv(get_paths(False)['ages'], index_col=0)
 
 # Get save path
@@ -29,8 +29,8 @@ parameters = pd.DataFrame(columns=np.append(param_names, ['sID']))
 # Type in some parameters
 if model_to_be_simulated == 'none':
     parameters['beta'] = 10 * np.ones(n_sim)  # 1 + 3 * np.random.rand(n_sim)
-    parameters['p_switch'] = 0.1 * np.random.rand(n_sim)
-    parameters['p_reward'] = 0.75 * np.ones(n_sim)  # 0.5 + 0.5 * np.random.rand(n_sim)
+    parameters['p_switch'] = 0.1 * np.ones(n_sim)  # np.random.rand(n_sim)
+    parameters['p_reward'] = 0.4 * np.ones(n_sim)  # 0.5 + 0.5 * np.random.rand(n_sim)
     parameters['persev'] = 0 * np.random.rand(n_sim)  # - 0.15
     parameters['sID'] = range(n_sim)
 
