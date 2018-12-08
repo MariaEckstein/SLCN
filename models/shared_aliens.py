@@ -203,9 +203,10 @@ def get_summary_rainbow(n_aliens, n_seasons, rainbow_dat, task):
     # Get number of choices for each TS
     correct_actions = np.argmax(task.TS, axis=2)  # season x alien
     TS_choices = np.array([rainbow_dat[range(n_aliens), correct_actions[TSi]] for TSi in range(n_seasons)])
-    TS_choices = np.vstack([TS_choices, (rainbow_dat[0, 0], 0, 0, rainbow_dat[3, 2])])
-    TS_choices = TS_choices / np.sum(TS_choices, axis=0, keepdims=True)
-    summary_rainbow = np.mean(TS_choices, axis=1)
+    TS_choices[[1, 2, 0, 2], [0, 0, 3, 3]] = np.nan  # remove actions that are correct in > 1 TS
+    none_choices = (rainbow_dat[0, 0], 0, 0, rainbow_dat[3, 2])
+    TS_choices = np.vstack([TS_choices, none_choices])
+    summary_rainbow = np.nanmean(TS_choices, axis=1)
 
     # Get slope
     slope = summary_rainbow[2] - summary_rainbow[0]  # linear contrast: -1, 0, 1
@@ -264,21 +265,21 @@ def get_summary_initial_learn(seasons, corrects, aliens, actions,
     intrusion_errors = [np.mean(acc_current_TS), np.mean(acc_prev_TS), np.mean(acc_other_TS)]
 
     # Get performance index for each TS (% correct for aliens with same value in different TS)
-    Q6_TS0 = (seasons == 0) * (aliens == 0)
-    Q7_TS1 = (seasons == 1) * (aliens == 2)
-    Q7_TS2 = (seasons == 2) * (aliens == 0)
+    Q6_TS0 = (seasons == 0) * (aliens == 0)  # unique alien-action combo
+    Q7_TS1 = (seasons == 1) * (aliens == 2)  # unique alien-action combo
+    Q7_TS2 = (seasons == 2) * (aliens == 0)  # same as TS1 (value 2)
     Q7 = [np.mean(corrects[Q6_TS0]), np.mean(corrects[Q7_TS1]), np.mean(corrects[Q7_TS2])]
 
-    Q2_TS1 = (seasons == 1) * (aliens == 0)
-    Q2_TS2 = (seasons == 2) * (aliens == 3)
-    Q2 = [np.nan, np.mean(corrects[Q2_TS1]), np.mean(corrects[Q2_TS2])]
+    # Q2_TS1 = (seasons == 1) * (aliens == 0)  # same correct action as in TS2 (value 4)
+    # Q2_TS2 = (seasons == 2) * (aliens == 3)  # same correct action as in TS0 (value 10)
+    # Q2 = [np.nan, np.mean(corrects[Q2_TS1]), np.mean(corrects[Q2_TS2])]
 
-    Q4_TS0 = (seasons == 0) * (aliens == 1)
-    Q3_TS1 = (seasons == 1) * (aliens == 3)
-    Q3_TS2 = (seasons == 2) * ((aliens == 2) + (aliens == 3))
+    Q4_TS0 = (seasons == 0) * (aliens == 1)  # unique alien-action combo
+    Q3_TS1 = (seasons == 1) * (aliens == 3)  # unique alien-action combo
+    Q3_TS2 = (seasons == 2) * ((aliens == 1) + (aliens == 2))  # unique alien-action combo
     Q3 = [np.mean(corrects[Q4_TS0]), np.mean(corrects[Q3_TS1]), np.mean(corrects[Q3_TS2])]
 
-    TS_perf = np.nanmean([Q7, Q2, Q3], axis=0)
+    TS_perf = np.nanmean([Q7, Q3], axis=0)
 
     # Get corr of performance over TS
     corr = np.corrcoef(TS_perf, np.arange(3))
@@ -288,7 +289,7 @@ def get_summary_initial_learn(seasons, corrects, aliens, actions,
 
 def get_summary_cloudy(seasons, corrects, n_sim, trials_cloudy):
 
-    # Get accuracy for trials 0 to 3
+    # Get accuracy for trials 0 to 3 (averaged over TS)
     season_changes = np.array([seasons[i, 0] != seasons[i+1, 0] for i in list(trials_cloudy)[:-1]])
     season_changes = np.insert(season_changes, 0, False)
     season_presentation = np.cumsum(season_changes)
@@ -301,9 +302,21 @@ def get_summary_cloudy(seasons, corrects, n_sim, trials_cloudy):
     acc_first4 = learning_curve_rep[:, :4]
     acc_first4_mean = np.mean(acc_first4, axis=0)
 
-    # Get corr
-    linear_increase = np.arange(4) * np.ones((n_first_trials, 4))
-    corr = np.corrcoef(acc_first4.flatten(), linear_increase.flatten())
+    # Get a slope for each TS
+    seasons_rep = seasons[trials_cloudy].reshape((n_first_trials, n_rep_rep, n_sim))
+    slope = np.sum(acc_first4_mean * (np.arange(4) - 1.5))
+    TS_slopes = np.zeros(3)
+
+    for TS in range(3):
+        corrects_rep_TS = corrects_rep.copy()
+        corrects_rep_TS[seasons_rep != TS] = np.nan
+
+        learning_curve_rep_TS = np.nanmean(corrects_rep_TS, axis=2)
+
+        acc_first4_mean_TS = np.mean(learning_curve_rep_TS[:, :4], axis=0)
+
+        slope_TS = np.sum(acc_first4_mean_TS * (np.arange(4) - 1.5))
+        TS_slopes[TS] = slope_TS
 
     if False:
         plt.figure()
@@ -312,7 +325,7 @@ def get_summary_cloudy(seasons, corrects, n_sim, trials_cloudy):
         plt.legend()
         plt.show()
 
-    return np.append(acc_first4_mean, corr[0, 1])
+    return list(acc_first4_mean) + [slope] + list(TS_slopes)
 
 
 def read_in_human_data(human_data_path, n_trials, n_aliens, n_actions):
@@ -386,6 +399,7 @@ def read_in_human_data(human_data_path, n_trials, n_aliens, n_actions):
         comp = sum_season_file.append(sum_season_alien_file)
         hum_comp_dat.loc[subj] = comp.values.flatten()
         hum_comp_dat.columns = comp.index.values
+        hum_comp_dat['2(1, 2)'] = np.nan  # aliens 1 and 2 have the same value in TS 2 -> select better is not defined!
 
     return n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, hum_rainbow_dat, hum_comp_dat
 
