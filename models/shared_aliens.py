@@ -256,7 +256,7 @@ def get_summary_initial_learn(seasons, corrects, aliens, actions,
     prev_TS = seasons[season_changes][:-1]
     other_TS = 3 - current_TS - prev_TS
 
-    first_action_new_season[first_action_new_season < 0] = np.random.choice(a=range(3))  # TODO: think about how to deal with missing value!
+    first_action_new_season[first_action_new_season < 0] = np.random.choice(a=range(3))  # TODO: think about how to deal with missing values!
     acc_current_TS = task.TS[current_TS, first_alien_new_season, first_action_new_season] > 1
     # assert np.all(first_acc_new_season == acc_current_TS)
     acc_prev_TS = task.TS[prev_TS, first_alien_new_season, first_action_new_season] > 1
@@ -310,11 +310,8 @@ def get_summary_cloudy(seasons, corrects, n_sim, trials_cloudy):
     for TS in range(3):
         corrects_rep_TS = corrects_rep.copy()
         corrects_rep_TS[seasons_rep != TS] = np.nan
-
         learning_curve_rep_TS = np.nanmean(corrects_rep_TS, axis=2)
-
         acc_first4_mean_TS = np.mean(learning_curve_rep_TS[:, :4], axis=0)
-
         slope_TS = np.sum(acc_first4_mean_TS * (np.arange(4) - 1.5))
         TS_slopes[TS] = slope_TS
 
@@ -347,7 +344,7 @@ def read_in_human_data(human_data_path, n_trials, n_aliens, n_actions):
 
         # Get feed-aliens phases
         feed_aliens_file = subj_file[
-            (subj_file['phase'] == '1InitialLearning') + (subj_file['phase'] == '2CloudySeason')]
+            (subj_file['phase'] == '1InitialLearning') | (subj_file['phase'] == '2CloudySeason')]
         hum_seasons[:, subj] = feed_aliens_file['TS']
         hum_aliens[:, subj] = feed_aliens_file['sad_alien']
         hum_actions[:, subj] = feed_aliens_file['item_chosen']
@@ -367,7 +364,7 @@ def read_in_human_data(human_data_path, n_trials, n_aliens, n_actions):
 
     # Get competition data
     comp_file_names = [file_name for file_name in os.listdir(human_data_path) if "pick" in file_name]
-    assert(n_hum == len(comp_file_names), "The competition files and initial learning files are not for the same subjects!")
+    assert((n_hum == len(comp_file_names)), "The competition files and initial learning files are not for the same subjects!")
 
     hum_comp_dat = pd.DataFrame(np.zeros((n_hum, 21)))  # 21 = 3 (n_colums season) + 18 (n_columns season_alien)
 
@@ -381,25 +378,25 @@ def read_in_human_data(human_data_path, n_trials, n_aliens, n_actions):
 
         # Get season phase
         season_file = subj_file.loc[(subj_file['assess'] == 'season')]
-        season_file.loc[(season_file['id_chosen'].astype(int) + season_file['id_unchosen'].astype(int)) == 1, 'choice'] = "(0, 1)"
+        season_file.loc[(season_file['id_chosen'].astype(int) + season_file['id_unchosen'].astype(int)) == 1, 'choice'] = "(0, 1)"  # TODO: throws warning SettingWithCopyWarning:  A value is trying to be set on a copy of a slice from a DataFrame. Try using .loc[row_indexer,col_indexer] = value instead
         season_file.loc[(season_file['id_chosen'].astype(int) + season_file['id_unchosen'].astype(int)) == 2, 'choice'] = "(0, 2)"
         season_file.loc[(season_file['id_chosen'].astype(int) + season_file['id_unchosen'].astype(int)) == 3, 'choice'] = "(1, 2)"
         sum_season_file = season_file[['selected_better_obj', 'choice']].groupby('choice').aggregate('mean')
 
         # Get season-alien phase
         season_alien_file = subj_file.loc[(subj_file['assess'] == 'alien-same-season')]
-        season_alien_file['alien_a'] = season_alien_file['id_unchosen'].str[0].astype(int)
-        season_alien_file['alien_b'] = season_alien_file['id_chosen'].str[0].astype(int)
-        season_alien_file['choice'] = season_alien_file['id_unchosen'].str[1] + "(" +\
-                                      season_alien_file[['alien_a', 'alien_b']].min(axis=1).astype(str) + ", " +\
-                                      season_alien_file[['alien_a', 'alien_b']].max(axis=1).astype(str) + ")"
+        season_alien_file.loc[:, 'alien_a'] = season_alien_file['id_unchosen'].str[0].astype(int)
+        season_alien_file.loc[:, 'alien_b'] = season_alien_file['id_chosen'].str[0].astype(int)
+        season_alien_file.loc[:, 'choice'] = season_alien_file['id_unchosen'].str[1] + "(" +\
+                                             season_alien_file[['alien_a', 'alien_b']].min(axis=1).astype(str) + ", " +\
+                                             season_alien_file[['alien_a', 'alien_b']].max(axis=1).astype(str) + ")"
         sum_season_alien_file = season_alien_file[['selected_better_obj', 'choice']].groupby('choice').aggregate('mean')
 
         # Add all subjects together
         comp = sum_season_file.append(sum_season_alien_file)
         hum_comp_dat.loc[subj] = comp.values.flatten()
         hum_comp_dat.columns = comp.index.values
-        hum_comp_dat['2(1, 2)'] = np.nan  # aliens 1 and 2 have the same value in TS 2 -> select better is not defined!
+        hum_comp_dat.loc[:, '2(1, 2)'] = np.nan  # aliens 1 and 2 have the same value in TS 2 -> select better is not defined!
 
     return n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, hum_rainbow_dat, hum_comp_dat
 

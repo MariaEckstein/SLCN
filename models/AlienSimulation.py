@@ -11,12 +11,6 @@ from shared_aliens import alien_initial_Q, update_Qs_sim, softmax, get_alien_pat
     simulate_competition_phase, simulate_rainbow_phase, get_summary_rainbow, read_in_human_data
 
 
-# TODO:
-# Implement flat agent in competition & rainbow (old code: alien_agens.py, get_Q_for_stimulus() & get_p_from_Q())
-# Plot competition phase
-# add beta's in all softmax's
-# cloudy won't work because version1.0 and version3.1 have different numbers of trials
-
 # Switches for this script
 model_name = "hier"
 verbose = False
@@ -27,7 +21,7 @@ start_id = 0
 param_names = np.array(['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high'])
 fake_data = False
 human_data_path = get_alien_paths()["human data prepr"]  # "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/",  # note: human data prepr works for analyzing human behavior, the direct path works just for simulating agents
-model_to_be_simulated = "specify"  # "MSE" "MCMC" "specify"
+model_to_be_simulated = "1NumberSummaries"  # "MSE" "MCMC" "specify" "1NumberSummaries"
 # model_name = "/AliensMSEFitting/18-10-14/f_['alpha' 'beta' 'forget']_[[ 1 10  1]]_2018_10_14_9_47"  # 'Aliens/max_abf_2018_10_10_18_7_humans_n_samples10'  #
 
 # Get save path
@@ -53,6 +47,18 @@ if model_to_be_simulated == 'specify':
     parameters['total_NLL'] = np.nan
 
 # Load fitted parameters
+elif model_to_be_simulated == '1NumberSummaries':
+    read_dir = parameter_dir + '/SummariesInsteadOfFitting/selected_agents.csv'
+    print('Using parameters in {} for simulation!'.format(read_dir))
+    all_parameters = pd.read_csv(read_dir, usecols=param_names)
+    parameters = all_parameters.loc[:(n_subj-1)]
+    parameters.loc[:, 'sID'] = range(n_subj)
+    # parameters = pd.DataFrame(np.tile(parameters, (n_sim_per_subj, 1)))
+    # parameters = pd.DataFrame(np.array(parameters, dtype=float))
+    # parameters.columns = np.append(param_names, ['sID'])
+
+    stop = 4
+
 elif model_to_be_simulated == 'MSE':
 
     read_dir = parameter_dir + '/AliensMSEFitting/ten_best_indiv_{}.csv'.format(model_name)
@@ -126,7 +132,7 @@ Q_highs = np.zeros([n_trials, n_sim])
 phase = np.zeros(seasons.shape)
 
 print('Simulating {0} {2} agents on {1} trials.\n'.format(n_sim, n_trials, model_name))
-print('Parameters:\n{}'.format(parameters[np.append(param_names, ['total_NLL'])].round(2)))
+# print('Parameters:\n{}'.format(parameters[np.append(param_names, ['total_NLL'])].round(2)))
 
 Q_low = alien_initial_Q * np.ones([n_sim, n_TS, n_aliens, n_actions])
 Q_high = alien_initial_Q * np.ones([n_sim, n_seasons, n_TS])
@@ -168,7 +174,7 @@ for trial in trials['1InitialLearn']:
 # Save final Q-values to simulate subsequent phases
 final_Q_low = Q_low.copy()
 final_Q_high = Q_high.copy()
-first_cloudy_trial = trial + 1
+# first_cloudy_trial = trial + 1
 
 # Cloudy season
 print("Working on Cloudy Season!")
@@ -179,7 +185,7 @@ for trial in trials['2CloudySeason']:
     season, alien = task.present_stimulus(trial)
 
     # Take care of season switches
-    if trial == first_cloudy_trial:
+    if trial == list(trials['2CloudySeason'])[0]:
         season_switches = np.ones(n_sim, dtype=bool)
     else:
         season_switches = season != old_season
@@ -218,7 +224,7 @@ for trial in trials['2CloudySeason']:
     p_lows[trial] = p_low
 
 # Read in human data
-n_hum, hum_aliens, hum_seasons, hum_corrects, hum_rainbow_dat = read_in_human_data(human_data_path, n_trials, n_aliens, n_actions)
+n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, hum_rainbow_dat, hum_comp_dat = read_in_human_data(human_data_path, n_trials, n_aliens, n_actions)
 
 assert np.all(hum_seasons == seasons)
 assert np.all(hum_aliens == aliens)
@@ -324,25 +330,23 @@ plt.show()
 
 # Rainbow phase
 print("Working on Rainbow Phase!")
-rainbow_dat = simulate_rainbow_phase(n_aliens, n_actions, n_TS,
-                           model_name, n_sim,
-                           beta, beta_high, final_Q_low, final_Q_high)
+rainbow_dat = simulate_rainbow_phase(n_seasons, model_name, n_sim,
+                                     beta, beta_high, final_Q_low, final_Q_high)
 
-# Summary (this INCLUDES choices that are correct in multiple TS!)
 TS_choices = get_summary_rainbow(n_aliens, n_seasons, rainbow_dat, task)
 hum_TS_choices = get_summary_rainbow(n_aliens, n_seasons, hum_rainbow_dat, task)
 
-# plot rainbow phase (this INCLUDES choices that are correct in multiple TS!)
-fig = plt.figure()
-ax = fig.add_subplot(111)
-plt.title('Rainbow phase')
-ax.bar(np.arange(4)+0.15, np.sum(TS_choices, axis=1), 0.3, label='Simulatinos')
-ax.bar(np.arange(4)-0.15, np.sum(hum_TS_choices, axis=1), 0.3, label='Humans')
-ax.set_ylabel('TS chosen (count)')
-ax.set_xticks(range(4))
-ax.set_xticklabels(['TS0', 'TS1', 'TS2', 'noTS'])
-ax.legend()
-plt.show()
+# # plot rainbow phase (this INCLUDES choices that are correct in multiple TS!)
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# plt.title('Rainbow phase')
+# ax.bar(np.arange(4)+0.15, np.sum(TS_choices, axis=1), 0.3, label='Simulatinos')
+# ax.bar(np.arange(4)-0.15, np.sum(hum_TS_choices, axis=1), 0.3, label='Humans')
+# ax.set_ylabel('TS chosen (count)')
+# ax.set_xticks(range(4))
+# ax.set_xticklabels(['TS0', 'TS1', 'TS2', 'noTS'])
+# ax.legend()
+# plt.show()
 
 # Save simulation data
 for sID in range(n_sim):
