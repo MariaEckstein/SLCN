@@ -51,11 +51,12 @@ elif model_to_be_simulated == '1NumberSummaries':
     read_dir = parameter_dir + '/SummariesInsteadOfFitting/selected_agents.csv'
     print('Using parameters in {} for simulation!'.format(read_dir))
     all_parameters = pd.read_csv(read_dir, usecols=param_names)
-    parameters = all_parameters.loc[:(n_subj-1)]
+    # Same parameters for all subj
+    parameters = all_parameters.loc[7].values.reshape((1, len(param_names))) * np.ones((n_subj, len(param_names)))
+    parameters = pd.DataFrame(parameters, columns=all_parameters.columns.values)
+    # Different parameters for each subj
+    # parameters = all_parameters.loc[:(n_subj-1)]
     parameters.loc[:, 'sID'] = range(n_subj)
-    # parameters = pd.DataFrame(np.tile(parameters, (n_sim_per_subj, 1)))
-    # parameters = pd.DataFrame(np.array(parameters, dtype=float))
-    # parameters.columns = np.append(param_names, ['sID'])
 
     stop = 4
 

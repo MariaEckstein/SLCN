@@ -20,6 +20,7 @@ do_analyze_humans = True
 do_calculate_summaries = False
 do_read_in_and_visualize_summaries = True
 do_isomap = False
+do_save_selected_agents = False
 if do_analyze_humans:
     import seaborn as sns
 if do_isomap:
@@ -79,8 +80,8 @@ trials = {'1InitialLearn': range(n_trials_['1InitialLearn']),
 # Get human data
 if do_analyze_humans:
     n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, hum_rainbow_dat, hum_comp_dat = read_in_human_data(human_data_path, 828, n_aliens, n_actions)
-    selected_agents = pd.read_csv(plot_dir + 'selected_agents.csv')
-    ag_summary = np.mean(selected_agents, axis=0)
+    selected_agents = pd.read_csv(plot_dir + 'selected_agents4_good.csv')
+    ag_summary = selected_agents.loc[0]  # np.mean(selected_agents, axis=0)
 
     # Get agent-like summaries
     hum_summary_initial_learn = get_summary_initial_learn(hum_seasons[trials['1InitialLearn']], hum_corrects[trials['1InitialLearn']], hum_aliens[trials['1InitialLearn']], hum_actions[trials['1InitialLearn']],
@@ -106,7 +107,8 @@ if do_analyze_humans:
                                        columns=RB_sum_cols)
     hum_summary_rainbow['TS2minusTS1'] = hum_summary_rainbow['TS2'] - hum_summary_rainbow['TS1']
 
-    ag_summary_rainbow = get_summary_rainbow(n_aliens, n_seasons, ag_summary[RB_cols].values.reshape((n_aliens, n_actions)), task)
+    ag_rainbow_dat = ag_summary[RB_cols].values.reshape((n_aliens, n_actions))
+    ag_summary_rainbow = get_summary_rainbow(n_aliens, n_seasons, ag_rainbow_dat, task)
     ag_summary_rainbow = pd.DataFrame(np.expand_dims(ag_summary_rainbow, axis=0),
                                        columns=RB_sum_cols)
     ag_summary_rainbow['TS2minusTS1'] = ag_summary_rainbow['TS2'] - ag_summary_rainbow['TS1']
@@ -116,65 +118,48 @@ if do_analyze_humans:
     hum_summary_initial_learn['IL_perf_TS2minus1'] = hum_summary_initial_learn['IL_perf_TS2'] - hum_summary_initial_learn['IL_perf_TS1']
 
     # Plot human behavior & selected_agents
-    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 4))
-    [ax.set_title(title) for ax, title in zip(axes, ['Humans', 'Simulations'])]
-    hum_summary_initial_learn[IL_cols[:3]].T.plot.bar(rot=20, legend=False, ax=axes[0])
-    ag_summary[IL_cols[:3]].T.plot.bar(rot=20, legend=False, ax=axes[1])
-    [ax.set_ylabel('Savings') for ax in axes]
-    plt.tight_layout()
+    def make_plot(hum_dat, ag_dat, ylabel="", hline=False, ylim=False):
+        fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 4))
+        [ax.set_title(title) for ax, title in zip(axes, ['Humans', 'Simulations'])]
+        hum_dat.T.plot.bar(rot=20, legend=False, ax=axes[0])
+        ag_dat.T.plot.bar(rot=20, legend=False, ax=axes[1])
+        [ax.set_ylabel(ylabel) for ax in axes]
+        if ylim:
+            [ax.set_ylim(ylim) for ax in axes]
+        if hline:
+            [ax.axhline(y=hline, color='grey', linestyle='--') for ax in axes]
+        plt.tight_layout()
+
+    make_plot(hum_summary_initial_learn[IL_cols[:3]], ag_summary[IL_cols[:3]],
+              ylabel="Savings")
+    make_plot(hum_summary_initial_learn[IL_cols[3:6]], ag_summary[IL_cols[3:6]],
+              ylabel="Intrusion errors", hline=1/3, ylim=(0, 0.55))
+    make_plot(hum_summary_initial_learn[IL_cols[6:9]], ag_summary[IL_cols[6:9]],
+              ylabel="TS performance", hline=1 / 3, ylim=(1/3, 0.65))
+    make_plot(hum_summary_cloudy[CL_cols[:4]], ag_summary[CL_cols[:4]],
+              ylabel="Accuracy (trial 1)", hline=1/3, ylim=(0, 0.45))
+    make_plot(hum_summary_competition[CO_cols], ag_summary[CO_cols],
+              ylabel="% better chosen", hline=1/2, ylim=(0, 0.65))
+    make_plot(hum_summary_rainbow[RB_sum_cols[:4]], ag_summary_rainbow[RB_sum_cols[:4]])
 
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 4))
     [ax.set_title(title) for ax, title in zip(axes, ['Humans', 'Simulations'])]
-    hum_summary_initial_learn[IL_cols[3:6]].T.plot.bar(rot=20, legend=False, ax=axes[0])
-    ag_summary[IL_cols[3:6]].T.plot.bar(rot=20, legend=False, ax=axes[1])
-    [ax.axhline(y=1 / 3, color='grey', linestyle='--') for ax in axes]
-    [ax.set_ylabel('Intrusion errors') for ax in axes]
-    plt.tight_layout()
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 4))
-    [ax.set_title(title) for ax, title in zip(axes, ['Humans', 'Simulations'])]
-    hum_summary_initial_learn[IL_cols[6:9]].T.plot.bar(rot=20, legend=False, ax=axes[0])
-    ag_summary[IL_cols[6:9]].T.plot.bar(rot=20, legend=False, ax=axes[1])
-    [ax.axhline(y=1 / 3, color='grey', linestyle='--') for ax in axes]
-    [ax.set_ylabel('TS performance (r={})'.format(hum_summary_initial_learn[IL_cols[9]].values.round(2))) for ax in axes]
-    plt.tight_layout()
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 4))
-    [ax.set_title(title) for ax, title in zip(axes, ['Humans', 'Simulations'])]
-    hum_summary_cloudy[CL_cols[:4]].T.plot.bar(rot=20, legend=False, ax=axes[0])
-    ag_summary[CL_cols[:4]].T.plot.bar(rot=20, legend=False, ax=axes[1])
-    [ax.axhline(y=1/3, color='grey', linestyle='--') for ax in axes]
-    [ax.set_ylabel('ACC (slops={})'.format([hum_summary_cloudy[CL_cols[4]].values.round(2)])) for ax in axes]
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 4))
-    [ax.set_title(title) for ax, title in zip(axes, ['Humans', 'Simulations'])]
-    hum_summary_competition.T.plot.bar(rot=20, legend=False, ax=axes[0])
-    ag_summary[CO_cols + ['CO_season_minus_alien']].T.plot.bar(rot=20, legend=False, ax=axes[1])
-    [ax.axhline(y=1/2, color='grey', linestyle='--') for ax in axes]
-    [ax.set_ylabel('% better chosen (p={})'.format(comp_p.round(3))) for ax in axes]
-
-    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 4))
-    [ax.set_title(title) for ax, title in zip(axes, ['Humans', 'Simulations'])]
-    hum_summary_rainbow.T.plot.bar(rot=20, legend=False, ax=axes[0])
-    ag_summary_rainbow.T.plot.bar(rot=20, legend=False, ax=axes[1])
-
-    fig, axes = plt.subplots(nrows=1, ncols=2)
-    axes[0].set_title('Rainbow phase')
     axes[0].matshow(hum_rainbow_dat)
-    axes[0].set_xlabel('Aliens')
-    axes[0].set_ylabel('Actions')
+    axes[1].matshow(ag_rainbow_dat.astype(float))
+    [ax.set_xlabel('Aliens') for ax in axes]
+    [ax.set_ylabel('Actions') for ax in axes]
 
-    # Show values of correct actions in rainbow phase
-    correct_TS = task.TS.copy().astype(float)
-    correct_TS[correct_TS == 1] = np.nan
-    av_Q_correct_action = np.nanmean(correct_TS, axis=0)
-    av_Q_correct_action[np.isnan(av_Q_correct_action)] = 0
-    axes[1].set_title("Values correct actions")
-    axes[1].matshow(av_Q_correct_action)
-    for (i, j), z in np.ndenumerate(av_Q_correct_action):
-        axes[1].text(j, i, '{:0.1f}'.format(z), ha='center', va='center')
-    axes[0].set_xlabel('Aliens')
-    axes[0].set_ylabel('Actions')
+    # # Show values of correct actions in rainbow phase
+    # correct_TS = task.TS.copy().astype(float)
+    # correct_TS[correct_TS == 1] = np.nan
+    # av_Q_correct_action = np.nanmean(correct_TS, axis=0)
+    # av_Q_correct_action[np.isnan(av_Q_correct_action)] = 0
+    # axes[1].set_title("Values correct actions")
+    # axes[1].matshow(av_Q_correct_action)
+    # for (i, j), z in np.ndenumerate(av_Q_correct_action):
+    #     axes[1].text(j, i, '{:0.1f}'.format(z), ha='center', va='center')
+    # axes[0].set_xlabel('Aliens')
+    # axes[0].set_ylabel('Actions')
 
 
 # Function to calculate summaries
@@ -291,6 +276,7 @@ if do_calculate_summaries:
 
         params = np.random.rand(len(param_names))
         # params = [0.01, 6.5/20, 0.005, 0.3, 4.5/20, 0.005]  # TODO: debug - remove!
+        params = selected_agents.loc[1, param_names].values
         # params = [0.1, 5, 0]
         summaries.loc[iter] = get_summary(params, param_ranges, n_sim, n_subj)
 
@@ -527,25 +513,34 @@ if do_read_in_and_visualize_summaries:
     plt.tight_layout()
 
     # Find a good subset of parameters - define criteria
-    CL_slope = all_summaries['CL_slope'] > 3/4 * hum_summary_cloudy['CL_slope'].values[0]
-    IL_acc_prev_TS = all_summaries['IL_acc_prev_TS'] > 3/4 * hum_summary_initial_learn['IL_acc_prev_TS'].values[0]
-    IL_perf_TS2minus1 = all_summaries['IL_perf_TS2minus1'] < 3/4 * hum_summary_initial_learn['IL_perf_TS2minus1'].values[0]
-    CO_season_minus_alien = all_summaries['CO_season_minus_alien'] > 3/4 * hum_summary_competition['CO_season_minus_alien'].values[0]
+    IL_acc_prev_TS = (
+            all_summaries['IL_acc_prev_TS'] > 3/4 * hum_summary_initial_learn['IL_acc_prev_TS'].values[0]) & (
+            all_summaries['IL_acc_prev_TS'] < 3/2 * hum_summary_initial_learn['IL_acc_prev_TS'].values[0])
+    IL_perf_TS2minus1 = (
+            all_summaries['IL_perf_TS2minus1'] < 3/4 * hum_summary_initial_learn['IL_perf_TS2minus1'].values[0]) & (
+            all_summaries['IL_perf_TS2minus1'] > 3/2 * hum_summary_initial_learn['IL_perf_TS2minus1'].values[0])
+    CL_slope = (
+            all_summaries['CL_slope'] > 3/4 * hum_summary_cloudy['CL_slope'].values[0]) & (
+            all_summaries['CL_slope'] < 3/2 * hum_summary_cloudy['CL_slope'].values[0])
+    CO_season_minus_alien = (
+           all_summaries['CO_season_minus_alien'] > 3/4 * hum_summary_competition['CO_season_minus_alien'].values[0]) & (
+           all_summaries['CO_season_minus_alien'] < 3/2 * hum_summary_competition['CO_season_minus_alien'].values[0])
     # RB_TS2minusTS0 = rainbow_dat['TS2minutsTS0']
 
     # Subset data and plot
     selected_agents = all_summaries.loc[
-        CL_slope & IL_acc_prev_TS & CO_season_minus_alien & IL_perf_TS2minus1]
+        IL_acc_prev_TS & IL_perf_TS2minus1 & CL_slope & CO_season_minus_alien]
+    # Save selected_agents as csv
+    if do_save_selected_agents:
+        save_path = plot_dir + 'selected_agents.csv'
+        print("Saving selected_agents to {}".format(save_path))
+        selected_agents.to_csv(save_path, index=False)
+
     selected_agents[['beta', 'beta_high']] /= 20
     selected_agents[param_names].plot(kind='bar')
     selected_agents[param_names].plot(kind='box', by='model')
     scatter_matrix(selected_agents[param_names])
     plt.show()
-
-    # Save selected_agents as csv
-    save_path = plot_dir + 'selected_agents.csv'
-    print("Saving selected_agents to {}".format(save_path))
-    selected_agents.to_csv(save_path, index=False)
 
     # Intrusion error heatmap (prev_TS)
     fig = plt.figure(figsize=(10, 5))
