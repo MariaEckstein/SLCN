@@ -46,16 +46,20 @@ else:
 
 IL_cols = ['IL_saving_av', 'IL_saving_first_trial', 'IL_saving_last_trial',  # savings
            'IL_acc_current_TS', 'IL_acc_prev_TS', 'IL_acc_other_TS',  # intrusion errors
-           'IL_perf_TS0', 'IL_perf_TS1', 'IL_perf_TS2', 'IL_perf_TS_corr']  # TS values
+           'IL_acc_current_TS_se', 'IL_acc_prev_TS_se', 'IL_acc_other_TS_se',
+           'IL_perf_TS0', 'IL_perf_TS1', 'IL_perf_TS2',  # TS values
+           'IL_perf_TS0_se', 'IL_perf_TS1_se', 'IL_perf_TS2_se', 'IL_perf_TS_corr'
+           ]
 CL_cols = ['CL_acc_trial0', 'CL_acc_trial1', 'CL_acc_trial2', 'CL_acc_trial3',
+           'CL_acc_trial0_se', 'CL_acc_trial1_se', 'CL_acc_trial2_se', 'CL_acc_trial3_se',
            'CL_slope', 'CL_slope_TS0', 'CL_slope_TS1', 'CL_slope_TS2']  # TS reactivation
-CO_cols = ['CO_acc_season', 'CO_acc_season_alien']  # competition alien values & TS values
+CO_cols = ['CO_acc_season', 'CO_acc_season_alien', 'CO_acc_season_se', 'CO_acc_season_alien_se']  # competition alien values & TS values
 RB_cols = ['RB_alien0_action0', 'RB_alien0_action1', 'RB_alien0_action2',
            'RB_alien1_action0', 'RB_alien1_action1', 'RB_alien1_action2',
            'RB_alien2_action0', 'RB_alien2_action1', 'RB_alien2_action2',
            'RB_alien3_action0', 'RB_alien3_action1', 'RB_alien3_action2']
-RB_sum_cols = ['TS0', 'TS1', 'TS2', 'None', 'TS2minusTS0']
-summary_dat_cols = param_names + IL_cols + CL_cols + CO_cols + RB_cols
+RB_sum_cols = ['TS0', 'TS1', 'TS2', 'None', 'TS0_se', 'TS1_se', 'TS2_se', 'None_se', 'TS2minusTS0']
+summary_dat_cols = param_names + IL_cols + CL_cols + CO_cols[:2] + RB_cols
 
 plot_dir = get_alien_paths(run_on_cluster)['fitting results'] + '/SummariesInsteadOfFitting/'
 now = datetime.datetime.now()
@@ -80,7 +84,7 @@ trials = {'1InitialLearn': range(n_trials_['1InitialLearn']),
 # Get human data
 if do_analyze_humans:
     n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, hum_rainbow_dat, hum_comp_dat = read_in_human_data(human_data_path, 828, n_aliens, n_actions)
-    selected_agents = pd.read_csv(plot_dir + 'selected_agents4_good.csv')
+    selected_agents = pd.read_csv(plot_dir + 'rerun_selected_agents.csv')
     ag_summary = selected_agents.loc[0]  # np.mean(selected_agents, axis=0)
 
     # Get agent-like summaries
@@ -97,8 +101,12 @@ if do_analyze_humans:
     alien_cols = [col for col in hum_comp_dat.columns.values if col[0] != "("]
     season_perf = np.mean(hum_comp_dat[season_cols], axis=1)
     alien_perf = np.mean(hum_comp_dat[alien_cols], axis=1)
+    season_mean = np.mean(season_perf)
+    season_se = np.std(season_perf) / np.sqrt(n_hum)
+    alien_mean = np.mean(alien_perf)
+    alien_se = np.std(alien_perf) / np.sqrt(n_hum)
     comp_t, comp_p = stats.ttest_rel(season_perf, alien_perf)
-    hum_summary_competition = pd.DataFrame(np.array([[np.mean(season_perf), np.mean(alien_perf), np.mean(season_perf-alien_perf)]]),
+    hum_summary_competition = pd.DataFrame(np.array([[season_mean, alien_mean, season_se, alien_se, np.mean(season_perf-alien_perf)]]),
                                            columns=CO_cols + ['CO_season_minus_alien'])
 
     # hum_rainbow_dat = pd.DataFrame(np.expand_dims(hum_rainbow_dat.flatten(), axis=0), columns=RB_cols)
@@ -118,33 +126,53 @@ if do_analyze_humans:
     hum_summary_initial_learn['IL_perf_TS2minus1'] = hum_summary_initial_learn['IL_perf_TS2'] - hum_summary_initial_learn['IL_perf_TS1']
 
     # Plot human behavior & selected_agents
-    def make_plot(hum_dat, ag_dat, ylabel="", hline=False, ylim=False):
+    def make_plot(hum_mean, ag_mean, hum_se=False, ag_se=False, ylabel="", hline=False, ylim=False, xlabel="", xticklabels=False):
+        if not np.any(hum_se):
+            hum_se = np.zeros(len(hum_mean.T))
+        if not np.any(ag_se):
+            ag_se = np.zeros(len(ag_mean.T))
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 4))
         [ax.set_title(title) for ax, title in zip(axes, ['Humans', 'Simulations'])]
-        hum_dat.T.plot.bar(rot=20, legend=False, ax=axes[0])
-        ag_dat.T.plot.bar(rot=20, legend=False, ax=axes[1])
+        hum_mean.T.plot.bar(rot=0, legend=False, ax=axes[0], yerr=hum_se, color='darkblue')
+        ag_mean.T.plot.bar(rot=0, legend=False, ax=axes[1], yerr=ag_se, color='darkblue')
         [ax.set_ylabel(ylabel) for ax in axes]
+        [ax.set_xlabel(xlabel) for ax in axes]
+        if xticklabels:
+            [ax.set_xticklabels(xticklabels) for ax in axes]
         if ylim:
             [ax.set_ylim(ylim) for ax in axes]
         if hline:
             [ax.axhline(y=hline, color='grey', linestyle='--') for ax in axes]
         plt.tight_layout()
 
+    # Reactivation of TS
+    make_plot(hum_summary_cloudy[CL_cols[:4]], ag_summary[CL_cols[:4]],
+              hum_summary_cloudy[CL_cols[4:8]].values, ag_summary[CL_cols[4:8]].values,
+              ylabel="Accuracy (trial 1)", hline=1/3, ylim=(0, 0.45),
+              xlabel="# other aliens seen", xticklabels=[str(i) for i in range(n_aliens)])
+    # Intrusion errors
+    make_plot(hum_summary_initial_learn[IL_cols[3:5]], ag_summary[IL_cols[3:5]],
+              hum_summary_initial_learn[IL_cols[6:8]].values, ag_summary[IL_cols[6:8]].values,
+              ylabel="Intrusion errors", hline=1/3, ylim=(0, 0.5), xticklabels=['Accuracy', 'Intrusion (prev.)'])
+    # TS values affect performance
+    make_plot(hum_summary_initial_learn[IL_cols[10:12]], ag_summary[IL_cols[10:12]],
+              hum_summary_initial_learn[IL_cols[13:15]].values, ag_summary[IL_cols[13:15]].values,
+              ylabel="TS performance", hline=1/3, ylim=(1/3, 0.65), xticklabels=['TS5', 'TS4'])
+    # TS values affect preference
+    make_plot(hum_summary_competition[CO_cols[:2]], ag_summary[CO_cols[:2]],
+              hum_summary_competition[CO_cols[2:4]].values,
+              ylabel="% better chosen", hline=1/2, ylim=(0, 0.65), xticklabels=['Context', 'Context-stimulus'])
+    # TS values affect generalization
+    make_plot(hum_summary_rainbow[RB_sum_cols[:4]], ag_summary_rainbow[RB_sum_cols[:4]],
+              hum_summary_rainbow[RB_sum_cols[4:8]].values,
+              ylabel='% TS selected', ylim=(0, 0.45), xticklabels=['TS6', 'TS5', 'TS4', 'None'])
+    # Savings
     make_plot(hum_summary_initial_learn[IL_cols[:3]], ag_summary[IL_cols[:3]],
               ylabel="Savings")
-    make_plot(hum_summary_initial_learn[IL_cols[3:6]], ag_summary[IL_cols[3:6]],
-              ylabel="Intrusion errors", hline=1/3, ylim=(0, 0.55))
-    make_plot(hum_summary_initial_learn[IL_cols[6:9]], ag_summary[IL_cols[6:9]],
-              ylabel="TS performance", hline=1 / 3, ylim=(1/3, 0.65))
-    make_plot(hum_summary_cloudy[CL_cols[:4]], ag_summary[CL_cols[:4]],
-              ylabel="Accuracy (trial 1)", hline=1/3, ylim=(0, 0.45))
-    make_plot(hum_summary_competition[CO_cols], ag_summary[CO_cols],
-              ylabel="% better chosen", hline=1/2, ylim=(0, 0.65))
-    make_plot(hum_summary_rainbow[RB_sum_cols[:4]], ag_summary_rainbow[RB_sum_cols[:4]])
 
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 4))
     [ax.set_title(title) for ax, title in zip(axes, ['Humans', 'Simulations'])]
-    axes[0].matshow(hum_rainbow_dat)
+    axes[0].matshow(hum_rainbow_dat[0])
     axes[1].matshow(ag_rainbow_dat.astype(float))
     [ax.set_xlabel('Aliens') for ax in axes]
     [ax.set_ylabel('Actions') for ax in axes]
@@ -276,8 +304,9 @@ if do_calculate_summaries:
 
         params = np.random.rand(len(param_names))
         # params = [0.01, 6.5/20, 0.005, 0.3, 4.5/20, 0.005]  # TODO: debug - remove!
-        params = selected_agents.loc[1, param_names].values
-        # params = [0.1, 5, 0]
+        params = selected_agents.loc[iter, param_names]
+        params[['beta', 'beta_high']] = (params[['beta', 'beta_high']] - param_ranges.loc[0, ['beta', 'beta_high']]) / (param_ranges.loc[1, ['beta', 'beta_high']] - param_ranges.loc[0, ['beta', 'beta_high']])  # rescale beta to 0-1
+        # params = [0.1, 0.8, 0]
         summaries.loc[iter] = get_summary(params, param_ranges, n_sim, n_subj)
 
         # Save summaries to disk (every trial)
@@ -340,21 +369,33 @@ if do_read_in_and_visualize_summaries:
     plt.legend()
     plt.tight_layout()
 
+    # def make_histograms(sim_dat, hum_dat, ylabel="", xlabel="", xlim=False, vline=False):
+    #     fig, axes = plt.subplots(ncols=2, figsize=(6, 3))
+    #     [ax.axvline(x=1 / 3, color='grey', linestyle='--') for ax in axes]
+    #     [ax.set_xlim(0, 1) for ax in axes]
+    #     [ax.set_ylabel("Probability density") for ax in axes]
+    #     # [ax.set_yscale('log') for ax in axes]
+    #     for i, effect in enumerate(IL_cols[3:5]):
+    #         axes[i].axvline(x=hum_summary_initial_learn[effect].values, color='red', linestyle='-')
+    #         for model in models:
+    #             dat = all_summaries.loc[all_summaries['model'] == model]
+    #             sns.distplot(dat[effect], kde=True, hist=True, label=model, ax=axes[i])
+    #         axes[i].set_xlabel(effect)
+    #     plt.legend()
+    #     plt.tight_layout()
+
     # Plot intrusion errors (Initial Learning)
-    plt.figure()
-    for i, effect in enumerate(IL_cols[3:6]):
-        plt.subplot(2, 2, i+1)
-        # bins = np.arange(min(all_summaries[effect]), max(all_summaries[effect]), 0.02)
-        plt.axvline(x=1/3, color='grey', linestyle='--')
-        plt.axvline(x=hum_summary_initial_learn[effect].values, color='red', linestyle='-')
-        plt.xlim(0, 1)
-        # plt.ylim(0, 1)  # TODO comment in for zoomed-in paper plot
+    fig, axes = plt.subplots(ncols=2, figsize=(6, 3))
+    [ax.axvline(x=1 / 3, color='grey', linestyle='--') for ax in axes]
+    [ax.set_xlim(0, 1) for ax in axes]
+    [ax.set_ylabel("Probability density") for ax in axes]
+    # [ax.set_yscale('log') for ax in axes]
+    for i, effect in enumerate(IL_cols[3:5]):
+        axes[i].axvline(x=hum_summary_initial_learn[effect].values, color='red', linestyle='-')
         for model in models:
             dat = all_summaries.loc[all_summaries['model'] == model]
-            # plt.hist(dat[effect], bins=bins, alpha=0.5, label=model, density=True)
-            sns.distplot(dat[effect], kde=True, hist=True, label=model)
-        plt.xlabel(effect)
-        plt.ylabel("Probability density")
+            sns.distplot(dat[effect], kde=True, hist=True, label=model, ax=axes[i])
+        axes[i].set_xlabel(effect)
     plt.legend()
     plt.tight_layout()
 
@@ -405,7 +446,7 @@ if do_read_in_and_visualize_summaries:
 
     # Competition phase
     plt.figure()
-    for i, effect in enumerate(CO_cols):
+    for i, effect in enumerate(CO_cols[:2]):
         plt.subplot(3, 1, i+1)
         # bins = np.arange(min(all_summaries[effect]), max(all_summaries[effect]), 0.01)
         plt.axvline(x=1/2, color='grey', linestyle='--')
