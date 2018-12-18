@@ -52,48 +52,59 @@ with pm.Model() as model:
     eps = T.as_tensor_variable(0)
     p_noisy = 1e-5 * T.as_tensor_variable(1)
 
-    beta_a = pm.Uniform('beta_a', lower=0, upper=upper)
-    beta_b = pm.Uniform('beta_b', lower=0, upper=upper)
-    beta = pm.Gamma('beta', alpha=beta_a, beta=beta_b, shape=n_subj, testval=2 * T.ones(n_subj))
+    beta_int_mu = pm.Normal('beta_int_mu', mu=0, sd=1)
+    beta_int_sd = pm.HalfNormal('beta_int_sd', sd=1)
+    beta_int = pm.Normal('beta_int', mu=beta_int_mu, sd=beta_int_sd,
+                         shape=n_subj, testval=0.1 * T.ones(n_subj))
 
-    persev_mu = pm.Normal('persev_mu', mu=0, sd=1)
-    persev_sd = pm.HalfNormal('persev_sd', sd=1)
-    persev_int = pm.Normal('persev_int', mu=persev_mu, sd=persev_sd, shape=(1, n_subj), testval=0.1 * T.ones((1, n_subj)))
+    p_switch_int_mu = pm.Normal('p_switch_int_mu', mu=0, sd=1)
+    p_switch_int_sd = pm.HalfNormal('p_switch_int_sd', sd=1)
+    p_switch_int = pm.Normal('p_switch_int', mu=p_switch_int_mu, sd=p_switch_int_sd,
+                             shape=n_subj, testval=0.1 * T.ones(n_subj))
 
-    p_switch_a = pm.Uniform('p_switch_a', lower=0, upper=upper)
-    p_switch_b = pm.Uniform('p_switch_b', lower=0, upper=upper)
-    p_switch = pm.Beta('p_switch', alpha=p_switch_a, beta=p_switch_b, shape=n_subj, testval=0.1 * T.ones(n_subj))
+    persev_int_mu = pm.Normal('persev_int_mu', mu=0, sd=1)
+    persev_int_sd = pm.HalfNormal('persev_int_sd', sd=1)
+    persev_int = pm.Normal('persev_int', mu=persev_int_mu, sd=persev_int_sd,
+                           shape=(1, n_subj), testval=0.1 * T.ones((1, n_subj)))
 
-    p_reward_a = pm.Uniform('p_reward_a', lower=0, upper=upper)
-    p_reward_b = pm.Uniform('p_reward_b', lower=0, upper=upper)
-    p_reward = pm.Beta('p_reward', alpha=p_reward_a, beta=p_reward_b, shape=n_subj, testval=0.75 * T.ones(n_subj))
+    p_reward_int_mu = pm.Normal('p_reward_int_mu', mu=0, sd=1)
+    p_reward_int_sd = pm.HalfNormal('p_reward_int_sd', sd=1)
+    p_reward_int = pm.Normal('p_reward_int', mu=p_reward_int_mu, sd=p_reward_int_sd,
+                             shape=n_subj, testval=0.1 * T.ones(n_subj))
 
-    # Parameter mu and slope
-    beta_mu = pm.Deterministic('beta_mu', beta_a / beta_b)
-    p_switch_mu = pm.Deterministic('p_switch_mu', p_switch_a / (p_switch_a + p_switch_b))
-    p_reward_mu = pm.Deterministic('p_reward_mu', p_reward_a / (p_reward_a + p_reward_b))
-
-    # beta_slope = pm.Normal('beta_slope', mu=0, sd=1, testval=0.1)
+    # Parameter slopes
+    beta_slope = pm.Normal('beta_slope', mu=0, sd=1, testval=-0.1)
     persev_slope = pm.Normal('persev_slope', mu=0, sd=1, testval=0.1)
-    # p_switch_slope = pm.Normal('p_switch_slope', mu=0, sd=1, testval=-0.1)
-    # p_reward_slope = pm.Normal('p_reward_slope', mu=0, sd=1, testval=-0.1)
+    p_switch_slope = pm.Normal('p_switch_slope', mu=0, sd=1, testval=-0.1)
+    p_reward_slope = pm.Normal('p_reward_slope', mu=0, sd=1, testval=-0.1)
 
     # Individual parameters
-    # beta = pm.Deterministic('beta', beta_int + beta_slope * age_z)
-    persev = pm.Deterministic('persev', persev_int + persev_slope * age_z)
-    # p_switch = pm.Deterministic('p_switch', p_switch_int + p_switch_slope * age_z)
-    # p_reward = pm.Deterministic('p_reward', p_reward_int + p_reward_slope * age_z)
-    scaled_persev_bonus = persev_bonus * persev
+    beta = beta_int + beta_slope * age_z
+    beta_soft = pm.Deterministic('beta_soft', np.exp(beta))  # 0 < beta_soft < inf
+    T.printing.Print('beta_soft')(beta_soft)
+
+    p_switch = p_switch_int + p_switch_slope * age_z
+    p_switch_soft = pm.Deterministic('p_switch_soft', 1 / (1 + T.exp(-p_switch)))  # 0 < p_switch_soft < 1
+    T.printing.Print('p_switch_soft')(p_switch_soft)
+
+    persev = persev_int + persev_slope * age_z
+    persev_soft = pm.Deterministic('persev_soft', 2 / (1 + T.exp(-persev)) - 1)  # -1 < persev_soft < 1
+    T.printing.Print('persev_soft')(persev_soft)
+    scaled_persev_bonus = persev_bonus * persev_soft
+
+    p_reward = p_reward_int + p_reward_slope * age_z
+    p_reward_soft = pm.Deterministic('p_reward_soft', 1 / (1 + T.exp(-p_reward)))  # 0 < p_reward_soft < 1
+    T.printing.Print('p_reward_soft')(p_reward_soft)
 
     # Get likelihoods
-    lik_cor, lik_inc = get_likelihoods(rewards, choices, p_reward, p_noisy)
+    lik_cor, lik_inc = get_likelihoods(rewards, choices, p_reward_soft, p_noisy)
 
     # Get posterior & calculate probability of subsequent trial
     p_right = 0.5 * T.ones(n_subj, dtype='int32')
     [p_right, p_choice], _ = theano.scan(fn=post_from_lik,
                                          sequences=[lik_cor, lik_inc, scaled_persev_bonus],
                                          outputs_info=[p_right, None],
-                                         non_sequences=[p_switch, eps, beta])
+                                         non_sequences=[p_switch_soft, eps, beta_soft])
 
     # Add p=0.5 for the first trial
     initial_p = 0.5 * T.ones((1, n_subj))
@@ -102,8 +113,8 @@ with pm.Model() as model:
     # Use Bernoulli to sample responses
     model_choices = pm.Bernoulli('model_choices', p=p_choice, observed=choices)
 
-    # Check model logp and RV logps (will crash if they are nan or -inf)
-    print_logp_info(model)
+    # # Check model logp and RV logps (will crash if they are nan or -inf)
+    # print_logp_info(model)
 
     # Sample the model
     trace = pm.sample(n_samples, tune=n_tune, chains=n_chains, cores=n_cores, nuts_kwargs=dict(target_accept=.8))
