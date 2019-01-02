@@ -11,8 +11,10 @@ n_actions, n_aliens, n_seasons, n_TS = 3, 4, 3, 3
 human_data_path = get_alien_paths()["human data prepr"]
 
 alpha, beta, forget, alpha_high, beta_high, forget_high = 0.1, 5, 0.001, 0.1, 5, 0.001
-n_samples_MCMC = 20000
-beta_MCMC = 1/1e4  # 1/1e4 -> acceptance rate ~ 80%; 1/1e5 -> acceptance rate ~ 20%
+subj_id = 0  # which subject should be fitted?
+n_samples_MCMC = 10000
+beta_MCMC = 1/1e3  # 1/1e3 -> acceptance rate ~ 50%; 1/1e4 -> acceptance rate ~ 20%
+verbose = False
 
 correct_TS = np.array([[[1, 6, 1],  # alien0, items0-2
                         [1, 1, 4],  # alien1, items0-2
@@ -43,9 +45,9 @@ print("Reading in human data took {} seconds.".format(end - start))
 # Run MCMC to get TS
 start = time.time()
 TS_series_samples, L_samples, accepted_samples = \
-    sample_TS_series(season_series, alien_series, action_series, reward_series,
+    sample_TS_series(season_series[:, subj_id], alien_series[:, subj_id], action_series[:, subj_id], reward_series[:, subj_id],
                      alpha, beta, forget, alpha_high, beta_high, forget_high,
-                     n_subj, n_TS, n_aliens, n_actions, n_samples_MCMC, beta_MCMC)
+                     n_TS, n_aliens, n_actions, n_samples_MCMC, beta_MCMC, verbose=verbose)
 end = time.time()
 print("Running TS_series_samples with {0} samples took {1} seconds.".format(n_samples_MCMC, end - start))
 
