@@ -10,42 +10,37 @@ import pandas as pd
 from shared_aliens import alien_initial_Q, update_Qs
 from modeling_helpers import load_aliens_data, get_save_dir_and_save_id, plot_gen_rec
 
-# TODO
-# backend = pymc3.backends.sqlite.SQLite('aliens_trace')
-# sample from posterior predictive distribution
+# THINGS
 # simulation = pm.sample_ppc(trace, samples=500)
-# p = eps / n_actions + (1 - eps) * softmax(Q)
-# requirements file
-# issues.md -> all the issues and how I solved them
-# to plot distributions: plt.hist(pm.Bound(pm.Normal, lower=0).dist(mu=1, sd=3).random(size=int(1e6)), bins=int(1e2)); plt.show()
+# plt.hist(pm.Bound(pm.Normal, lower=0).dist(mu=1, sd=3).random(size=int(1e6)), bins=int(1e2)); plt.show()
 
-# How to stuff
+# HOW TO
 # http://deeplearning.net/software/theano/extending/graphstructures.html#apply
 # theano.printing.pydotprint()  # TypeError: pydotprint() missing 1 required positional argument: 'fct'
 # figure out theano.config.floatX==float32 (http://deeplearning.net/software/theano/library/config.html)
 # debug theano: http://deeplearning.net/software/theano/cifarSC2011/advanced_theano.html#debugging
 
-# Switches for this script
+# Switches
 verbose = False
 run_on_cluster = False
 print_logps = False
-file_name_suff = 'f_abf'
+file_name_suff = 'hier'
 param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high']  # Don't change
-use_fake_data = False
+use_fake_data = True
 
 # Which data should be fitted?
 fitted_data_name = 'humans'  # 'humans', 'simulations'
 n_seasons, n_TS, n_aliens, n_actions = 3, 3, 4, 3
 
 # Sampling details
-max_n_subj = 31  # set > 31 to include all subjects
+max_n_subj = 3  # set to 31 to include all subjects
 max_n_trials = 440  # 440 / 960
 if run_on_cluster:
     n_cores = 4
     n_chains = 2
     n_samples = 100
     n_tune = 100
-else:
+else:  # debug version
     n_cores = 1
     n_samples = 10
     n_tune = 5
@@ -74,7 +69,7 @@ else:
     # n_trials = seasons.shape[0]
     # n_subj = seasons.shape[1]
 
-if 'fs' in file_name_suff:
+if 'fs' in file_name_suff:  # 'flat-stimulus' model: completely ignores the context
     seasons = np.zeros(seasons.shape, dtype=int)
 
 trials, subj = np.meshgrid(range(n_trials), range(n_subj))
@@ -109,12 +104,12 @@ with pm.Model() as model:
     forget_mu = pm.HalfNormal('forget_mu', sd=0.05)
     forget_sd = pm.HalfNormal('forget_sd', sd=0.05)
 
-    # alpha_high_mu = pm.HalfNormal('alpha_high_mu', sd=0.1)
-    # alpha_high_sd = pm.HalfNormal('alpha_high_sd', sd=0.1)
-    # beta_high_mu = pm.Bound(pm.Normal, lower=0)('beta_high_mu', mu=1, sd=2)
-    # beta_high_sd = pm.HalfNormal('beta_high_sd', sd=1)
-    # forget_high_mu = pm.HalfNormal('forget_high_mu', sd=0.05)
-    # forget_high_sd = pm.HalfNormal('forget_high_sd', sd=0.05)
+    alpha_high_mu = pm.HalfNormal('alpha_high_mu', sd=0.1)
+    alpha_high_sd = pm.HalfNormal('alpha_high_sd', sd=0.1)
+    beta_high_mu = pm.Bound(pm.Normal, lower=0)('beta_high_mu', mu=1, sd=2)
+    beta_high_sd = pm.HalfNormal('beta_high_sd', sd=1)
+    forget_high_mu = pm.HalfNormal('forget_high_mu', sd=0.05)
+    forget_high_sd = pm.HalfNormal('forget_high_sd', sd=0.05)
 
     alpha = pm.Beta('alpha', mu=alpha_mu, sd=alpha_sd, shape=n_subj)
     beta = pm.Bound(pm.Normal, lower=0)('beta', mu=beta_mu, sd=beta_sd, shape=beta_shape)
@@ -126,15 +121,15 @@ with pm.Model() as model:
     # alpha_high = pm.Deterministic('alpha_high', alpha.copy())
     # beta_high = pm.Deterministic('beta_high', beta.flatten().reshape(beta_shape))
     # forget_high = pm.Deterministic('forget_high', forget.flatten().reshape(forget_high_shape))
-    # alpha_high = pm.Beta('alpha_high', mu=alpha_high_mu, sd=alpha_high_sd, shape=n_subj)
-    # beta_high = pm.Bound(pm.Normal, lower=0)('beta_high', mu=beta_high_mu, sd=beta_high_sd, shape=beta_shape)
-    # forget_high = pm.Beta('forget_high', mu=forget_high_mu, sd=forget_high_sd, shape=forget_high_shape)
+    alpha_high = pm.Beta('alpha_high', mu=alpha_high_mu, sd=alpha_high_sd, shape=n_subj)
+    beta_high = pm.Bound(pm.Normal, lower=0)('beta_high', mu=beta_high_mu, sd=beta_high_sd, shape=beta_shape)
+    forget_high = pm.Beta('forget_high', mu=forget_high_mu, sd=forget_high_sd, shape=forget_high_shape)
     # alpha_high = pm.HalfNormal('alpha_high', sd=0.1, shape=n_subj)
     # beta_high = pm.Bound(pm.Normal, lower=0)('beta_high', mu=1, sd=2, shape=beta_high_shape)
     # forget_high = pm.HalfNormal('forget_high', sd=0.05, shape=forget_high_shape)
-    alpha_high = pm.Deterministic('alpha_high', 0.2 * T.ones(n_subj))  # Flat agent
-    beta_high = pm.Deterministic('beta_high', 2 * T.ones(beta_high_shape))
-    forget_high = pm.Deterministic('forget_high', T.zeros(forget_high_shape))
+    # alpha_high = pm.Deterministic('alpha_high', 0.2 * T.ones(n_subj))  # Flat agent
+    # beta_high = pm.Deterministic('beta_high', 2 * T.ones(beta_high_shape))
+    # forget_high = pm.Deterministic('forget_high', T.zeros(forget_high_shape))
 
     # Calculate Q_high and Q_low for each trial
     Q_low0 = alien_initial_Q * T.ones([n_subj, n_TS, n_aliens, n_actions])

@@ -18,23 +18,33 @@ create_pairplot = False
 analyze_indiv_models = False
 test_group_differences = False
 compare_models = True
-calculate_waic = False
+calculate_waic = True
 do_plot_gen_rec = False
-param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high']  # necessary for do_plot_genrec
-model_names = ['Bsr', 'Bbsr', 'Bbpsr', 'Rab', 'Rabc', 'Rabn', 'Rabnp', 'Rabcn', 'Rabcncn', 'Rabcnp', 'Rabcncnp']  # for compare_models
+param_names = ['beta', 'p_switch', 'p_reward', 'persev']
+model_names = ['no', 'beta', 'swi', 'rew', 'per', 'all']
+# param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high']  # necessary for do_plot_genrec
+# model_names = ['Bsr', 'Bbsr', 'Bbpsr', 'Rab', 'Rabc', 'Rabn', 'Rabnp', 'Rabcn', 'Rabcncn', 'Rabcnp', 'Rabcncnp']  # for compare_models
+
 
 file_names = [
-    'Bayes_3groups/swirew_2018_11_15_11_31_humans_n_samples5000',
-    'Bayes_3groups/betswirew_2018_11_15_11_24_humans_n_samples5000',
-    'Bayes_3groups/betperswirew_2018_11_13_16_26_humans_n_samples5000',
-    'RL_3groups/ab_2018_11_16_14_6_humans_n_samples5000',
-    'RL_3groups/abc_2018_10_3_19_28_humans_n_samples5000',
-    'RL_3groups/abn_2018_10_3_19_34_humans_n_samples5000',
-    'RL_3groups/abnp_2018_11_15_11_17_humans_n_samples5000',
-    'RL_3groups/abcn_2018_10_3_19_35_humans_n_samples5000',
-    'RL_3groups/abcncn_2018_10_3_19_36_humans_n_samples5000',
-    'RL_3groups/abcnp_2018_11_15_11_21_humans_n_samples5000',
-    'RL_3groups/abncncper_2018_11_13_19_21_humans_n_samples5000',
+    'Bayes_cont/bpsr_noslope_2018_12_18_14_29_humans_n_samples10000',
+    'Bayes_cont/bpsr_betaslope_2018_12_18_13_41_humans_n_samples10000',
+    'Bayes_cont/bpsr_switchslope_2018_12_18_13_47_humans_n_samples10000',
+    'Bayes_cont/bpsr_rewardslope_2018_12_18_14_24_humans_n_samples10000',
+    'Bayes_cont/bpsr_persevslope_2018_12_18_13_43_humans_n_samples10000',
+    'Bayes_cont/bpsr_2018_12_18_12_16_humans_n_samples10000',
+
+    # 'Bayes_3groups/swirew_2018_11_15_11_31_humans_n_samples5000',
+    # 'Bayes_3groups/betswirew_2018_11_15_11_24_humans_n_samples5000',
+    # 'Bayes_3groups/betperswirew_2018_11_13_16_26_humans_n_samples5000',
+    # 'RL_3groups/ab_2018_11_16_14_6_humans_n_samples5000',
+    # 'RL_3groups/abc_2018_10_3_19_28_humans_n_samples5000',
+    # 'RL_3groups/abn_2018_10_3_19_34_humans_n_samples5000',
+    # 'RL_3groups/abnp_2018_11_15_11_17_humans_n_samples5000',
+    # 'RL_3groups/abcn_2018_10_3_19_35_humans_n_samples5000',
+    # 'RL_3groups/abcncn_2018_10_3_19_36_humans_n_samples5000',
+    # 'RL_3groups/abcnp_2018_11_15_11_21_humans_n_samples5000',
+    # 'RL_3groups/abncncper_2018_11_13_19_21_humans_n_samples5000',
 
     # 'Aliens/soft_abf_lowishigh_2018_10_13_13_53_humans_n_samples100',
     # 'Aliens/soft_abf_lowishigh_2018_10_13_13_52_humans_n_samples100',

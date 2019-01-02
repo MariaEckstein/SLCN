@@ -24,7 +24,7 @@ def get_alien_paths(run_on_cluster=False):
 
     else:
         base_path = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets'
-        return {'human data': base_path + '/Data/versions1.0and3.1/',
+        return {'human data': base_path + '/Data/version3.1/',  # '/Data/versions1.0and3.1/'
                 'human data prepr': base_path + '/Data/version3.1preprocessed/',  # '/Data/versions1.0and3.1preprocessed',
                 'fitting results': base_path + '/AliensFitting/',
                 'simulations': 'C:/Users/maria/MEGAsync/SLCN/PSsimulations/'}
@@ -86,12 +86,15 @@ def update_Qs(season, alien, action, reward,
 
     # Select TS
     Q_high_sub = Q_high[T.arange(n_subj), season]  # Q_high_sub.shape -> [n_subj, n_TS]
-    # TS = season  # Flat
-    # TS = T.argmax(Q_high_sub, axis=1)  # Hierarchical deterministic
+    # Use the following lines for the hierarchical softmax agent
     p_high = T.nnet.softmax(beta_high * Q_high_sub)
     rand = rs.uniform(size=(n_subj, 1))
     cumsum = T.extra_ops.cumsum(p_high, axis=1)
-    TS = n_TS - T.sum(rand < cumsum, axis=1)
+    TS = n_TS - T.sum(rand < cumsum, axis=1)  # UGLY solution (should be pm.Categorical('TS'), but that doesn't work inside theano.scan loops)
+    # # Use the following line for the flat agent
+    # TS = season
+    # # Use the following line for the hierarchical deterministic agent
+    # TS = T.argmax(Q_high_sub, axis=1)
 
     # Calculate action probabilities based on TS
     Q_low_sub = Q_low[T.arange(n_subj), TS, alien]  # Q_low_sub.shape -> [n_subj, n_actions]
@@ -419,7 +422,7 @@ def read_in_human_data(human_data_path, n_trials, n_aliens, n_actions):
         hum_comp_dat.columns = comp.index.values
         hum_comp_dat.loc[:, '2(1, 2)'] = np.nan  # aliens 1 and 2 have the same value in TS 2 -> select better is not defined!
 
-    return n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, (hum_rainbow_dat_mean, hum_rainbow_dat_se), hum_comp_dat
+    return n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, hum_rewards, (hum_rainbow_dat_mean, hum_rainbow_dat_se), hum_comp_dat
 
 
 def split_subj_in_half(n_subj):

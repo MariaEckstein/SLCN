@@ -48,13 +48,13 @@ if model_to_be_simulated == 'specify':
 
 # Load fitted parameters
 elif model_to_be_simulated == '1NumberSummaries':
-    read_dir = parameter_dir + '/SummariesInsteadOfFitting/selected_agents.csv'
+    read_dir = parameter_dir + '/SummariesInsteadOfFitting/selected_agents4_good.csv'
     print('Using parameters in {} for simulation!'.format(read_dir))
     all_parameters = pd.read_csv(read_dir, usecols=param_names)
     # Same parameters for all subj
-    parameters = all_parameters.loc[7].values.reshape((1, len(param_names))) * np.ones((n_subj, len(param_names)))
+    parameters = all_parameters.loc[8].values.reshape((1, len(param_names))) * np.ones((n_subj, len(param_names)))
     parameters = pd.DataFrame(parameters, columns=all_parameters.columns.values)
-    # Different parameters for each subj
+    # # Different parameters for each subj
     # parameters = all_parameters.loc[:(n_subj-1)]
     parameters.loc[:, 'sID'] = range(n_subj)
 
@@ -225,7 +225,7 @@ for trial in trials['2CloudySeason']:
     p_lows[trial] = p_low
 
 # Read in human data
-n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, hum_rainbow_dat, hum_comp_dat = read_in_human_data(human_data_path, n_trials, n_aliens, n_actions)
+n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, hum_rewards, hum_rainbow_dat, hum_comp_dat = read_in_human_data(human_data_path, n_trials, n_aliens, n_actions)
 
 assert np.all(hum_seasons == seasons)
 assert np.all(hum_aliens == aliens)
