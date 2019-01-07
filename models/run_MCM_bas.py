@@ -1,3 +1,4 @@
+from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
 import numpy as np
 import time
@@ -53,6 +54,9 @@ print("Running TS_series_samples with {0} samples took {1} seconds.".format(n_sa
 
 # Look at best sample
 best_sample = TS_series_samples[np.argwhere(L_samples == np.max(L_samples)).flatten()[0]]
+r_best_sample = pearsonr(best_sample, season_series[:, 0])
+r_all = [pearsonr(sample, season_series[:, 0])[0] for sample in TS_series_samples]
+p_all = [pearsonr(sample, season_series[:, 0])[1] for sample in TS_series_samples]
 
 # Verify that MH is working
 colors = ['green' if accepted_samples[i] else 'red' for i in range(len(accepted_samples))]
@@ -63,6 +67,11 @@ for i, (L, color, accepted) in enumerate(zip(L_samples, colors, accepted_samples
 axes[0, 0].set_xlabel("Sample")
 axes[0, 0].set_ylabel("Log prob")
 # axes[0, 0].legend()
+axes[0, 1].set_title("Correlation true and recovered TS")
+
+colors = ['green' if p_all[i] < 0.05 else 'red' for i in range(len(p_all))]
+for i, r in enumerate(r_all):
+    axes[0, 1].plot(i, r, '.', color=colors[i])
 plt.tight_layout()
 plt.show()
 
