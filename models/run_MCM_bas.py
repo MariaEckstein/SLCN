@@ -27,7 +27,6 @@ n_subj, alien_series, season_series, hum_corrects, action_series, reward_series,
 missing_trials = action_series < 0
 action_series[missing_trials] = np.random.randint(0, n_actions, np.sum(missing_trials))
 reward_series[missing_trials] = correct_TS[season_series[missing_trials], alien_series[missing_trials], action_series[missing_trials]]
-season_series[missing_trials], alien_series[missing_trials], action_series[missing_trials]
 end = time.time()
 print("Reading in human data took {} seconds.".format(end - start))
 
@@ -72,6 +71,4 @@ TS_series_samples, L_samples, accepted_samples = test_MCMC()
 
 #stop = 42
 
-plt.plot(TS_series_samples[-1,:])
-
-modeling_helpers_bas.compute_logprob(TS_series_samples[0,:], season_series, alien_series, action_series, reward_series,                    alpha, beta, forget, alpha_high, beta_high, forget_high,                    n_TS, n_aliens, n_actions)
+print(modeling_helpers_bas.compute_logprob(TS_series_samples[0,:], season_series, alien_series, action_series, reward_series,alpha, beta, forget, alpha_high, beta_high, forget_high,n_TS, n_aliens, n_actions))
