@@ -422,7 +422,7 @@ def read_in_human_data(human_data_path, n_trials, n_aliens, n_actions):
         hum_comp_dat.loc[subj] = comp.values.flatten()
         hum_comp_dat.columns = comp.index.values
         hum_comp_dat.loc[:, '2(1, 2)'] = np.nan  # aliens 1 and 2 have the same value in TS 2 -> select better is not defined!
-        
+
     return n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, hum_rewards, (hum_rainbow_dat_mean, hum_rainbow_dat_se), hum_comp_dat
 
 

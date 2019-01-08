@@ -1,5 +1,5 @@
 import numpy as np
-from shared_aliens import alien_initial_Q, softmax
+from shared_aliens_bas import alien_initial_Q, softmax
 
 def get_Qhigh_series(TS_series, season_series, reward_series, alpha_high, forget_high, n_TS):
     Q_high_series = []

@@ -7,9 +7,9 @@ import modeling_helpers_bas
 importlib.reload(modeling_helpers_bas)
 from modeling_helpers_bas import sample_TS_series
 
-import shared_aliens
-importlib.reload(shared_aliens)
-from shared_aliens import alien_initial_Q, get_alien_paths, read_in_human_data
+import shared_aliens_bas
+importlib.reload(shared_aliens_bas)
+from shared_aliens_bas import alien_initial_Q, get_alien_paths, read_in_human_data
 
 
 # Define things
@@ -32,7 +32,7 @@ end = time.time()
 print("Reading in human data took {} seconds.".format(end - start))
 
 alpha, beta, forget, alpha_high, beta_high, forget_high = 0.1, 5, 0.001, 0.1, 5, 0.001
-n_samples_MCMC = 10000
+n_samples_MCMC = 1000
 beta_MCMC = 1  # 1/1e3 -> acceptance rate ~ 50%; 1/1e4 -> acceptance rate ~ 20%
 verbose = False
 
