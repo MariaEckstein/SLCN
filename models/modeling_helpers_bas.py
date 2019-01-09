@@ -26,20 +26,20 @@ def get_plow_series(Q_low_series, TS_series, alien_series, beta):
     return np.array([softmax(beta * Q_low[TS, alien]) for Q_low, TS, alien in zip(Q_low_series, TS_series, alien_series)])
 
 def get_initial_TS_series(season_series):
-    #return np.mod(np.arange(0,len(season_series)),3)
-    #return np.random.randint(0,3,len(season_series))
-    #return np.zeros_like(season_series)
+    # return np.mod(np.arange(0,len(season_series)),3)
+    # return np.random.randint(0,3,len(season_series))
+    # return np.zeros_like(season_series)
     return season_series  # Initializing with a flat RL agent
 
 def generate_TS_series(TS_series, n_TS):
-    #this replaces a random entry in TS_series by a random alternative TS
-    #which serves a proposal distribution for the MCMC chain that we're building
-    ind = np.random.randint(0,len(TS_series))
+    # this replaces a random entry in TS_series by a random alternative TS
+    # which serves a proposal distribution for the MCMC chain that we're building
+    ind = np.random.randint(0, len(TS_series))
     TS_series_new = TS_series.copy()
-    TS_series_new[ind] = np.random.randint(0, n_TS)
-    #TS_series_new[ind] = np.mod(TS_series[ind] + np.random.randint(1,n_TS),n_TS)
-    #This (untested!) line should replace the entry in TS_series_new with a
-    #random number, but one that isn't the same as in TS_series
+    # TS_series_new[ind] = np.random.randint(0, n_TS)
+    TS_series_new[ind] = np.mod(TS_series[ind] + np.random.randint(1, n_TS), n_TS)
+    # This line (tested by Maria) replaces the entry in TS_series_new with a
+    # random number, but one that isn't the same as in TS_series
     return TS_series_new
 
 def compute_logprob(TS_series, season_series, alien_series, action_series, reward_series,
@@ -50,7 +50,7 @@ def compute_logprob(TS_series, season_series, alien_series, action_series, rewar
     phigh_series = get_phigh_series(Q_high_series, season_series, beta_high)
     plow_series = get_plow_series(Q_low_series, TS_series, alien_series, beta)
 
-    return np.sum(np.log(plow_series[range(len(action_series)),action_series])) + np.sum(np.log(phigh_series[range(len(TS_series)),TS_series]))
+    return np.sum(np.log(plow_series[range(len(action_series)), action_series])) + np.sum(np.log(phigh_series[range(len(TS_series)), TS_series]))
 
 
 def accept(beta_MCMC, delta_L):

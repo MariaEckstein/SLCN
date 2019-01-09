@@ -14,7 +14,7 @@ from shared_aliens_bas import alien_initial_Q, get_alien_paths, read_in_human_da
 
 # Define things
 n_actions, n_aliens, n_seasons, n_TS = 3, 4, 3, 3
-human_data_path = get_alien_paths(False, True)["human data prepr"]
+human_data_path = get_alien_paths(False, False)["human data prepr"]
 
 subj_id = 1  # which subject should be fitted?
 correct_TS = np.array([[[1, 6, 1],                        [1, 1, 4],                        [5, 1, 1],                        [10, 1, 1]],                        [[1, 1, 2],[1, 8, 1],[1, 1, 7],[1, 3, 1]],                       [[1, 1, 7],                        [3, 1, 1],                        [1, 3, 1],                        [2, 1, 1]]])
@@ -30,7 +30,7 @@ reward_series[missing_trials] = correct_TS[season_series[missing_trials], alien_
 end = time.time()
 print("Reading in human data took {} seconds.".format(end - start))
 
-alpha, beta, forget, alpha_high, beta_high, forget_high = 0.1, 1, 0.001, 0.1, 1, 0.001
+alpha, beta, forget, alpha_high, beta_high, forget_high = 0.1, 1.5, 0.01, 0.1, 1.5, 0.01
 n_samples_MCMC = 10000
 beta_MCMC = 1  # 1/1e3 -> acceptance rate ~ 50%; 1/1e4 -> acceptance rate ~ 20%
 verbose = False
