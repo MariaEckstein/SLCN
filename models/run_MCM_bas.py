@@ -62,14 +62,6 @@ L_samples[-1]
 plt.plot([np.mean(t[:-1]==t[1:]) for t in TS_series_samples])
 
 plt.plot(TS_series_samples[0,:])
-plt.plot(np.mean(TS_series_samples,axis=0),'.')
+plt.plot(np.mean(TS_series_samples[int(n_samples_MCMC/2):,:],axis=0),'.')
 
-phigh = [np.sum(np.log(modeling_helpers_bas.get_phigh_series(modeling_helpers_bas.get_Qhigh_series(TS_series_samples[i,:], season_series[:,subj_id], reward_series[:,subj_id], alpha_high, forget_high, n_TS), season_series[:,subj_id], beta_high))) for i in range(n_samples_MCMC)]
-plt.plot(phigh)
-plow = [np.sum(np.log(modeling_helpers_bas.get_plow_series(modeling_helpers_bas.get_Qlow_series(TS_series_samples[i,:], alien_series[:,subj_id], action_series[:,subj_id], reward_series[:,subj_id], alpha, forget, n_TS, n_aliens, n_actions), TS_series_samples[i,:], alien_series[:,subj_id], beta_high))) for i in range(n_samples_MCMC)]
-plt.plot(plow)
-
-i=0
-modeling_helpers_bas.get_plow_series(modeling_helpers_bas.get_Qlow_series(TS_series_samples[i,:], alien_series[:,subj_id], action_series[:,subj_id], reward_series[:,subj_id], alpha, forget, n_TS, n_aliens, n_actions), TS_series_samples[i,:], alien_series[:,subj_id], beta_high)
-
-n_actions
+plt.plot([np.corrcoef(season_series[:,subj_id],TS_series_samples[i,:])[0,1] for i in range(n_samples_MCMC)])
