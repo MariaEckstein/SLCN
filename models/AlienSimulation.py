@@ -21,7 +21,7 @@ start_id = 0
 param_names = np.array(['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high'])
 fake_data = False
 human_data_path = get_alien_paths()["human data prepr"]  # "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/",  # note: human data prepr works for analyzing human behavior, the direct path works just for simulating agents
-model_to_be_simulated = "1NumberSummaries"  # "MSE" "MCMC" "specify" "1NumberSummaries"
+model_to_be_simulated = "specify"  # "MSE" "MCMC" "specify" "1NumberSummaries"
 # model_name = "/AliensMSEFitting/18-10-14/f_['alpha' 'beta' 'forget']_[[ 1 10  1]]_2018_10_14_9_47"  # 'Aliens/max_abf_2018_10_10_18_7_humans_n_samples10'  #
 
 # Get save path
@@ -35,13 +35,13 @@ parameter_dir = get_alien_paths(run_on_cluster=False)['fitting results']
 
 if model_to_be_simulated == 'specify':
 
-    parameters['alpha'] = 0.01 + 0.05 * np.random.rand(n_subj)  # 0 < alpha < 0.2
-    parameters['beta'] = 6.5 + np.random.rand(n_subj)  # 1 < beta < 2
-    parameters['forget'] = 0.005 + 0.01 * np.random.rand(n_subj)  # 0 < forget < 0.1
+    parameters['alpha'] = 0.1 + 0 * np.random.rand(n_subj)  # 0 < alpha < 0.2
+    parameters['beta'] = 1.5 + 0 * np.random.rand(n_subj)  # 1 < beta < 2
+    parameters['forget'] = 0.01 + 0 * np.random.rand(n_subj)  # 0 < forget < 0.1
 
-    parameters['alpha_high'] = 0.3 + 0.1 * np.random.rand(n_subj)  # 0 < alpha_high < 0.2
-    parameters['beta_high'] = 4.5 + np.random.rand(n_subj)  # 1 < beta < 2
-    parameters['forget_high'] = 0.2 + 0.1 * np.random.rand(n_subj)
+    parameters['alpha_high'] = 0.1 + 0 * np.random.rand(n_subj)  # 0 < alpha_high < 0.2
+    parameters['beta_high'] = 1.5 + 0 * np.random.rand(n_subj)  # 1 < beta < 2
+    parameters['forget_high'] = 0.01 + 0 * np.random.rand(n_subj)
 
     parameters['sID'] = range(n_subj)
     parameters['total_NLL'] = np.nan
@@ -227,7 +227,7 @@ for trial in trials['2CloudySeason']:
 # Read in human data
 n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, hum_rewards, hum_rainbow_dat, hum_comp_dat = read_in_human_data(human_data_path, n_trials, n_aliens, n_actions)
 
-assert np.all(hum_seasons == seasons)
+assert np.all(hum_seasons == seasons)  # only works when simulating exactly 31 agents
 assert np.all(hum_aliens == aliens)
 
 # Plot learning curves
@@ -356,7 +356,7 @@ for sID in range(n_sim):
     # Create pandas DataFrame
     subj_data = pd.DataFrame()
     subj_data["context"] = seasons[:, sID]
-    subj_data["phase"] = phase[:, sID]
+    # subj_data["phase"] = phase[:, sID]
     subj_data["TS_chosen"] = TSs[:, sID]
     subj_data["sad_alien"] = aliens[:, sID]
     subj_data["item_chosen"] = actions[:, sID]
