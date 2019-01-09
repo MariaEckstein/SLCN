@@ -16,7 +16,7 @@ from shared_aliens_bas import alien_initial_Q, get_alien_paths, read_in_human_da
 n_actions, n_aliens, n_seasons, n_TS = 3, 4, 3, 3
 human_data_path = get_alien_paths(False, True)["human data prepr"]
 
-subj_id = 0  # which subject should be fitted?
+subj_id = 1  # which subject should be fitted?
 correct_TS = np.array([[[1, 6, 1],                        [1, 1, 4],                        [5, 1, 1],                        [10, 1, 1]],                        [[1, 1, 2],[1, 8, 1],[1, 1, 7],[1, 3, 1]],                       [[1, 1, 7],                        [3, 1, 1],                        [1, 3, 1],                        [2, 1, 1]]])
 
 # Get human data
@@ -30,8 +30,8 @@ reward_series[missing_trials] = correct_TS[season_series[missing_trials], alien_
 end = time.time()
 print("Reading in human data took {} seconds.".format(end - start))
 
-alpha, beta, forget, alpha_high, beta_high, forget_high = 0.1, 5, 0.001, 0.1, 5, 0.001
-n_samples_MCMC = 1000
+alpha, beta, forget, alpha_high, beta_high, forget_high = 0.1, 1, 0.001, 0.1, 1, 0.001
+n_samples_MCMC = 10000
 beta_MCMC = 1  # 1/1e3 -> acceptance rate ~ 50%; 1/1e4 -> acceptance rate ~ 20%
 verbose = False
 
@@ -56,19 +56,20 @@ def test_MCMC():
     return TS_series_samples, L_samples, accepted_samples
 
 TS_series_samples, L_samples, accepted_samples = test_MCMC()
+#TS_series_samples2, L_samples2, accepted_samples2 = test_MCMC()
+L_samples[-1]
 
-# Run MCMC to get TS
+plt.plot([np.mean(t[:-1]==t[1:]) for t in TS_series_samples])
 
-#fig, axes = plt.subplots(nrows=2, ncols=2)
-#axes[0, 0].set_title("Acceptance rate: {}".format(np.mean(accepted_samples).round(3)))
-#for i, (L, color, accepted) in enumerate(zip(L_samples, colors, accepted_samples)):
-#    axes[0, 0].plot(i, L, '.', color=color, label=accepted)
-#axes[0, 0].set_xlabel("Sample")
-#axes[0, 0].set_ylabel("Log prob")
-# axes[0, 0].legend()
-#plt.tight_layout()
-#plt.show()
+plt.plot(TS_series_samples[0,:])
+plt.plot(np.mean(TS_series_samples,axis=0),'.')
 
-#stop = 42
+phigh = [np.sum(np.log(modeling_helpers_bas.get_phigh_series(modeling_helpers_bas.get_Qhigh_series(TS_series_samples[i,:], season_series[:,subj_id], reward_series[:,subj_id], alpha_high, forget_high, n_TS), season_series[:,subj_id], beta_high))) for i in range(n_samples_MCMC)]
+plt.plot(phigh)
+plow = [np.sum(np.log(modeling_helpers_bas.get_plow_series(modeling_helpers_bas.get_Qlow_series(TS_series_samples[i,:], alien_series[:,subj_id], action_series[:,subj_id], reward_series[:,subj_id], alpha, forget, n_TS, n_aliens, n_actions), TS_series_samples[i,:], alien_series[:,subj_id], beta_high))) for i in range(n_samples_MCMC)]
+plt.plot(plow)
 
-print(modeling_helpers_bas.compute_logprob(TS_series_samples[0,:], season_series, alien_series, action_series, reward_series,alpha, beta, forget, alpha_high, beta_high, forget_high,n_TS, n_aliens, n_actions))
+i=0
+modeling_helpers_bas.get_plow_series(modeling_helpers_bas.get_Qlow_series(TS_series_samples[i,:], alien_series[:,subj_id], action_series[:,subj_id], reward_series[:,subj_id], alpha, forget, n_TS, n_aliens, n_actions), TS_series_samples[i,:], alien_series[:,subj_id], beta_high)
+
+n_actions
