@@ -86,6 +86,15 @@ with pm.Model() as model:
     calpha_sc = pm.Beta('calpha_sc', alpha=calpha_sc_a[group], beta=calpha_sc_b[group], shape=n_subj)
     # calpha_sc = pm.Deterministic('calpha_sc', T.as_tensor_variable(1))
 
+    # alpha_sc_a_a = pm.Uniform('alpha_sc_a_a', lower=0, upper=upper)
+    # alpha_sc_a_b = pm.Uniform('alpha_sc_a_b', lower=0, upper=upper)
+    # alpha_sc_b_a = pm.Uniform('alpha_sc_b_a', lower=0, upper=upper)
+    # alpha_sc_b_b = pm.Uniform('alpha_sc_b_b', lower=0, upper=upper)
+    # alpha_sc_a = pm.Gamma('alpha_sc_a', alpha=alpha_sc_a_a, beta=alpha_sc_a_b, shape=n_groups)
+    # alpha_sc_b = pm.Gamma('alpha_sc_b', alpha=alpha_sc_b_a, beta=alpha_sc_b_b, shape=n_groups)
+    # alpha_sc = pm.Beta('alpha_sc', alpha=alpha_sc_a[group], beta=alpha_sc_b[group], shape=n_subj)
+    # # alpha_sc = pm.Deterministic('alpha_sc', T.as_tensor_variable(1))
+
     # cnalpha_sc_a_a = pm.Uniform('cnalpha_sc_a_a', lower=0, upper=upper)
     # cnalpha_sc_a_b = pm.Uniform('cnalpha_sc_a_b', lower=0, upper=upper)
     # cnalpha_sc_b_a = pm.Uniform('cnalpha_sc_b_a', lower=0, upper=upper)
@@ -150,7 +159,7 @@ with pm.Model() as model:
     [Q_left, Q_right], _ = theano.scan(fn=update_Q,
                                        sequences=[rewards, choices],
                                        outputs_info=[Q_left, Q_right],
-                                       non_sequences=[alpha, nalpha, calpha, cnalpha])
+                                       non_sequences=[alpha, nalpha, calpha, cnalpha])#, alpha_sc])
 
     # Translate Q-values into probabilities and add eps noise
     p_right = p_from_Q(Q_left, Q_right,

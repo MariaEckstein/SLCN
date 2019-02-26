@@ -52,11 +52,18 @@ def p_from_Q(Q_left, Q_right, persev_bonus_left, persev_bonus_right, beta, eps, 
 
 def update_Q(reward, choice,
              Q_left, Q_right,
-             alpha, nalpha, calpha, cnalpha):
+             alpha, nalpha, calpha, cnalpha):#, alpha_sc, kappa):
 
     # Counter-factual learning: Weigh RPE with alpha for chosen action, and with calpha for unchosen action
     # Reward-sensitive learning: Different learning rates for positive (rew1) and negative (rew0) outcomes
     RPE = reward - choice * Q_right - (1 - choice) * Q_left  # RPE = reward - Q[chosen]
+
+    # # Adjust learning rate to RPE
+    # alpha = alpha_sc * RPE + (1 - alpha_sc) * alpha
+    # nalpha = alpha_sc * RPE + (1 - alpha_sc) * nalpha
+    # calpha = alpha_sc * RPE + (1 - alpha_sc) * calpha
+    # cnalpha = alpha_sc * RPE + (1 - alpha_sc) * cnalpha
+
     alpha_right_rew1 = choice * alpha - (1 - choice) * calpha   # choice==1 -> alpha; choice==0 -> -calpha
     alpha_right_rew0 = choice * nalpha - (1 - choice) * cnalpha   # choice==1 -> nalpha; choice==0 -> -cnalpha
 

@@ -150,8 +150,8 @@ for i, sID in enumerate(parameters['sID']):
 
     # Save to disc
     file_name = save_dir + "PSRL_{0}_{1}.csv".format(int(sID), version)
-    # print('Saving file {0}'.format(file_name))
     subj_data.to_csv(file_name)
+    # print('Saving file {0}'.format(file_name))
 
 print("Ran and saved {0} simulations ({1} * {2}) to {3}!".
       format(len(parameters['sID']), n_subj, n_sim_per_subj, file_name))
