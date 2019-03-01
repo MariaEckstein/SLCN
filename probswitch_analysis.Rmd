@@ -22,10 +22,10 @@ if (data == "human") {
   patt = ".csv"
 } else if (data == "simulated_human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSsimulations" # "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
-  patt = "PSTimeCount21.3.*csv"
+  patt = "PSRL.*csv"
 }
-# plot_dir = file.path(data_dir, "PS_plots_RLDM")
-plot_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch/PS_plots"
+plot_dir = file.path(data_dir, "PS_plots_RLDM")
+# plot_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch/PS_plots"
 
 if (!dir.exists(plot_dir)) {
   dir.create(plot_dir)
@@ -136,6 +136,7 @@ write.csv(reward_versions, paste0(data_dir, "_rewardversions.csv"))
 print(paste("Red in data from", length(unique(all_files$sID)), "subjects"))
 summary(all_files)
 summary(subj_file)
+colnames(all_files)
 ```
 ```{r Remaining fixes for all_filess}
 all_files$outcome_21_back = paste(all_files$outcome_2_back, all_files$outcome_1_back)
@@ -149,24 +150,18 @@ all_files$choice_12_back[!all_files$same_choice_12_back | is.na(all_files$same_c
 all_files$reward_port = factor(all_files$correct_box, levels = c(0, 1), labels = c("Left", "Right"))
 all_files$learning_style = factor(all_files$learning_style)
 
-# # Add collapsed columns (averaging left and right choices together)
-# all_files$ACC_collapse = all_files$ACC
-# all_files$ACC_collapse[all_files$selected_box == 0] = 1 - all_files$ACC[all_files$selected_box == 0]
-
 old_nrows = nrow(all_files)
 all_files = merge(all_files, ages, all.x = T)
+all_files$Columbia_cat = factor(all_files$Columbia_cat)
 all_files$age_group = as.character(all_files$age_group)
-all_files$age_group[is.na(all_files$age_group)] = "None"
+# all_files$age_group[is.na(all_files$age_group)] = "None"
 all_files$age_group = factor(all_files$age_group, levels=c("Children", "Teens", "Adults"))
 assertthat::assert_that(nrow(all_files) == old_nrows)
 # summary(all_files)
 
-unique(subset(all_files, is.na(PreciseYrs))$sID)
-
 all_files = subset(all_files, !is.na(PreciseYrs))
 
 xyz = ddply(all_files, .(sID, age_group), x = NA, summarize)
-
 ddply(xyz, .(age_group), summarize, n=length(age_group))
 ```
 
@@ -176,10 +171,10 @@ ddply(xyz, .(age_group), summarize, n=length(age_group))
 # Behavior
 ## Summarize over individual simulations of the same participant (necesary for simulated_humans - should not do anything for the other datasets)
 all_files_sum_pre = ddply(subset(all_files, !is.na(choice_12_back)),
-                      .(sID, version, age_group, model_name, outcome_21_back, choice_12_back), summarize,
+                      .(sID, version, age_group, Columbia_cat, model_name, outcome_21_back, choice_12_back), summarize,
                       choice_left = mean(choice_left, na.rm = T))
 all_files_sum = ddply(all_files_sum_pre,
-                      .(sID, age_group, model_name, outcome_21_back, choice_12_back), summarize,
+                      .(sID, age_group, Columbia_cat, model_name, outcome_21_back, choice_12_back), summarize,
                       choice = mean(choice_left, na.rm = T))
 all_files_sum2_pre = ddply(subset(all_files, !is.na(trialsinceswitch)),
                        .(sID, version, age_group, model_name, trialsinceswitch), summarize,
@@ -211,6 +206,7 @@ gg_RT = ggplot(all_files, aes(TrialID, RT, fill = age_group)) +
   # geom_point() +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar", position = position_dodge(width = 0.9)) +
   facet_grid(~ age_group)
+# gg_RT_PDS = gg_RT + aes(fill=Columbia_cat) + facet_grid(~ Columbia_cat)
 
 gg_RTt = ggplot(all_files_sum2, aes(trialsinceswitch, RT, fill = age_group)) +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "bar", position = position_dodge(width = 0.9)) +
@@ -234,10 +230,12 @@ gg_choice_blocks = ggplot(subset(all_files, !is.na(choice_left)),
   coord_cartesian(x = c(-3, 7)) +
   labs(x = "Trials since switch", y = "% choice left", color = "Reward port", shape = "") +
   facet_grid(model_name ~ age_group)
+# gg_choice_blocks_PDS = gg_choice_blocks + aes(shape=factor(Columbia_cat)) + facet_grid(model_name ~ Columbia_cat)
 
 # ACC over blocks
-ACC_subj = ddply(all_files, .(sID, trialsinceswitch, age_group, model_name, PreciseYrs), summarize, ACC = mean(ACC, na.rm=T))  # to make sure error bars are right
-gg_ACC_blocks = ggplot(ACC_subj, aes(trialsinceswitch, 100 * ACC, group = age_group, color = age_group, shape = age_group)) + 
+ACC_subj = ddply(all_files, .(sID, trialsinceswitch, age_group, model_name, PreciseYrs, Columbia_cat), summarize, ACC = mean(ACC, na.rm=T))  # to make sure error bars are right
+gg_ACC_blocks =
+  ggplot(ACC_subj, aes(trialsinceswitch, 100 * ACC, group = age_group, color = age_group, shape = age_group)) + 
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "pointrange") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "line") +
   geom_vline(xintercept = 0, linetype = "dotted") +
@@ -245,19 +243,20 @@ gg_ACC_blocks = ggplot(ACC_subj, aes(trialsinceswitch, 100 * ACC, group = age_gr
   scale_x_continuous(breaks = seq(-3, 7, 2)) +
   labs(x = "Trials since switch", y = "% correct", color = "", shape = "") +
   facet_grid(~ model_name)
+gg_ACC_blocks_PDS = gg_ACC_blocks + aes(group=Columbia_cat, color=Columbia_cat, shape=Columbia_cat)
 
 dat1 = subset(ACC_subj, trialsinceswitch == 1)
-t.test(ACC ~ age_group, data=subset(dat1, age_group %in% c("Children", "Adults")))
-t.test(ACC ~ age_group, data=subset(dat1, age_group %in% c("Children", "Teens")))
-t.test(ACC ~ age_group, data=subset(dat1, age_group %in% c("Teens", "Adults")))
-summary(lm(ACC ~ PreciseYrs, dat=subset(dat1, PreciseYrs<24)))  # quadratic effect?
+# t.test(ACC ~ age_group, data=subset(dat1, age_group %in% c("Children", "Adults")))
+# t.test(ACC ~ age_group, data=subset(dat1, age_group %in% c("Children", "Teens")))
+# t.test(ACC ~ age_group, data=subset(dat1, age_group %in% c("Teens", "Adults")))
+# summary(lm(ACC ~ PreciseYrs, dat=subset(dat1, PreciseYrs<24)))  # quadratic effect?
 
 dat37 = subset(ACC_subj, trialsinceswitch %in% c(3, 4, 5, 6, 7))
 dat37 = ddply(dat37, .(sID, age_group, PreciseYrs), summarize, ACC=mean(ACC,na.rm=T))
-t.test(ACC ~ age_group, data=subset(dat37, age_group %in% c("Children", "Adults")))
-t.test(ACC ~ age_group, data=subset(dat37, age_group %in% c("Children", "Teens")))
-t.test(ACC ~ age_group, data=subset(dat37, age_group %in% c("Teens", "Adults")))
-summary(lm(ACC ~ PreciseYrs, dat=subset(dat37, PreciseYrs<24)))  # quadratic effect?
+# t.test(ACC ~ age_group, data=subset(dat37, age_group %in% c("Children", "Adults")))
+# t.test(ACC ~ age_group, data=subset(dat37, age_group %in% c("Children", "Teens")))
+# t.test(ACC ~ age_group, data=subset(dat37, age_group %in% c("Teens", "Adults")))
+# summary(lm(ACC ~ PreciseYrs, dat=subset(dat37, PreciseYrs<24)))  # quadratic effect?
 
 # Response times
 gg_RT_blocks = gg_choice_blocks + aes(y = RT) + coord_cartesian(x = c(-3, 7), y = c(250, 650))
@@ -277,25 +276,27 @@ gg_rewards2 = ggplot(subset(all_files_sum, !is.na(choice_12_back)),
   theme(axis.text.x = element_text(angle = -90, hjust = 0)) +
   labs(x = "Reward history (1 trial back, 2 trials back)", y = "% left choice", fill = "Previous two choices", shape = "") +
   facet_grid(model_name ~ age_group)
+# gg_rewards2_PDS = gg_rewards2 + aes(shape=factor(Columbia_cat)) + facet_grid(model_name ~ Columbia_cat)
 
 # Choice depending on previous outcome (collapsed)
 # sub = subset(all_files, !is.na(outcome_21_back), select = c("sID", "TrialID", "choice_left", "choice_1_back", "stay", "same_choice_01_back", "outcome_21_back"))
 # sub[order(sub$sID, sub$TrialID), ]
 reward_subj = ddply(subset(all_files, !is.na(outcome_21_back)),
-                    .(sID, outcome_21_back, age_group, model_name, PreciseYrs), summarize, stay = mean(same_choice_01_back, na.rm = T))
+                    .(sID, Columbia_cat, outcome_21_back, age_group, model_name, PreciseYrs), summarize, stay = mean(same_choice_01_back, na.rm = T))
 
-summary(lmer(same_choice_01_back ~ PreciseYrs + (1 | sID), subset(all_files, outcome_21_back=='both reward')))
-summary(lmer(same_choice_01_back ~ PreciseYrs + (1 | sID), subset(all_files, outcome_21_back=='no reward, reward')))
-summary(lmer(same_choice_01_back ~ PreciseYrs + (1 | sID), subset(all_files, outcome_21_back=='both no reward')))
+# summary(lmer(same_choice_01_back ~ PreciseYrs + (1 | sID), subset(all_files, outcome_21_back=='both reward')))
+# summary(lmer(same_choice_01_back ~ PreciseYrs + (1 | sID), subset(all_files, outcome_21_back=='no reward, reward')))
+# summary(lmer(same_choice_01_back ~ PreciseYrs + (1 | sID), subset(all_files, outcome_21_back=='both no reward')))
 
 stay_plot =
   ggplot(reward_subj, aes(outcome_21_back, 100 * stay, fill = age_group)) +
   stat_summary(fun.data = mean_cl_normal, geom = "bar", fun.args = list(mult = 1), position = "dodge") +
-  stat_summary(fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), position = position_dodge(0.9)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "pointrange", fun.args = list(mult = 1), position = position_dodge(0.9), size=0.1) +
   theme(axis.text.x = element_text(angle = -30, hjust = 0.2)) +
   coord_cartesian(ylim = c(0, 100)) +
   labs(x = "Previous outcomes", y = "% stay", fill = "") +
   facet_grid(~ model_name)
+stay_plot_PDS = stay_plot + aes(fill=Columbia_cat, group=Columbia_cat)
 
 if (gg_save) {
   if (data %in% c("human", "fitted_human")) {
@@ -308,7 +309,9 @@ if (gg_save) {
   ggsave(file.path(plot_dir, "/gg_rewards.png"), gg_rewards)
   ggsave(file.path(plot_dir, "/gg_rewards2.png"), gg_rewards2, width = 8, height = 1 + 2 * length(unique(gg_ACC_blocks$data$model_name)))
   ggsave(file.path(plot_dir, "/gg_ACC_blocks.png"), gg_ACC_blocks, width = 3.3, height = 1.4 + length(unique(gg_ACC_blocks$data$model_name)))
-  ggsave(file.path(plot_dir, "/stay_plot2.png"), stay_plot, width = 3.3, height = 2.2 + length(unique(stay_plot$data$model_name)))
+  ggsave(file.path(plot_dir, "/gg_ACC_blocks_PDS.png"), gg_ACC_blocks_PDS, width = 3.3, height = 1.4 + length(unique(gg_ACC_blocks$data$model_name)))
+  ggsave(file.path(plot_dir, "/stay_plot.png"), stay_plot, width = 3.3, height = 2.2 + length(unique(stay_plot$data$model_name)))
+  ggsave(file.path(plot_dir, "/stay_plot_PDS.png"), stay_plot_PDS, width = 3.3, height = 2.2 + length(unique(stay_plot$data$model_name)))
 }
 ```
 ```{r WSLS}
@@ -330,25 +333,57 @@ summary(all_files)
 ```{r regression ACC / RT ~ age * testosterone}
 # Vizualize effects of age and testosterone on ACC & RT
 median_RT = ddply(subset(all_files, ACC=T), .(sID, PreciseYrs, T1), RT=median(RT), T1=median(T1), Gender=median(Gender), summarize)
-ggplot(median_RT, aes(PreciseYrs, T1, color=Gender)) + geom_point()
+# gg_age_testosterone =
+  ggplot(median_RT, aes(PreciseYrs, T1, color=Gender)) + geom_point()
 
-ggplot(subset(median_RT, PreciseYrs<24), aes(PreciseYrs, RT, color=T1)) + geom_point()
-ggplot(subset(median_RT, PreciseYrs<24), aes(T1, RT, color=Gender)) + geom_point()
+# gg_age_RT =
+  ggplot(subset(median_RT, PreciseYrs<24), aes(PreciseYrs, RT, color=log(T1))) + geom_point() + geom_smooth()
+# gg_T_RT =
+  ggplot(subset(median_RT, PreciseYrs<24), aes(log(T1), RT, color=Gender)) + geom_point() + geom_smooth()
+
+# gg_age_RT =
+  ggplot(subset(median_RT, PreciseYrs>=11 & PreciseYrs<=14), aes(PreciseYrs, RT, color=log(T1))) + geom_point() + geom_smooth()
+# gg_T_RT =
+  ggplot(subset(median_RT, PreciseYrs>=11 & PreciseYrs<=14), aes(log(T1), RT, color=Gender)) + geom_point() + geom_smooth()
 
 mean_ACC = ddply(all_files, .(sID, PreciseYrs, T1), ACC=mean(ACC), T1=median(T1), Gender=median(Gender), summarize)
-ggplot(subset(mean_ACC, PreciseYrs<24), aes(PreciseYrs, ACC, color=T1)) + geom_point()
-ggplot(subset(mean_ACC, PreciseYrs<24), aes(T1, ACC, color=Gender)) + geom_point()
+# gg_age_ACC =
+  ggplot(subset(mean_ACC, PreciseYrs<24), aes(PreciseYrs, ACC, color=T1)) + geom_point() + geom_smooth()
+# gg_T_ACC =
+  ggplot(subset(mean_ACC, PreciseYrs<24), aes(T1, ACC, color=Gender)) + geom_point() + geom_smooth()
+  
+# gg_T_PDS =
+  ggplot(subset(all_files, PreciseYrs<20), aes(PDS, T1, color=PreciseYrs, shape=factor(Gender))) + geom_point()
 
 # z-score predictors
-all_files$PreciseYrs_z = (all_files$PreciseYrs - mean(all_files$PreciseYrs, na.rm=T)) / sd(all_files$PreciseYrs, na.rm=T)
-all_files$T1_z = (all_files$T1 - mean(all_files$T1, na.rm=T)) / sd(all_files$T1, na.rm=T)
-
 # Calculate regression models
-summary(lmer(RT ~ PreciseYrs_z * T1_z + (1 | sID) + (1 | Gender), subset(all_files, PreciseYrs<24 & ACC==T)))
-summary(glmer(ACC ~ PreciseYrs_z * T1_z + (1 | sID) + (1 | Gender), subset(all_files, PreciseYrs<24), binomial))
+reg_dat = subset(all_files, age_group!="Adults")
+# reg_dat = subset(all_files, PreciseYrs>=11 & PreciseYrs<=14)
+# reg_dat = subset(all_files, PreciseYrs<20)
+reg_dat$PreciseYrs_z = (reg_dat$PreciseYrs - mean(reg_dat$PreciseYrs, na.rm=T)) / sd(reg_dat$PreciseYrs, na.rm=T)
+reg_dat$T1_log = log(reg_dat$T1)
+reg_dat$T1_z = (reg_dat$T1_log - mean(reg_dat$T1_log, na.rm=T)) / sd(reg_dat$T1_log, na.rm=T)
+reg_dat$Gender = factor(reg_dat$Gender)
+reg_dat$log_RT = log(reg_dat$RT)
+# reg_dat$pub = (log(reg_dat$T1) - mean(log(reg_dat$T1), na.rm=T)) / sd(log(reg_dat$T1), na.rm=T) + (reg_dat$PDS - mean(reg_dat$PDS, na.rm=T)) / ggplot(reg_dat, aes(PreciseYrs, pub)) + geom_point()
+hist(reg_dat$RT)
+hist(reg_dat$log_RT)
+summary(lmer(log_RT ~ PreciseYrs_z * T1_z + (1 | sID) + (1 | Gender), subset(reg_dat, ACC==T), na.action=na.omit, REML=F, verbose=T))
+summary(glmer(ACC ~ PreciseYrs_z * T1_z + (1 | sID) + (1 | Gender), reg_dat, binomial))
+
+summary(lmer(log_RT ~ PreciseYrs_z + (1 | sID) + (1 | Gender), subset(reg_dat, ACC==T), na.action=na.omit, REML=F, verbose=T))
+summary(glmer(ACC ~ PreciseYrs_z + (1 | sID) + (1 | Gender), reg_dat, binomial))
+
+summary(lmer(log_RT ~ PreciseYrs_z * T1_z + (1 | sID), subset(reg_dat, ACC==T & Gender==2), na.action=na.omit, REML=F, verbose=T))
+summary(lmer(log_RT ~ PreciseYrs_z * T1_z + (1 | sID), subset(reg_dat, ACC==T & Gender==1), na.action=na.omit, REML=F, verbose=T))
+summary(glmer(ACC ~ PreciseYrs_z * T1_z + (1 | sID), subset(reg_dat, Gender==1), binomial))
+summary(glmer(ACC ~ PreciseYrs_z * T1_z + (1 | sID), subset(reg_dat, Gender==2), binomial))
+
+# summary(subset(reg_dat, is.na(T1), select=c("RT", "log_RT", "T1", "T1_z", "PreciseYrs", "PreciseYrs_z"))$T1_z)
+# summary(reg_dat)
 ```
 ```{r Relationship between puberty testosterone and stuff ages 11-14}
-all_files
+summary(all_files$Columbia_cat)
 ```
 # Run regression models
 
