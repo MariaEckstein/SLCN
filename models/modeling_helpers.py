@@ -145,8 +145,11 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
 
     # Get each participant's group assignment
     group = np.zeros(n_subj, dtype=int)
-    group[age['age'] > 12] = 1
-    group[age['age'] > 17] = 2
+    # group[age['age'] > 12] = 1
+    # group[age['age'] > 17] = 2
+    group[age['age'] > 11] = 1
+    group[age['age'] > 15] = 2
+    group[age['age'] > 20] = 3
     n_groups = len(np.unique(group))
 
     # Remove subjects that are missing age
