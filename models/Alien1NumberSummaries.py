@@ -1,22 +1,25 @@
 import datetime
 import glob
 import matplotlib.pyplot as plt
+plt.style.use('seaborn-colorblind')  # https://matplotlib.org/users/style_sheets.html
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import os
 import pandas as pd
 from pandas.plotting import scatter_matrix
 from scipy import stats
+import seaborn as sns
 
 from AlienTask import Task
 from shared_aliens import alien_initial_Q, update_Qs_sim, get_alien_paths,\
     get_summary_initial_learn, get_summary_cloudy, simulate_competition_phase, simulate_rainbow_phase, get_summary_rainbow,\
-    read_in_human_data
+    read_in_human_data, se
 
 
 # Define things
 run_on_cluster = False
 do_analyze_humans = True
+do_calculate_best_summary = True
 do_calculate_summaries = False
 do_read_in_and_visualize_summaries = True
 do_isomap = False
@@ -65,6 +68,7 @@ plot_dir = get_alien_paths(run_on_cluster)['fitting results'] + '/SummariesInste
 now = datetime.datetime.now()
 save_id = '{0}_{1}_{2}_{3}'.format(model_name, param_names, [str(i) for i in np.asarray(param_ranges)], '_'.join([str(i) for i in [now.year, now.month, now.day, now.hour, now.minute]]))
 
+plot_save_dir = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/paperplots/'
 
 # Create task
 task = Task(n_subj)
@@ -83,9 +87,12 @@ trials = {'1InitialLearn': range(n_trials_['1InitialLearn']),
 
 # Get human data
 if do_analyze_humans:
-    n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, hum_rewards, hum_rainbow_dat, hum_comp_dat = read_in_human_data(human_data_path, 828, n_aliens, n_actions)
+    n_hum, hum_aliens, hum_seasons, hum_corrects, hum_actions, hum_rewards, hum_rainbow_dat, hum_comp_dat = read_in_human_data(human_data_path, 828, n_aliens, n_actions, exclude=['160', '164'])
     selected_agents = pd.read_csv(plot_dir + 'rerun_selected_agents.csv')
-    ag_summary = selected_agents.loc[5]  # 0, 5, 6
+    ag_summary = selected_agents.loc[0]  # 0, 5, 6
+    save_dir = plot_dir + 'ag_summary_for_paper.csv'
+    ag_summary.to_csv(save_dir)
+    print("Saving agent used for paper plots to {}!".format(save_dir))
     # ag_summary = np.mean(selected_agents.loc[[0, 5, 6]], axis=0)
 
     # Get agent-like summaries
@@ -127,61 +134,76 @@ if do_analyze_humans:
     hum_summary_initial_learn['IL_perf_TS2minus1'] = hum_summary_initial_learn['IL_perf_TS2'] - hum_summary_initial_learn['IL_perf_TS1']
 
     # Plot human behavior & selected_agents
-    def make_plot(hum_mean, ag_mean, hum_se=False, ag_se=False, ylabel="", hline=False, ylim=False, xlabel="", xticklabels=False):
+    def make_plot(hum_mean, ag_mean, hum_se=False, ag_se=False, plot_name="plot.png", ylabel="",
+                  hline=False, ylim=False, xlabel="", xticklabels=False, figsize=(8,4)):
+
         if not np.any(hum_se):
             hum_se = np.zeros(len(hum_mean.T))
         if not np.any(ag_se):
             ag_se = np.zeros(len(ag_mean.T))
-        fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 4))
+        if not xticklabels:
+            xticklabels = ""
+
+        fig, axes = plt.subplots(nrows=1, ncols=2, figsize=figsize)
         [ax.set_title(title) for ax, title in zip(axes, ['Humans', 'Simulations'])]
-        hum_mean.T.plot.bar(rot=0, legend=False, ax=axes[0], yerr=hum_se, color='darkblue')
-        ag_mean.T.plot.bar(rot=0, legend=False, ax=axes[1], yerr=ag_se, color='darkblue')
+
+        axes[0].bar(range(len(hum_mean)), hum_mean, yerr=hum_se, tick_label=xticklabels, color='grey')
+        axes[1].bar(range(len(ag_mean)), ag_mean, yerr=ag_se, tick_label=xticklabels, color='grey')
+
         [ax.set_ylabel(ylabel) for ax in axes]
         [ax.set_xlabel(xlabel) for ax in axes]
-        if xticklabels:
-            [ax.set_xticklabels(xticklabels) for ax in axes]
+
         if ylim:
             [ax.set_ylim(ylim) for ax in axes]
         if hline:
-            [ax.axhline(y=hline, color='grey', linestyle='--') for ax in axes]
+            [ax.axhline(y=hline, color='black', linestyle='--') for ax in axes]
+
         plt.tight_layout()
+        plt.savefig(plot_save_dir + plot_name)
 
     # Reactivation of TS
-    make_plot(hum_summary_cloudy[CL_cols[:4]], ag_summary[CL_cols[:4]],
-              hum_summary_cloudy[CL_cols[4:8]].values, ag_summary[CL_cols[4:8]].values,
-              ylabel="Accuracy (trial 1)", hline=1/3, ylim=(0, 0.45),
-              xlabel="# other stimuli seen", xticklabels=[str(i) for i in range(n_aliens)])
+    make_plot(hum_summary_cloudy[CL_cols[:4]].values.flatten(), ag_summary[CL_cols[:4]].values.flatten(),
+              hum_summary_cloudy[CL_cols[4:8]].values.flatten(), ag_summary[CL_cols[4:8]].values.flatten(),
+              plot_name='0TS_react.png',
+              ylabel="% correct", hline=False, ylim=(0, 0.45),
+              xlabel="Trial", xticklabels=range(1, n_aliens+1))
     # Intrusion errors
-    make_plot(hum_summary_initial_learn[IL_cols[3:5]], ag_summary[IL_cols[3:5]],
-              hum_summary_initial_learn[IL_cols[6:8]].values, ag_summary[IL_cols[6:8]].values,
-              ylabel="Intrusion errors", hline=1/3, ylim=(0, 0.5), xticklabels=['Accuracy', 'Intrusion (prev.)'])
+    make_plot(hum_summary_initial_learn[IL_cols[3:5]].values.flatten(), ag_summary[IL_cols[3:5]].values.flatten(),
+              hum_summary_initial_learn[IL_cols[6:8]].values.flatten(), ag_summary[IL_cols[6:8]].values.flatten(),
+              plot_name='1intrusion_errors.png', figsize=(4, 4),
+              ylabel="Fraction (trial 1)", hline=1/3, ylim=(0, 0.5), xticklabels=['Acc.', 'Intr.err.'])
     # TS values affect performance
-    make_plot(hum_summary_initial_learn[IL_cols[10:12]], ag_summary[IL_cols[10:12]],
-              hum_summary_initial_learn[IL_cols[13:15]].values, ag_summary[IL_cols[13:15]].values,
-              ylabel="TS performance", hline=1/3, ylim=(1/3, 0.65), xticklabels=['TS5', 'TS4'])
+    make_plot(hum_summary_initial_learn[IL_cols[10:12]].values.flatten(), ag_summary[IL_cols[10:12]].values.flatten(),
+              hum_summary_initial_learn[IL_cols[13:15]].values.flatten(), ag_summary[IL_cols[13:15]].values.flatten(),
+              plot_name='2TS_values_perf.png.', figsize=(4, 4),
+              ylabel="TS performance", hline=1/3, ylim=(1/3, 0.65), xticklabels=['TS2', 'TS1'])
     # TS values affect preference
-    make_plot(hum_summary_competition[CO_cols[:2]], ag_summary[CO_cols[:2]],
-              hum_summary_competition[CO_cols[2:4]].values,
-              ylabel="% better chosen", hline=1/2, ylim=(0, 0.65), xticklabels=['Context', 'Context-stimulus'])
+    make_plot(hum_summary_competition[CO_cols[:2]].values.flatten(), ag_summary[CO_cols[:2]].values.flatten(),
+              hum_summary_competition[CO_cols[2:4]].values.flatten(),
+              plot_name='3TS_values_preference.png', figsize=(4, 4),
+              ylabel="frac. better chosen", hline=1/2, ylim=(0, 0.65), xticklabels=['Context', 'Stimulus'])
     # TS values affect generalization
-    make_plot(hum_summary_rainbow[RB_sum_cols[:4]], ag_summary_rainbow[RB_sum_cols[:4]],
-              hum_summary_rainbow[RB_sum_cols[4:8]].values,
-              ylabel='% TS selected', ylim=(0, 0.45), xticklabels=['TS6', 'TS5', 'TS4', 'None'])
+    make_plot(hum_summary_rainbow[RB_sum_cols[:4]].values.flatten(), ag_summary_rainbow[RB_sum_cols[:4]].values.flatten(),
+              hum_summary_rainbow[RB_sum_cols[4:8]].values.flatten(),
+              plot_name='4TS_values_generalization.png',
+              ylabel='% TS selected', ylim=(0, 0.45), xticklabels=['TS3', 'TS2', 'TS1', 'No-TS'])
     # Savings
-    make_plot(hum_summary_initial_learn[IL_cols[:3]], ag_summary[IL_cols[:3]],
+    make_plot(hum_summary_initial_learn[IL_cols[:3]].values.flatten(), ag_summary[IL_cols[:3]].values.flatten(),
+              plot_name='5Savings.png', figsize=(6, 4),
               ylabel="Savings")
 
-    # Rainbow phase correction between human and simulated actions
+    # Rainbow phase correclation between human and simulated actions
     rb_cor = np.corrcoef(hum_rainbow_dat[0].flatten(), ag_rainbow_dat.astype(float).flatten())[0, 1]
 
     # Rainbow phase action heatmaps
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 6))
     plt.suptitle('Correlation between humans & simulation: {}'.format(rb_cor.round(3)))
     [ax.set_title(title) for ax, title in zip(axes, ['Humans', 'Simulations'])]
-    axes[0].matshow(hum_rainbow_dat[0])
+    cax1 = axes[0].matshow(hum_rainbow_dat[0])
     axes[1].matshow(ag_rainbow_dat.astype(float))
-    [ax.set_xlabel('Aliens') for ax in axes]
-    [ax.set_ylabel('Actions') for ax in axes]
+    [ax.set_xlabel('Action') for ax in axes]
+    [ax.set_ylabel('Stimulus') for ax in axes]
+    # fig.colorbar(cax1)
 
     # # Show values of correct actions in rainbow phase
     # correct_TS = task.TS.copy().astype(float)
@@ -250,6 +272,32 @@ def get_summary(parameters, param_ranges, n_sim, n_subj):
         aliens[trial] = alien
         actions[trial] = action
 
+    # COMMENT IN IF YOU WANT TO SAVE EACH AGENT!
+    # for sID in range(n_sim):
+    #
+    #     agent_ID = sID
+    #     # Create pandas DataFrame
+    #     subj_data = pd.DataFrame()
+    #     subj_data["context"] = seasons[:, sID]
+    #     # subj_data["phase"] = phase[:, sID]
+    #     subj_data["sad_alien"] = aliens[:, sID]
+    #     subj_data["item_chosen"] = actions[:, sID]
+    #     subj_data["reward"] = rewards[:, sID]
+    #     subj_data["correct"] = corrects[:, sID]
+    #     subj_data["trial_type"] = "feed-aliens"
+    #     subj_data["trial_index"] = np.arange(n_trials)
+    #     # subj_data["p_low"] = p_norms[:, sID]
+    #     subj_data["sID"] = sID
+    #     subj_data["block.type"] = "normal"
+    #     subj_data["model_name"] = model_name
+    #     for param_name in param_names:
+    #         subj_data[param_name] = subj_data[param_name] = np.array(parameters[param_name])
+    #
+    #     # Save to disc
+    #     file_name = get_alien_paths(False)['simulations'] + "aliens_" + model_name + '_' + str(sID) + ".csv"
+    #     print('Saving file {0}'.format(file_name))
+    #     subj_data.to_csv(file_name)
+
     # Save final Q-values for subsequent phases
     final_Q_low = Q_low.copy()
     final_Q_high = Q_high.copy()
@@ -302,6 +350,18 @@ def get_summary(parameters, param_ranges, n_sim, n_subj):
     return list(parameters.values) + summary_initial_learn + list(summary_cloudy) + list(summary_competition) + list(rainbow_dat.flatten())
 
 
+if do_calculate_best_summary:
+
+    params = pd.read_csv(plot_dir + 'ag_summary_for_paper.csv', index_col=0).loc[param_names]
+    params_01 = params.values.flatten() / (param_ranges.loc[1] - param_ranges.loc[0]) - param_ranges.loc[0] / (
+                param_ranges.loc[1] - param_ranges.loc[0])
+    # params_back = param_ranges.loc[0] + (param_ranges.loc[1] - param_ranges.loc[0]) * params_01  # making sure i'm getting the right parameters back after transformation!
+
+    summary = get_summary(params_01.values.flatten(), param_ranges, n_sim, n_subj)
+    summary = pd.DataFrame(summary, index=summary_dat_cols).transpose()
+
+    print(summary)  # check that it agrees with what we have in the paper! (This is just to double-check that I'm using the right parameters for the simulations!
+
 # Get summaries for different parameters
 if do_calculate_summaries:
     summaries = pd.DataFrame(np.full((n_iter, len(summary_dat_cols)), np.nan), columns=summary_dat_cols)
@@ -312,6 +372,7 @@ if do_calculate_summaries:
         # params = selected_agents.loc[iter, param_names]
         # params[['beta', 'beta_high']] = (params[['beta', 'beta_high']] - param_ranges.loc[0, ['beta', 'beta_high']]) / (param_ranges.loc[1, ['beta', 'beta_high']] - param_ranges.loc[0, ['beta', 'beta_high']])  # rescale beta to 0-1
         # params = [0.1, 0.8, 0]
+
         params = np.random.rand(len(param_names))
         summaries.loc[iter] = get_summary(params, param_ranges, n_sim, n_subj)
 
@@ -371,18 +432,18 @@ if do_read_in_and_visualize_summaries:
 
     # Reusable histogram function for all histogram plots
     def make_histogram(sim_dat, hum_dat, columns,
-                       xlabels=False, ylabel="Density", xlim=False, ylim=False, vline=False, yscale_log=False, scale_data=1):
+                       xlabels=False, ylabel="Density", xlim=False, ylim=False, vline=False, yscale_log=False, scale_data=1, plot_name=''):
         nrows = max(len(columns), 2)
         fig, axes = plt.subplots(nrows=nrows, figsize=(6, nrows * 2))
         [ax.set_ylabel(ylabel) for ax in axes]
         if not xlabels:
             xlabels = columns
         for i, (effect, xlabel) in enumerate(zip(columns, xlabels)):
-            if np.any(hum_dat):
-                axes[i].axvline(x=scale_data*hum_dat[effect].values, color='red', linestyle='-')
             for model in models:
                 dat = sim_dat.loc[sim_dat['model'] == model]
                 sns.distplot(scale_data*dat[effect], kde=True, hist=True, label=model, ax=axes[i])
+            if np.any(hum_dat):
+                axes[i].axvline(x=scale_data*hum_dat[effect].values, color='tomato', linestyle='-')
             axes[i].set_xlabel(xlabel)
         if vline:
             [ax.axvline(x=vline, color='grey', linestyle='--') for ax in axes]
@@ -394,28 +455,52 @@ if do_read_in_and_visualize_summaries:
             [ax.set_yscale('log') for ax in axes]
         plt.legend()
         plt.tight_layout()
+        plt.savefig(plot_save_dir + plot_name)
+
+    def get_means_sds(sim_dat, hum_dat, column, t_compare_value=0):
+        means_sds = sim_dat.groupby("model")[column].agg({'mean': 'mean',
+                                                          'std': 'std',
+                                                          'lik': lambda x: np.mean(x > hum_dat[column][0]),
+                                                          'lik2': lambda x: np.mean(x < hum_dat[column][0])})
+        ttests = sim_dat.groupby('model')[column].agg(stats.ttest_1samp, t_compare_value)
+        return means_sds, ttests
 
     # Reactivation of TS (cloudy)
     make_histogram(all_summaries, hum_summary_cloudy, CL_cols[8:],
-                   xlabels=['Slope (performance increase)'] + CL_cols[9:], vline=1e-10, yscale_log=True)
+                   plot_name='0TS_react_hist.png',
+                   xlabels=['Slope (trials 1-4)'] + CL_cols[9:], vline=1e-10, yscale_log=False)
+    make_histogram(all_summaries, hum_summary_cloudy, CL_cols[8:],
+                   plot_name='0TS_react_hist_log.png',
+                   xlabels=['Slope (trials 1-4)'] + CL_cols[9:], vline=1e-10, yscale_log=True)
+    get_means_sds(all_summaries, hum_summary_cloudy, 'CL_slope')
     # Intrusion errors (init. learn.)
     make_histogram(all_summaries, hum_summary_initial_learn, IL_cols[3:5],
-                   xlim=(0, 1), xlabels=['Accuracy', 'Intrusion (prev.)'], vline=1/3)
+                   plot_name='1intrusion_errors_hist.png',
+                   xlim=(0.2, 0.6), xlabels=['Accuracy', 'Intrusion errors'], vline=1/3)
+    get_means_sds(all_summaries, hum_summary_initial_learn, IL_cols[3], 1/3)
+    get_means_sds(all_summaries, hum_summary_initial_learn, IL_cols[4], 1/3)
     # TS values affect performance (init. learn.)
     make_histogram(all_summaries, hum_summary_initial_learn, ['IL_perf_TS2minus1'],
-                   xlim=(-0.1, 0.1), xlabels=['TS5 minus TS4'], vline=1e-10, scale_data=-1)
+                   plot_name='2TS_values_perf_hist.png',
+                   xlim=(-0.05, 0.05), xlabels=['TS2 minus TS1'], vline=1e-10, scale_data=-1)
+    get_means_sds(all_summaries, hum_summary_initial_learn, 'IL_perf_TS2minus1')
     make_histogram(all_summaries, hum_summary_initial_learn, [IL_cols[-1]],
+                   plot_name='2TS_values_perf_hist2.png',
                    xlabels=['Correlation'], vline=1e-10, scale_data=-1)
-    make_histogram(all_summaries, hum_summary_initial_learn, IL_cols[9:12][::-1])  # TS perf (init. learn.)
+    make_histogram(all_summaries, hum_summary_initial_learn, IL_cols[9:12][::-1], plot_name='2TS_values_perf_hist3.png')  # TS perf (init. learn.)
     # TS values affect preference (competition)
     make_histogram(all_summaries, hum_summary_competition, CO_cols[:2],
-                   xlim=(0, 0.8), xlabels=['% better context chosen', '% better context-stimulus chosen'], vline=1/2)
+                   plot_name='3TS_values_preference_hist.png',
+                   xlim=(0, 0.8), xlabels=['frac. better context chosen', 'frac. better stimulus chosen'], vline=1/2)
     make_histogram(all_summaries, hum_summary_competition, ['CO_season_minus_alien'],
-                   xlim=(-0.2, 0.2), xlabels=['Context minus context-stimulus'], vline=1e-10)
+                   plot_name='3TS_values_preference_hist2.png',
+                   xlim=(-0.1, 0.1), xlabels=['Context minus stimulus'], vline=1e-10)
+    get_means_sds(all_summaries, hum_summary_competition, 'CO_season_minus_alien')
     # TS values affect generalization (rainbow)
-    make_histogram(summary_rainbow, hum_dat=False, columns=['corr_with_humans'])
+    make_histogram(summary_rainbow, hum_dat=False, columns=['corr_with_humans'],
+                   plot_name='4TS_values_generalization_hist.png')
     # Savings (init. learn.)
-    make_histogram(all_summaries, hum_summary_initial_learn, IL_cols[:3] + ['IL_saving_last_minus_first'])  # Savings (init. learn.)
+    make_histogram(all_summaries, hum_summary_initial_learn, IL_cols[:3] + ['IL_saving_last_minus_first'], plot_name='5Savings_hist.png')  # Savings (init. learn.)
 
     # TS values affect generalization (rainbow)
     fig, axes = plt.subplots(nrows=3)
@@ -438,11 +523,14 @@ if do_read_in_and_visualize_summaries:
         sns.distplot(-dat[effect], kde=True, hist=True, label=model, ax=axes[2])
         axes[2].axvline(x=0, color='grey', linestyle='--')
         axes[2].axvline(x=-hum_summary_rainbow[effect].values, color='red', linestyle='-')
+        axes[2].set_xlim(-0.03, 0.3)
         axes[2].set_ylim(0, 40)
-        axes[2].set_xlabel("TS6 minus TS4")
+        axes[2].set_xlabel("TS3 minus TS1")
         axes[2].legend()
     [ax.set_ylabel("Density") for ax in axes]
     plt.tight_layout()
+    plt.savefig(plot_save_dir + '4TS_values_generalization_hist2.png')
+    get_means_sds(summary_rainbow, hum_summary_rainbow, 'TS2minusTS0')
 
     # Rainbow phase TS choices
     plt.figure()
@@ -488,6 +576,28 @@ if do_read_in_and_visualize_summaries:
     plt.legend()
     plt.tight_layout()
 
+    # Plot paramter - marker correlations
+    hum_sums = hum_summary_initial_learn[['IL_acc_prev_TS', 'IL_acc_current_TS', 'IL_perf_TS2minus1']]
+    hum_sums['CL_slope'] = hum_summary_cloudy['CL_slope']
+    hum_sums['CO_season_minus_alien'] = hum_summary_competition['CO_season_minus_alien']
+    markers = ['CL_slope', 'IL_acc_current_TS', 'IL_acc_prev_TS', 'IL_perf_TS2minus1', 'CO_season_minus_alien']
+
+    for model, params in zip(['flat', 'hier'], [param_names[:3], param_names]):
+
+        # Correlations between markers and parameters
+        dat = all_summaries.loc[all_summaries['model'] == model]
+        sns.pairplot(dat, x_vars=params, y_vars=markers, kind='reg',
+                 plot_kws={'color': 'grey', 'fit_reg': False, 'scatter_kws': {'s': 1}})
+        plt.savefig(plot_save_dir + 'CorrMarkerParam_' + model + '.png')
+
+        # Correlations between different markers
+        sns.pairplot(dat, vars=markers, kind='reg',
+                     plot_kws={'color': 'grey', 'fit_reg': False, 'scatter_kws': {'s': 1}},
+                     diag_kind='kde', diag_kws={'color': 'grey', 'shade': True})
+        # add human data
+        # plt.scatter(hum_sums)
+        plt.savefig(plot_save_dir + 'CorrParamParam_' + model + '.png')
+
     # Find a good subset of parameters - define criteria
     IL_acc_prev_TS = (
             all_summaries['IL_acc_prev_TS'] > 3/4 * hum_summary_initial_learn['IL_acc_prev_TS'].values[0]) & (
@@ -517,6 +627,8 @@ if do_read_in_and_visualize_summaries:
     selected_agents[param_names].plot(kind='box', by='model')
     scatter_matrix(selected_agents[param_names])
     plt.show()
+
+    # Nice looking agent: selected_agents.loc[129534, param_names]
 
     # Intrusion error heatmap (prev_TS)
     fig = plt.figure(figsize=(10, 5))

@@ -30,6 +30,10 @@ def get_alien_paths(run_on_cluster=False):
                 'simulations': 'C:/Users/maria/MEGAsync/SLCN/PSsimulations/'}
 
 
+# Calculate standard error
+def se(dat):
+    return np.std(dat) / np.sqrt(len(dat))
+
 # Same, but without theano, and selecting actions rather than reading them in from a file
 def update_Qs_sim(season, alien,
                   Q_low, Q_high,
@@ -348,10 +352,16 @@ def get_summary_cloudy(seasons, corrects, n_sim, trials_cloudy):
     return list(learning_curve_rep[:4]) + list(learning_curve_rep_se[:4]) + [slope] + list(TS_slopes)
 
 
-def read_in_human_data(human_data_path, n_trials, n_aliens, n_actions):
+def read_in_human_data(human_data_path, n_trials, n_aliens, n_actions, exclude=False):
     print("Reading in human data from {}!".format(human_data_path))
 
     file_names = [file_name for file_name in os.listdir(human_data_path) if "pick" not in file_name]
+    if exclude:
+        old_n_files = len(file_names)
+        file_names = [file_name for file_name in file_names if not file_name[-7:-4] in exclude]
+        new_n_files = len(file_names)
+        print("{0} subjects were exlcuded: {1}".format(old_n_files - new_n_files, exclude))
+
     n_hum = len(file_names)
 
     hum_seasons = np.zeros([n_trials, n_hum], dtype=int)

@@ -10,6 +10,8 @@ from competition_phase import CompetitionPhase
 from shared_aliens import alien_initial_Q, update_Qs_sim, softmax, get_alien_paths,\
     simulate_competition_phase, simulate_rainbow_phase, get_summary_rainbow, read_in_human_data
 
+plot_dir = get_alien_paths(False)['fitting results'] + '/SummariesInsteadOfFitting/'
+
 
 # Switches for this script
 def do_simulate(make_plots=False):
@@ -22,7 +24,7 @@ def do_simulate(make_plots=False):
     param_names = np.array(['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high'])
     fake_data = False
     human_data_path = get_alien_paths()["human data prepr"]  # "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/",  # note: human data prepr works for analyzing human behavior, the direct path works just for simulating agents
-    model_to_be_simulated = "specify"  # "MSE" "MCMC" "specify" "1NumberSummaries"
+    model_to_be_simulated = "best_hierarchical"  # "MSE" "MCMC" "specify" "best_hierarchical
     # model_name = "/AliensMSEFitting/18-10-14/f_['alpha' 'beta' 'forget']_[[ 1 10  1]]_2018_10_14_9_47"  # 'Aliens/max_abf_2018_10_10_18_7_humans_n_samples10'  #
 
     # Get save path
@@ -48,12 +50,12 @@ def do_simulate(make_plots=False):
         parameters['total_NLL'] = np.nan
 
     # Load fitted parameters
-    elif model_to_be_simulated == '1NumberSummaries':
+    elif model_to_be_simulated == 'best_hierarchical':
         read_dir = parameter_dir + '/SummariesInsteadOfFitting/selected_agents4_good.csv'
         print('Using parameters in {} for simulation!'.format(read_dir))
-        all_parameters = pd.read_csv(read_dir, usecols=param_names)
+        all_parameters = pd.read_csv(read_dir, usecols=param_names)  # pd.read_csv(plot_dir + 'ag_summary_for_paper.csv', index_col=0).loc[param_names]
         # Same parameters for all subj
-        parameters = all_parameters.loc[8].values.reshape((1, len(param_names))) * np.ones((n_subj, len(param_names)))
+        parameters = all_parameters.loc[0].values.reshape((1, len(param_names))) * np.ones((n_subj, len(param_names)))
         parameters = pd.DataFrame(parameters, columns=all_parameters.columns.values)
         # # Different parameters for each subj
         # parameters = all_parameters.loc[:(n_subj-1)]
@@ -129,8 +131,8 @@ def do_simulate(make_plots=False):
     rewards = np.zeros([n_trials, n_sim])
     corrects = np.zeros([n_trials, n_sim])
     p_lows = np.zeros([n_trials, n_sim, n_actions])
-    # Q_lows = np.zeros([n_trials, n_sim, n_TS, n_aliens, n_actions])
-    Q_highs = np.zeros([n_trials, n_sim])
+    Q_lows = np.zeros([n_trials, n_sim, n_TS, n_aliens, n_actions])
+    Q_highs = np.zeros([n_trials, n_sim, n_seasons, n_TS])
     phase = np.zeros(seasons.shape)
 
     print('Simulating {0} {2} agents on {1} trials.\n'.format(n_sim, n_trials, model_name))
@@ -169,8 +171,8 @@ def do_simulate(make_plots=False):
         actions[trial] = action
         rewards[trial] = reward
         corrects[trial] = correct
-        # Q_lows[trial] = Q_low
-        Q_highs[trial] = Q_high[np.arange(n_sim), season, TS]
+        Q_highs[trial] = Q_high
+        Q_lows[trial] = Q_low
         p_lows[trial] = p_low
 
     # Save final Q-values to simulate subsequent phases
@@ -221,8 +223,8 @@ def do_simulate(make_plots=False):
         actions[trial] = action
         rewards[trial] = reward
         corrects[trial] = correct
-        # Q_lows[trial] = Q_low
-        Q_highs[trial] = Q_high[np.arange(n_sim), season, TS]
+        Q_lows[trial] = Q_low
+        Q_highs[trial] = Q_high
         p_lows[trial] = p_low
 
     # Read in human data
@@ -341,17 +343,17 @@ def do_simulate(make_plots=False):
     hum_TS_choices = get_summary_rainbow(n_aliens, n_seasons, hum_rainbow_dat, task)
 
     # plot rainbow phase (this INCLUDES choices that are correct in multiple TS!)
-    if make_plots:
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        plt.title('Rainbow phase')
-        ax.bar(np.arange(4)+0.15, np.sum(TS_choices, axis=1), 0.3, label='Simulatinos')
-        ax.bar(np.arange(4)-0.15, np.sum(hum_TS_choices, axis=1), 0.3, label='Humans')
-        ax.set_ylabel('TS chosen (count)')
-        ax.set_xticks(range(4))
-        ax.set_xticklabels(['TS0', 'TS1', 'TS2', 'noTS'])
-        ax.legend()
-        plt.show()
+    # if make_plots:
+    #     fig = plt.figure()
+    #     ax = fig.add_subplot(111)
+    #     plt.title('Rainbow phase')
+    #     ax.bar(np.arange(4)+0.15, np.sum(TS_choices, axis=1), 0.3, label='Simulatinos')
+    #     ax.bar(np.arange(4)-0.15, np.sum(hum_TS_choices, axis=1), 0.3, label='Humans')
+    #     ax.set_ylabel('TS chosen (count)')
+    #     ax.set_xticks(range(4))
+    #     ax.set_xticklabels(['TS0', 'TS1', 'TS2', 'noTS'])
+    #     ax.legend()
+    #     plt.show()
 
     # Save simulation data
     for sID in range(n_sim):
@@ -374,8 +376,13 @@ def do_simulate(make_plots=False):
         subj_data["model_name"] = model_name
         for param_name in param_names:
             subj_data[param_name] = np.array(parameters.loc[sID, param_name])
-        # subj_data["Q_low"] = Q_lows[:, sID]
-        subj_data["Q_TS"] = Q_highs[:, sID]
+        for season in range(n_seasons):
+            for TS in range(n_TS):
+                subj_data["Q_high_c{0}TS{1}".format(season, TS)] = Q_highs[:, sID, season, TS]
+        for TS in range(n_TS):
+            for item in range(n_actions):
+                for alien in range(n_aliens):
+                    subj_data["Q_low_TS{0}s{1}a{2}".format(TS, alien, item)] = Q_lows[:, sID, TS, alien, item]
 
         # Save to disc
         file_name = save_dir + "aliens_" + model_name + '_' + str(agent_ID) + ".csv"
@@ -383,3 +390,6 @@ def do_simulate(make_plots=False):
         subj_data.to_csv(file_name)
 
     return (alpha, beta, forget, alpha_high, beta_high, forget_high), (seasons, TSs, aliens, actions, rewards)
+
+
+do_simulate(make_plots=False)
