@@ -23,8 +23,8 @@ kids_and_teens_only = False
 adults_only = False
 
 # Sampling details
-n_samples = 500
-n_tune = 10
+n_samples = 1000
+n_tune = 100
 n_cores = 2
 n_chains = 1
 target_accept = 0.8

@@ -7,7 +7,7 @@ output: html_notebook
 
 ```{r Set up parameters}
 gg_save = T
-data = "human"  # Can be "human", "fitted_human", or "simulated_human"
+data = "simulated_human"  # Can be "human", "fitted_human", or "simulated_human"
 # parameter_names = c("alpha", "alpha_high", "beta", "beta_high", "epsilon", "TS_bias", "forget")
 parameter_names = c('alpha', 'beta', 'nalpha', 'calpha', 'cnalpha')
 desired_columns = c("sID", "version", "selected_box", "p_right", "reward", "RT", "correct", "correct_box", "learning_style", "model_name", "NLL", parameter_names, paste0(parameter_names, "_rec"))
@@ -223,9 +223,9 @@ gg_T_composition = gg_PDS_composition + aes(fill=factor(round(log(T134)*3)/3)) +
 
 if (gg_save) {
   if (data %in% c("human", "fitted_human")) {
-    ggsave(file.path(plot_dir, "/gg_PDS_composition.png"), gg_PDS_composition)
-    ggsave(file.path(plot_dir, "/gg_age_composition.png"), gg_age_composition)
-    ggsave(file.path(plot_dir, "/gg_T_composition.png"), gg_T_composition)
+    ggsave(file.path(plot_dir, "/gg_PDS_composition.png"), gg_PDS_composition, width=4, height=2)
+    ggsave(file.path(plot_dir, "/gg_age_composition.png"), gg_age_composition, width=4, height=2)
+    ggsave(file.path(plot_dir, "/gg_T_composition.png"), gg_T_composition, width=6, height=3)
   }
 }
 ```
@@ -654,6 +654,12 @@ rewnorew_regr_PDS = rewnorew_regr + aes(color=PDS_group) + labs(color="PDS")
 rewnorew_regr_T = rewnorew_regr + aes(color=T_group) + labs(color="Testost.")
 rewnorew_regr_T$data = subset(rewnorew_regr$data, !is.na(T_group))
 
+rewnorew_regr_f = rewnorew_regr +
+  facet_wrap( ~ predictor, scales = "free")
+rewnorew_regr_f$data = subset(rewnorew_regr$data, Gender=="Female")
+rewnorew_regr_m = rewnorew_regr_f
+rewnorew_regr_m$data = subset(rewnorew_regr$data, Gender=="Male")
+
 # t.test(Estimate ~ age_group, subset(rewnorew_dat, predictor=='reward' & age_group%in%c('7-12', '13-17') & back==5))
 # t.test(Estimate ~ age_group, subset(rewnorew_dat, predictor=='reward' & age_group%in%c('7-12', '25-30') & back==1))
 # 
@@ -667,6 +673,8 @@ ggsave(file.path(plot_dir, "gg_nback_regr_agecats_sig.png"), gg_nback_regr_ageca
 ggsave(file.path(plot_dir, "gg_nback_regr_agecont.png"), gg_nback_regr_agecont, width=7, height=12)
 ggsave(file.path(plot_dir, "gg_nback_regr_agecont_sig.png"), gg_nback_regr_agecont_sig, width=7, height=12)
 ggsave(file.path(plot_dir, "rewnorew_regr.png"), rewnorew_regr, width=5, height=3 + length(unique(gg_ACC_blocks$data$model_name)))
+ggsave(file.path(plot_dir, "rewnorew_regr_f.png"), rewnorew_regr_f, width=5, height=1 + length(unique(gg_ACC_blocks$data$model_name)))
+ggsave(file.path(plot_dir, "rewnorew_regr_m.png"), rewnorew_regr_m, width=5, height=1 + length(unique(gg_ACC_blocks$data$model_name)))
 ggsave(file.path(plot_dir, "rewnorew_regr_PDS.png"), rewnorew_regr_PDS, width=5, height=3 + length(unique(gg_ACC_blocks$data$model_name)))
 ggsave(file.path(plot_dir, "rewnorew_regr_T.png"), rewnorew_regr_T, width=5, height=3 + length(unique(gg_ACC_blocks$data$model_name)))
 ```
