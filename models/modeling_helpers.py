@@ -85,7 +85,7 @@ def load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_su
     return [n_subj, n_trials, seasons, aliens, actions, rewards, true_params]
 
 
-def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only, verbose):
+def load_data(run_on_cluster, fitted_data_name, n_groups, kids_and_teens_only, adults_only, verbose):
 
     # Get data path and save path
     paths = get_paths(run_on_cluster)
@@ -145,11 +145,17 @@ def load_data(run_on_cluster, fitted_data_name, kids_and_teens_only, adults_only
 
     # Get each participant's group assignment
     group = np.zeros(n_subj, dtype=int)
-    # group[age['age'] > 12] = 1
-    # group[age['age'] > 17] = 2
-    group[age['age'] > 11] = 1
-    group[age['age'] > 15] = 2
-    group[age['age'] > 20] = 3
+    if n_groups == 1:
+        pass
+    elif n_groups == 3:
+        group[age['age'] > 12] = 1
+        group[age['age'] > 17] = 2
+    elif n_groups == 4:
+        group[age['age'] > 11] = 1
+        group[age['age'] > 15] = 2
+        group[age['age'] > 20] = 3
+    else:
+        raise(ValueError('n_groups can only be 1, 3, or 4!'))
     n_groups = len(np.unique(group))
 
     # Remove subjects that are missing age

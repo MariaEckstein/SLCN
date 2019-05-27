@@ -1,5 +1,6 @@
 import numpy as np
 import theano.tensor as T
+import theano
 
 
 alien_initial_Q = 5 / 3
@@ -28,21 +29,30 @@ def get_paths(run_on_cluster):
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
 
-def p_from_Q(Q_left, Q_right, persev_bonus_left, persev_bonus_right, beta, eps, verbose=False):
+def p_from_Q(Q_L1L_R1R, Q_L0L_R0R, Q_L1R_R1L, Q_L0R_R0L,  # Q_left, Q_right,
+             choices, rewards,
+             # persev_bonus_left, persev_bonus_right,
+             beta, eps, verbose=False):
 
-    if verbose:
-        print('Q_right:\n{}'.format(Q_right.round(3)))
-        print('Q_left:\n{}'.format(Q_left.round(3)))
+    # if verbose:
+    #     print('Q_right:\n{}'.format(Q_right.round(3)))
+    #     print('Q_left:\n{}'.format(Q_left.round(3)))
 
-    # Add perseverance bonus
-    Q_right_ = Q_right + persev_bonus_right  # perseverance only lasts for 1 trial
-    Q_left_ = Q_left + persev_bonus_left
-    if verbose:
-        print('Q_right after adding perseveration bonus:\n{}'.format(Q_right_.round(3)))
-        print('Q_left after adding perseveration bonus:\n{}'.format(Q_left_.round(3)))
+    # # Add perseverance bonus
+    # Q_right_ = Q_right + persev_bonus_right  # perseverance only lasts for 1 trial
+    # Q_left_ = Q_left + persev_bonus_left
+    # if verbose:
+    #     print('Q_right after adding perseveration bonus:\n{}'.format(Q_right_.round(3)))
+    #     print('Q_left after adding perseveration bonus:\n{}'.format(Q_left_.round(3)))
 
     # translate Q-values into probabilities using softmax
-    p_right = 1 / (1 + np.exp(beta * (Q_left_ - Q_right_)))
+    L1_1hot, L0_1hot = (1 - choices) * rewards, (1 - choices) * (1 - rewards)
+    R1_1hot, R0_1hot = choices * rewards, choices * (1 - rewards)
+
+    p_right = 1 / (1 + np.exp(beta * (Q_L1L_R1R - Q_L1R_R1L))) * L1_1hot + \
+              1 / (1 + np.exp(beta * (Q_L1R_R1L - Q_L1L_R1R))) * R1_1hot + \
+              1 / (1 + np.exp(beta * (Q_L0L_R0R - Q_L0R_R0L))) * L0_1hot + \
+              1 / (1 + np.exp(beta * (Q_L0R_R0L - Q_L0L_R0R))) * R0_1hot
     if verbose:
         print('p_right after softmax:\n{}'.format(p_right.round(3)))
 
@@ -50,31 +60,35 @@ def p_from_Q(Q_left, Q_right, persev_bonus_left, persev_bonus_right, beta, eps, 
     return eps * 0.5 + (1 - eps) * p_right
 
 
-def update_Q(reward, choice,
-             Q_left, Q_right,
-             alpha, nalpha, calpha, cnalpha):#, alpha_sc, kappa):
+def update_Q(prev_choice, prev_reward, choice, reward,
+             Q_L1L_R1R, Q_L0L_R0R, Q_L1R_R1L, Q_L0R_R0L,
+             alpha, nalpha, calpha, cnalpha):
 
     # Counter-factual learning: Weigh RPE with alpha for chosen action, and with calpha for unchosen action
-    # Reward-sensitive learning: Different learning rates for positive (rew1) and negative (rew0) outcomes
-    RPE = reward - choice * Q_right - (1 - choice) * Q_left  # RPE = reward - Q[chosen]
+    # RPE = reward - choice * Q_right - (1 - choice) * Q_left  # RPE = reward - Q[chosen] # TempDiff: + gamma * (next_choice * Q_right + (1 - next_choice) * Q_left)
+    L1L_R1R_1hot = (1 - prev_choice) * prev_reward * (1 - choice) + prev_choice * prev_reward * choice
+    L0L_R0R_1hot = (1 - prev_choice) * (1 - prev_reward) * (1 - choice) + prev_choice * (1 - prev_reward) * choice
+    L1R_R1L_1hot = (1 - prev_choice) * prev_reward * choice + prev_choice * prev_reward * (1 - choice)
+    L0R_R0L_1hot = (1 - prev_choice) * (1 - prev_reward) * choice + prev_choice * (1 - prev_reward) * (1 - choice)
 
-    # # Adjust learning rate to RPE
-    # alpha = alpha_sc * RPE + (1 - alpha_sc) * alpha
-    # nalpha = alpha_sc * RPE + (1 - alpha_sc) * nalpha
-    # calpha = alpha_sc * RPE + (1 - alpha_sc) * calpha
-    # cnalpha = alpha_sc * RPE + (1 - alpha_sc) * cnalpha
+    Q = Q_L1L_R1R * L1L_R1R_1hot + Q_L0L_R0R * L0L_R0R_1hot + Q_L1R_R1L * L1R_R1L_1hot + Q_L0R_R0L * L0R_R0L_1hot
+    RPE = reward - Q
 
-    alpha_right_rew1 = choice * alpha - (1 - choice) * calpha   # choice==1 -> alpha; choice==0 -> -calpha
-    alpha_right_rew0 = choice * nalpha - (1 - choice) * cnalpha   # choice==1 -> nalpha; choice==0 -> -cnalpha
-
-    alpha_left_rew1 = (1 - choice) * alpha - choice * calpha  # choice==0 -> alpha; choice==1 -> -calpha
-    alpha_left_rew0 = (1 - choice) * nalpha - choice * cnalpha  # choice==0 -> nalpha; choice==1 -> -cnalpha
-
-    alpha_right = reward * alpha_right_rew1 + (1 - reward) * alpha_right_rew0
-    alpha_left = reward * alpha_left_rew1 + (1 - reward) * alpha_left_rew0
+    # alpha_right_rew1 = choice * alpha - (1 - choice) * calpha   # choice==1 -> alpha; choice==0 -> -calpha
+    # alpha_right_rew0 = choice * nalpha - (1 - choice) * cnalpha   # choice==1 -> nalpha; choice==0 -> -cnalpha
+    #
+    # alpha_left_rew1 = (1 - choice) * alpha - choice * calpha  # choice==0 -> alpha; choice==1 -> -calpha
+    # alpha_left_rew0 = (1 - choice) * nalpha - choice * cnalpha  # choice==0 -> nalpha; choice==1 -> -cnalpha
+    #
+    # alpha_right = reward * alpha_right_rew1 + (1 - reward) * alpha_right_rew0
+    # alpha_left = reward * alpha_left_rew1 + (1 - reward) * alpha_left_rew0
 
     # Update Q-values for left and right action
-    return Q_left + alpha_left * RPE, Q_right + alpha_right * RPE
+    # return Q_left + alpha_left * RPE, Q_right + alpha_right * RPE
+    return Q_L1L_R1R + alpha * L1L_R1R_1hot * RPE,\
+           Q_L0L_R0R + alpha * L0L_R0R_1hot * RPE, \
+           Q_L1R_R1L + alpha * L1R_R1L_1hot * RPE,\
+           Q_L0R_R0L + alpha * L0R_R0L_1hot * RPE
 
 
 def get_likelihoods(rewards, choices, p_reward, p_noisy):

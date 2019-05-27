@@ -11,10 +11,10 @@ from PStask import Task
 verbose = False
 n_trials = 128  # humans: 128
 param_names = np.array(['alpha', 'beta', 'nalpha', 'calpha', 'cnalpha', 'persev'])  #
-n_subj = 233  # 233 as of 2018-10-03
+n_subj = 50  # 233 as of 2018-10-03
 n_sim_per_subj = 2
 n_sim = n_sim_per_subj * n_subj
-model_to_be_simulated = 'RL_3groups/abcnp_2018_11_15_11_21_humans_n_samples5000'
+model_to_be_simulated = 'none'  # 'RL_3groups/abcnp_2018_11_15_11_21_humans_n_samples5000'
 ages = pd.read_csv(get_paths(False)['ages'], index_col=0)
 
 # Get save path
@@ -26,10 +26,11 @@ parameters = pd.DataFrame(columns=np.append(param_names, ['sID']))
 
 # Type in some parameters
 if model_to_be_simulated == 'none':
-    parameters['alpha'] = 0.5 + 0.1 * np.random.rand(n_sim)
+    parameters['alpha'] = 0.3 + 0.1 * np.random.rand(n_sim)
     parameters['eps'] = 0 * np.ones(n_sim)
     parameters['beta'] = 1 + 3 * np.random.rand(n_sim)
-    parameters['persev'] = 0.05 * np.random.rand(n_sim)
+    # parameters['persev'] = 0.05 * np.random.rand(n_sim)
+    # parameters['gamma'] = 0.8 + 0.2 * np.random.rand(n_sim)
     parameters['nalpha'] = 0.4 + 0.1 * np.random.rand(n_sim)
     parameters['calpha_sc'] = 0.9 * np.ones(n_sim)
     parameters['calpha'] = parameters['alpha'] * parameters['calpha_sc']
@@ -81,8 +82,12 @@ choices = np.zeros(rewards.shape)  # human data: left choice==0; right choice==1
 correct_boxes = np.zeros(rewards.shape)  # human data: left choice==0; right choice==1 (verified in R script 18/11/17)
 ps_right = np.zeros(rewards.shape)
 LLs = np.zeros(rewards.shape)
-Qs_left = np.zeros(rewards.shape)
-Qs_right = np.zeros(rewards.shape)
+# Qs_left = np.zeros(rewards.shape)
+# Qs_right = np.zeros(rewards.shape)
+Qs_L1L_R1R = np.zeros(rewards.shape)
+Qs_L0L_R0R = np.zeros(rewards.shape)
+Qs_L1R_R1L = np.zeros(rewards.shape)
+Qs_L0R_R0L = np.zeros(rewards.shape)
 
 # Initialize task
 task_info_path = get_paths(run_on_cluster=False)['PS task info']
@@ -96,23 +101,36 @@ for trial in range(n_trials):
         print("\tTRIAL {0}".format(trial))
     task.prepare_trial()
 
-    # Translate Q-values into action probabilities, make a choice, obtain reward, update Q-values
-    try:
-        Q_left, Q_right = update_Q(reward, choice,
-                                   Q_left, Q_right,
-                                   parameters['alpha'], parameters['nalpha'], parameters['calpha'], parameters['cnalpha'])
-        persev_bonus_right = parameters['persev'] * choice
-        persev_bonus_left = parameters['persev'] * (1 - choice)
-    except NameError:
-        print('Initializing Q to 0.5!')
-        Q_left, Q_right = 0.5 * np.ones(n_sim), 0.5 * np.ones(n_sim)
-        persev_bonus_left, persev_bonus_right = np.zeros(n_sim), np.zeros(n_sim)
+    # Update Q-values (starting on third trial)
+    if trial <= 1:
+        Q_L1L_R1R, Q_L0L_R0R, Q_L1R_R1L, Q_L0R_R0L = 0.5 * np.ones(n_sim), 0.5 * np.ones(n_sim), 0.5 * np.ones(
+            n_sim), 0.5 * np.ones(n_sim)
+    else:
+        Q_L1L_R1R, Q_L0L_R0R, Q_L1R_R1L, Q_L0R_R0L = update_Q(
+            choices[trial-2], rewards[trial-2], choices[trial-1], rewards[trial-1],
+            Q_L1L_R1R, Q_L0L_R0R, Q_L1R_R1L, Q_L0R_R0L,
+            parameters['alpha'], parameters['nalpha'], parameters['calpha'], parameters['cnalpha'])
 
-    p_right = p_from_Q(Q_left, Q_right,
-                       persev_bonus_left, persev_bonus_right,
-                       parameters['beta'], np.zeros(n_sim), verbose)
+    # Translate Q-values into action probabilities
+    if verbose:
+        print("Q_L1L_R1R: {0}\nQ_L0L_R0R: {1}\nQ_L1R_R1L: {2}\nQ_L0R_R0L: {3}".format(
+            np.round(Q_L1L_R1R, 2), np.round(Q_L0L_R0R, 2), np.round(Q_L1R_R1L, 2), np.round(Q_L0R_R0L, 2)))
+
+    if trial == 0:
+        p_right = 0.5 * np.ones(n_sim)
+    else:
+        p_right = p_from_Q(
+            Q_L1L_R1R, Q_L0L_R0R, Q_L1R_R1L, Q_L0R_R0L,
+            choices[trial-1], rewards[trial-1],
+            parameters['beta'], np.zeros(n_sim), verbose)
+
+    # Select an action based on probabilities
     choice = np.random.binomial(n=1, p=p_right)  # produces "1" with p_right, and "0" with (1 - p_right)
+
+    # Obtain reward
     reward = task.produce_reward(choice)
+
+    # Update log-likelihood
     LL += np.log(p_right * choice + (1 - p_right) * (1 - choice))
 
     if verbose:
@@ -126,8 +144,12 @@ for trial in range(n_trials):
     rewards[trial] = reward
     correct_boxes[trial] = task.correct_box
     LLs[trial] = LL
-    Qs_left[trial] = Q_left
-    Qs_right[trial] = Q_right
+    # Qs_left[trial] = Q_left
+    # Qs_right[trial] = Q_right
+    Qs_L1L_R1R[trial] = Q_L1L_R1R
+    Qs_L0L_R0R[trial] = Q_L0L_R0R
+    Qs_L1R_R1L[trial] = Q_L1R_R1L
+    Qs_L0R_R0L[trial] = Q_L0R_R0L
 
 # Save data
 for i, sID in enumerate(parameters['sID']):
@@ -143,8 +165,8 @@ for i, sID in enumerate(parameters['sID']):
     subj_data["sID"] = sID
     subj_data["version"] = version
     subj_data["LL"] = LLs[:, i]
-    subj_data["Q_left"] = Qs_left[:, i]
-    subj_data["Q_right"] = Qs_right[:, i]
+    # subj_data["Q_left"] = Qs_left[:, i]
+    # subj_data["Q_right"] = Qs_right[:, i]
     # for param_name in param_names:
     #     subj_data[param_name] = np.array(parameters.loc[i, param_name])[version]
 
