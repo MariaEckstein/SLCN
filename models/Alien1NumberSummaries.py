@@ -19,7 +19,7 @@ from shared_aliens import alien_initial_Q, update_Qs_sim, get_alien_paths,\
 # Define things
 run_on_cluster = False
 do_analyze_humans = True
-do_calculate_best_summary = True
+do_calculate_best_summary = False
 do_calculate_summaries = False
 do_read_in_and_visualize_summaries = True
 do_isomap = False
@@ -194,6 +194,7 @@ if do_analyze_humans:
 
     # Rainbow phase correclation between human and simulated actions
     rb_cor = np.corrcoef(hum_rainbow_dat[0].flatten(), ag_rainbow_dat.astype(float).flatten())[0, 1]
+    stats.pearsonr(hum_rainbow_dat[0].flatten(), ag_rainbow_dat.astype(float).flatten())
 
     # Rainbow phase action heatmaps
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 6))

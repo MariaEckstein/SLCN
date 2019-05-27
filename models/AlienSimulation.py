@@ -15,7 +15,7 @@ plot_dir = get_alien_paths(False)['fitting results'] + '/SummariesInsteadOfFitti
 
 # Switches for this script
 def do_simulate(make_plots=False):
-    model_name = "hier"
+    model_name = "hier"  # "hier"
     verbose = False
     n_subj = 31
     n_sim_per_subj = 1
@@ -24,7 +24,7 @@ def do_simulate(make_plots=False):
     param_names = np.array(['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high'])
     fake_data = False
     human_data_path = get_alien_paths()["human data prepr"]  # "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/",  # note: human data prepr works for analyzing human behavior, the direct path works just for simulating agents
-    model_to_be_simulated = "best_hierarchical"  # "MSE" "MCMC" "specify" "best_hierarchical
+    model_to_be_simulated = "specify"  # "MSE" "MCMC" "specify" "best_hierarchical
     # model_name = "/AliensMSEFitting/18-10-14/f_['alpha' 'beta' 'forget']_[[ 1 10  1]]_2018_10_14_9_47"  # 'Aliens/max_abf_2018_10_10_18_7_humans_n_samples10'  #
 
     # Get save path
