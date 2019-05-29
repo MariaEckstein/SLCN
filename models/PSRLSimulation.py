@@ -1,17 +1,19 @@
 import pickle
 import os
 
-import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
 
 from shared_modeling_simulation import get_paths, update_Q, p_from_Q
 from PStask import Task
 
 # Switches for this script
 verbose = False
+make_plots = True
 n_trials = 128  # humans: 128
 param_names = np.array(['alpha', 'beta', 'nalpha', 'calpha', 'cnalpha', 'persev'])  #
-n_subj = 50  # 233 as of 2018-10-03
+n_subj = 2  # 233 as of 2018-10-03
 n_sim_per_subj = 2
 n_sim = n_sim_per_subj * n_subj
 model_to_be_simulated = 'none'  # 'RL_3groups/abcnp_2018_11_15_11_21_humans_n_samples5000'
@@ -26,9 +28,9 @@ parameters = pd.DataFrame(columns=np.append(param_names, ['sID']))
 
 # Type in some parameters
 if model_to_be_simulated == 'none':
-    parameters['alpha'] = 0.3 + 0.1 * np.random.rand(n_sim)
+    parameters['alpha'] = 0.1 + 0.1 * np.random.rand(n_sim)
     parameters['eps'] = 0 * np.ones(n_sim)
-    parameters['beta'] = 1 + 3 * np.random.rand(n_sim)
+    parameters['beta'] = 2 + 3 * np.random.rand(n_sim)
     # parameters['persev'] = 0.05 * np.random.rand(n_sim)
     # parameters['gamma'] = 0.8 + 0.2 * np.random.rand(n_sim)
     parameters['nalpha'] = 0.4 + 0.1 * np.random.rand(n_sim)
@@ -77,17 +79,13 @@ reward_versions = pd.read_csv(get_paths(run_on_cluster=False)['PS reward version
 assert np.all((reward_versions["sID"] % 4) == (reward_versions["rewardversion"]))
 
 # Set up data frames
-rewards = np.zeros((n_trials, n_sim_per_subj * n_subj))
-choices = np.zeros(rewards.shape)  # human data: left choice==0; right choice==1 (verified in R script 18/11/17)
-correct_boxes = np.zeros(rewards.shape)  # human data: left choice==0; right choice==1 (verified in R script 18/11/17)
-ps_right = np.zeros(rewards.shape)
-LLs = np.zeros(rewards.shape)
-# Qs_left = np.zeros(rewards.shape)
-# Qs_right = np.zeros(rewards.shape)
-Qs_L1L_R1R = np.zeros(rewards.shape)
-Qs_L0L_R0R = np.zeros(rewards.shape)
-Qs_L1R_R1L = np.zeros(rewards.shape)
-Qs_L0R_R0L = np.zeros(rewards.shape)
+rewards = np.zeros((n_trials, n_sim_per_subj * n_subj), dtype=int)
+choices = rewards.copy()  # human data: left choice==0; right choice==1 (verified in R script 18/11/17)
+correct_boxes = rewards.copy()  # human data: left choice==0; right choice==1 (verified in R script 18/11/17)
+ps_right = rewards.copy()
+LLs = rewards.copy()
+# Qs_trials = np.zeros((n_trials, 2, 2, 2, n_sim))
+Qs_trials = np.zeros((n_trials, 2, n_sim))
 
 # Initialize task
 task_info_path = get_paths(run_on_cluster=False)['PS task info']
@@ -103,26 +101,31 @@ for trial in range(n_trials):
 
     # Update Q-values (starting on third trial)
     if trial <= 1:
-        Q_L1L_R1R, Q_L0L_R0R, Q_L1R_R1L, Q_L0R_R0L = 0.5 * np.ones(n_sim), 0.5 * np.ones(n_sim), 0.5 * np.ones(
-            n_sim), 0.5 * np.ones(n_sim)
+        # Qs = 0.5 * np.ones((2, 2, 2, n_sim))  # shape: (n_prev_choice, n_prev_reward, n_choice, n_sim)
+        Qs = 0.5 * np.ones((2, n_sim))  # shape: (n_choice, n_sim)
     else:
-        Q_L1L_R1R, Q_L0L_R0R, Q_L1R_R1L, Q_L0R_R0L = update_Q(
-            choices[trial-2], rewards[trial-2], choices[trial-1], rewards[trial-1],
-            Q_L1L_R1R, Q_L0L_R0R, Q_L1R_R1L, Q_L0R_R0L,
-            parameters['alpha'], parameters['nalpha'], parameters['calpha'], parameters['cnalpha'])
+        # index = [choices[trial-2], rewards[trial-2], choices[trial-1], np.arange(n_sim)]
+        # mirror_index = [1 - choices[trial-2], rewards[trial-2], 1 - choices[trial-1], np.arange(n_sim)]
+        index = [choices[trial-1], np.arange(n_sim)]
+        Qs = update_Q(
+            choices[trial - 1], rewards[trial - 1],
+            Qs,
+            np.array(parameters['alpha']))  # , parameters['nalpha'], parameters['calpha'], parameters['cnalpha'])
 
     # Translate Q-values into action probabilities
     if verbose:
-        print("Q_L1L_R1R: {0}\nQ_L0L_R0R: {1}\nQ_L1R_R1L: {2}\nQ_L0R_R0L: {3}".format(
-            np.round(Q_L1L_R1R, 2), np.round(Q_L0L_R0R, 2), np.round(Q_L1R_R1L, 2), np.round(Q_L0R_R0L, 2)))
-
+        print(np.round(Qs, 2))
     if trial == 0:
         p_right = 0.5 * np.ones(n_sim)
     else:
+        # index_l = choices[trial-1], rewards[trial-1], 0, np.arange(n_sim)
+        # index_r = choices[trial-1], rewards[trial-1], 1, np.arange(n_sim)
+        index_l = 0, np.arange(n_sim)
+        index_r = 1, np.arange(n_sim)
         p_right = p_from_Q(
-            Q_L1L_R1R, Q_L0L_R0R, Q_L1R_R1L, Q_L0R_R0L,
-            choices[trial-1], rewards[trial-1],
-            parameters['beta'], np.zeros(n_sim), verbose)
+            Qs,
+            index_l, index_r,
+            np.array(parameters['beta']), np.zeros(n_sim), verbose)
 
     # Select an action based on probabilities
     choice = np.random.binomial(n=1, p=p_right)  # produces "1" with p_right, and "0" with (1 - p_right)
@@ -144,12 +147,31 @@ for trial in range(n_trials):
     rewards[trial] = reward
     correct_boxes[trial] = task.correct_box
     LLs[trial] = LL
+    Qs_trials[trial] = Qs
     # Qs_left[trial] = Q_left
     # Qs_right[trial] = Q_right
-    Qs_L1L_R1R[trial] = Q_L1L_R1R
-    Qs_L0L_R0R[trial] = Q_L0L_R0R
-    Qs_L1R_R1L[trial] = Q_L1R_R1L
-    Qs_L0R_R0L[trial] = Q_L0R_R0L
+    # Qs_L1L_R1R[trial] = Q_L1L_R1R
+    # Qs_L0L_R0R[trial] = Q_L0L_R0R
+    # Qs_L1R_R1L[trial] = Q_L1R_R1L
+    # Qs_L0R_R0L[trial] = Q_L0R_R0L
+
+# Plot development of Q-values
+if make_plots:
+    for subj in range(min(n_sim, 5)):
+        plt.figure()
+        # plt.plot(Qs_trials[:, 0, 0, 0, subj], label='L0L')
+        # plt.plot(Qs_trials[:, 1, 0, 1, subj], label='R0R')
+        # plt.plot(Qs_trials[:, 0, 1, 0, subj], label='L1L')
+        # plt.plot(Qs_trials[:, 1, 1, 1, subj], label='R1R')
+        # plt.plot(Qs_trials[:, 0, 1, 1, subj], label='L1R')
+        # plt.plot(Qs_trials[:, 1, 1, 0, subj], label='R1L')
+        # plt.plot(Qs_trials[:, 0, 0, 1, subj], label='L0R')
+        # plt.plot(Qs_trials[:, 1, 0, 0, subj], label='R0L')
+        plt.plot(Qs_trials[:, 0, subj], label='L')
+        plt.plot(Qs_trials[:, 1, subj], label='R')
+        plt.ylim((0, 1))
+        plt.legend()
+    plt.show()
 
 # Save data
 for i, sID in enumerate(parameters['sID']):

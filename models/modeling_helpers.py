@@ -85,7 +85,7 @@ def load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_su
     return [n_subj, n_trials, seasons, aliens, actions, rewards, true_params]
 
 
-def load_data(run_on_cluster, fitted_data_name, n_groups, kids_and_teens_only, adults_only, verbose):
+def load_data(run_on_cluster, fitted_data_name, n_groups, kids_and_teens_only, adults_only, verbose=False, n_subj='all'):
 
     # Get data path and save path
     paths = get_paths(run_on_cluster)
@@ -93,17 +93,19 @@ def load_data(run_on_cluster, fitted_data_name, n_groups, kids_and_teens_only, a
         data_dir = paths['human data']
         file_name_pattern = 'PS*.csv'
         n_trials = 128
-        n_subj = 500
     else:
         learning_style = 'hierarchical'
         data_dir = paths['simulations']
         file_name_pattern = 'PS' + learning_style + '*.csv'
         n_trials = 200
-        n_subj = 50
 
     # Prepare things for loading data
     print("Preparing to load {0} datasets with pattern {1} from {2}...\n".format(n_subj, file_name_pattern, data_dir))
-    filenames = glob.glob(data_dir + file_name_pattern)[:n_subj]
+    filenames = glob.glob(data_dir + file_name_pattern)
+    if n_subj != 'all':
+        filenames = filenames[:n_subj]
+    else:
+        n_subj = len(filenames)
     assert len(filenames) > 0, "Error: There are no files with pattern {0} in {1}".format(file_name_pattern, data_dir)
     choices = np.zeros((n_trials, len(filenames)))
     rewards = np.zeros(choices.shape)

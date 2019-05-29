@@ -29,67 +29,42 @@ def get_paths(run_on_cluster):
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
 
-def p_from_Q(Q_L1L_R1R, Q_L0L_R0R, Q_L1R_R1L, Q_L0R_R0L,  # Q_left, Q_right,
-             choices, rewards,
-             # persev_bonus_left, persev_bonus_right,
-             beta, eps, verbose=False):
+def p_from_Q(Qs,
+             persev_bonus,
+             beta):
 
-    # if verbose:
-    #     print('Q_right:\n{}'.format(Q_right.round(3)))
-    #     print('Q_left:\n{}'.format(Q_left.round(3)))
+    # Add perseverance bonus
+    Qs_p = Qs + persev_bonus
 
-    # # Add perseverance bonus
-    # Q_right_ = Q_right + persev_bonus_right  # perseverance only lasts for 1 trial
-    # Q_left_ = Q_left + persev_bonus_left
-    # if verbose:
-    #     print('Q_right after adding perseveration bonus:\n{}'.format(Q_right_.round(3)))
-    #     print('Q_left after adding perseveration bonus:\n{}'.format(Q_left_.round(3)))
+    # softmax-transform Q-values into probabilities
+    p_right = 1 / (1 + np.exp(beta * (Qs_p[..., 0] - Qs_p[..., 1])))  # 0 = left action; 1 = right action
 
-    # translate Q-values into probabilities using softmax
-    L1_1hot, L0_1hot = (1 - choices) * rewards, (1 - choices) * (1 - rewards)
-    R1_1hot, R0_1hot = choices * rewards, choices * (1 - rewards)
-
-    p_right = 1 / (1 + np.exp(beta * (Q_L1L_R1R - Q_L1R_R1L))) * L1_1hot + \
-              1 / (1 + np.exp(beta * (Q_L1R_R1L - Q_L1L_R1R))) * R1_1hot + \
-              1 / (1 + np.exp(beta * (Q_L0L_R0R - Q_L0R_R0L))) * L0_1hot + \
-              1 / (1 + np.exp(beta * (Q_L0R_R0L - Q_L0L_R0R))) * R0_1hot
-    if verbose:
-        print('p_right after softmax:\n{}'.format(p_right.round(3)))
-
-    # add eps noise
-    return eps * 0.5 + (1 - eps) * p_right
+    return p_right
 
 
-def update_Q(prev_choice, prev_reward, choice, reward,
-             Q_L1L_R1R, Q_L0L_R0R, Q_L1R_R1L, Q_L0R_R0L,
-             alpha, nalpha, calpha, cnalpha):
+def update_Q(
+        # prev_choice, prev_reward,
+        choice, reward,
+        Qs, _,
+        alpha, nalpha, calpha, cnalpha, n_subj):
 
-    # Counter-factual learning: Weigh RPE with alpha for chosen action, and with calpha for unchosen action
-    # RPE = reward - choice * Q_right - (1 - choice) * Q_left  # RPE = reward - Q[chosen] # TempDiff: + gamma * (next_choice * Q_right + (1 - next_choice) * Q_left)
-    L1L_R1R_1hot = (1 - prev_choice) * prev_reward * (1 - choice) + prev_choice * prev_reward * choice
-    L0L_R0R_1hot = (1 - prev_choice) * (1 - prev_reward) * (1 - choice) + prev_choice * (1 - prev_reward) * choice
-    L1R_R1L_1hot = (1 - prev_choice) * prev_reward * choice + prev_choice * prev_reward * (1 - choice)
-    L0R_R0L_1hot = (1 - prev_choice) * (1 - prev_reward) * choice + prev_choice * (1 - prev_reward) * (1 - choice)
+    # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
+    RPE = (reward - Qs[T.arange(n_subj), choice]) * reward
+    nRPE = (reward - Qs[T.arange(n_subj), choice]) * (1 - reward)
 
-    Q = Q_L1L_R1R * L1L_R1R_1hot + Q_L0L_R0R * L0L_R0R_1hot + Q_L1R_R1L * L1R_R1L_1hot + Q_L0R_R0L * L0R_R0L_1hot
-    RPE = reward - Q
+    # Update action taken (e.g., left & reward -> left)
+    Qs = T.set_subtensor(Qs[T.arange(n_subj), choice], Qs[T.arange(n_subj), choice] + alpha * RPE)
+    Qs = T.set_subtensor(Qs[T.arange(n_subj), choice], Qs[T.arange(n_subj), choice] + nalpha * nRPE)
 
-    # alpha_right_rew1 = choice * alpha - (1 - choice) * calpha   # choice==1 -> alpha; choice==0 -> -calpha
-    # alpha_right_rew0 = choice * nalpha - (1 - choice) * cnalpha   # choice==1 -> nalpha; choice==0 -> -cnalpha
-    #
-    # alpha_left_rew1 = (1 - choice) * alpha - choice * calpha  # choice==0 -> alpha; choice==1 -> -calpha
-    # alpha_left_rew0 = (1 - choice) * nalpha - choice * cnalpha  # choice==0 -> nalpha; choice==1 -> -cnalpha
-    #
-    # alpha_right = reward * alpha_right_rew1 + (1 - reward) * alpha_right_rew0
-    # alpha_left = reward * alpha_left_rew1 + (1 - reward) * alpha_left_rew0
+    # Update "mirror action" (e.g., right & reward -> right)
 
-    # Update Q-values for left and right action
-    # return Q_left + alpha_left * RPE, Q_right + alpha_right * RPE
-    return Q_L1L_R1R + alpha * L1L_R1R_1hot * RPE,\
-           Q_L0L_R0R + alpha * L0L_R0R_1hot * RPE, \
-           Q_L1R_R1L + alpha * L1R_R1L_1hot * RPE,\
-           Q_L0R_R0L + alpha * L0R_R0L_1hot * RPE
+    # Update counterfactual action (e.g., left & reward -> right)
+    Qs = T.set_subtensor(Qs[T.arange(n_subj), 1 - choice], Qs[T.arange(n_subj), 1 - choice] - calpha * RPE)
+    Qs = T.set_subtensor(Qs[T.arange(n_subj), 1 - choice], Qs[T.arange(n_subj), 1 - choice] - cnalpha * nRPE)
 
+    # Update counterfactual mirror action (e.g, right & reward -> left)
+
+    return Qs, _
 
 def get_likelihoods(rewards, choices, p_reward, p_noisy):
 
