@@ -29,6 +29,36 @@ def get_paths(run_on_cluster):
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
 
+def get_strat_Qs(n_trials, n_subj):
+
+    """code strategy 'stay unless you failed to receive reward twice in a row for the same action.'"""
+
+    Qs = np.zeros((n_trials, n_subj, 2, 2, 2, 2, 2))  # (..., prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice)
+    Qs[:, :, :, :, 1, 1, 1] = 1  # ...     R & 1 -> R
+    Qs[:, :, :, :, 0, 1, 0] = 1  # ...     L & 1 -> L
+    Qs[:, :, 1, 1, 1, 0, 1] = 1  # R & 1 & R & 0 -> R
+    Qs[:, :, 1, 0, 1, 0, 0] = 1  # R & 0 & R & 0 -> L
+    Qs[:, :, 0, 1, 1, 0, 0] = 1  # L & 1 & R & 0 -> L
+    Qs[:, :, 0, 0, 1, 0, 0] = 1  # L & 0 & R & 0 -> L
+    Qs[:, :, 1, 1, 0, 0, 1] = 1  # R & 1 & L & 0 -> R
+    Qs[:, :, 1, 0, 0, 0, 1] = 1  # R & 0 & L & 0 -> R
+    Qs[:, :, 0, 0, 0, 0, 1] = 1  # L & 0 & L & 0 -> R
+    Qs[:, :, 0, 1, 0, 0, 0] = 1  # L & 1 & L & 0 -> L
+    return Qs
+
+
+def get_WSLS_Qs(n_trials, n_subj):
+
+    """code strategy 'stay unless you failed to receive reward twice in a row for the same action.'"""
+
+    Qs = np.zeros((n_trials, n_subj, 2, 2, 2, 2, 2))  # (..., prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice)
+    Qs[:, :, :, :, 1, 1, 1] = 1  # R & 1 -> R
+    Qs[:, :, :, :, 0, 1, 0] = 1  # L & 1 -> L
+    Qs[:, :, :, :, 1, 0, 0] = 1  # R & 0 -> L
+    Qs[:, :, :, :, 0, 0, 1] = 1  # L & 0 -> R
+    return Qs
+
+
 def p_from_Q(
         Qs, persev_bonus,
         prev_prev_choice, prev_prev_reward,

@@ -4,7 +4,7 @@ import theano
 import theano.tensor as T
 import matplotlib.pyplot as plt
 
-from shared_modeling_simulation import update_Q, p_from_Q
+from shared_modeling_simulation import update_Q, p_from_Q, get_strat_Qs, get_WSLS_Qs
 from modeling_helpers import load_data, get_save_dir_and_save_id, print_logp_info
 
 import pymc3 as pm
@@ -12,11 +12,11 @@ import numpy as np
 
 # Switches for this script
 run_on_cluster = False
-verbose = True
+verbose = False
 print_logps = False
 file_name_suff = 'abcnSS'
 upper = 1000
-print("Working on model {}.".format(file_name_suff))
+print("Working on model '{}'.".format(file_name_suff))
 
 # Which data should be fitted?
 fitted_data_name = 'humans'  # 'humans', 'simulations'
@@ -27,15 +27,23 @@ n_subj = 'all'  # 'all' or int
 n_trials = 'all'  # 'all' or int
 
 # Sampling details
-n_samples = 100
-n_tune = 100
-n_cores = 2
-n_chains = 1
+if not run_on_cluster:
+    n_tune = 100
+    n_samples = 100
+    n_cores = 2
+    n_chains = 1
+else:
+    n_tune = 2000
+    n_samples = 5000
+    n_cores = 10
+    n_chains = 5
 target_accept = 0.8
 
 # Load to-be-fitted data from n_subj subjects with n_trials trials
 n_subj, rewards, choices, group, n_groups, age_z = load_data(run_on_cluster, fitted_data_name, n_groups, kids_and_teens_only, adults_only, n_subj)
-if n_trials != 'all':
+if n_trials == 'all':
+    n_trials = len(choices)
+else:
     choices = choices[:n_trials]
     rewards = rewards[:n_trials]
 
@@ -43,6 +51,12 @@ if n_trials != 'all':
 choices_both = np.array([1 - choices, choices])  # left, right
 choices_both = np.transpose(choices_both, (1, 2, 0))[:-1]  # make same shape as Qs (n_trials-1, n_subj, 2); remove last trial because it's not needed
 # choices_both = np.concatenate([np.zeros((1, n_subj, 2)), choices_both[:-1]])  # add 0's for first trial (what I did previously, but should be wrong, and also doesn't converge)
+
+# # Comment in for Strategy model ("stay unless failed to receive reward twice in a row for the same action.")
+# Qs = get_strat_Qs(n_trials, n_subj)
+# # Comment in for WSLS model ("stay if you won; switch if you lost")
+# Qs = get_WSLS_Qs(n_trials, n_subj)
+# Qs = theano.shared(np.asarray(Qs, dtype='float32'))
 
 # Transform everything into theano.shared variables
 rewards = theano.shared(np.asarray(rewards, dtype='int32'))
@@ -59,7 +73,7 @@ print("Compiling models for {0} with {1} samples and {2} tuning steps...\n".form
 
 with pm.Model() as model:
 
-    # # Get population-level and individual parameters
+    # Get population-level and individual parameters
     alpha_a_a = pm.Uniform('alpha_a_a', lower=0, upper=upper)
     alpha_a_b = pm.Uniform('alpha_a_b', lower=0, upper=upper)
     alpha_b_a = pm.Uniform('alpha_b_a', lower=0, upper=upper)
@@ -106,39 +120,39 @@ with pm.Model() as model:
     # alpha_sc = pm.Beta('alpha_sc', alpha=alpha_sc_a[group], beta=alpha_sc_b[group], shape=n_subj)
     # # alpha_sc = pm.Deterministic('alpha_sc', T.as_tensor_variable(1))
 
-    # cnalpha_sc_a_a = pm.Uniform('cnalpha_sc_a_a', lower=0, upper=upper)
-    # cnalpha_sc_a_b = pm.Uniform('cnalpha_sc_a_b', lower=0, upper=upper)
-    # cnalpha_sc_b_a = pm.Uniform('cnalpha_sc_b_a', lower=0, upper=upper)
-    # cnalpha_sc_b_b = pm.Uniform('cnalpha_sc_b_b', lower=0, upper=upper)
-    # cnalpha_sc_a = pm.Gamma('cnalpha_sc_a', alpha=cnalpha_sc_a_a, beta=cnalpha_sc_a_b, shape=n_groups)
-    # cnalpha_sc_b = pm.Gamma('cnalpha_sc_b', alpha=cnalpha_sc_b_a, beta=cnalpha_sc_b_b, shape=n_groups)
-    # cnalpha_sc = pm.Beta('cnalpha_sc', alpha=cnalpha_sc_a[group], beta=cnalpha_sc_b[group], shape=n_subj)
+    # # cnalpha_sc_a_a = pm.Uniform('cnalpha_sc_a_a', lower=0, upper=upper)
+    # # cnalpha_sc_a_b = pm.Uniform('cnalpha_sc_a_b', lower=0, upper=upper)
+    # # cnalpha_sc_b_a = pm.Uniform('cnalpha_sc_b_a', lower=0, upper=upper)
+    # # cnalpha_sc_b_b = pm.Uniform('cnalpha_sc_b_b', lower=0, upper=upper)
+    # # cnalpha_sc_a = pm.Gamma('cnalpha_sc_a', alpha=cnalpha_sc_a_a, beta=cnalpha_sc_a_b, shape=n_groups)
+    # # cnalpha_sc_b = pm.Gamma('cnalpha_sc_b', alpha=cnalpha_sc_b_a, beta=cnalpha_sc_b_b, shape=n_groups)
+    # # cnalpha_sc = pm.Beta('cnalpha_sc', alpha=cnalpha_sc_a[group], beta=cnalpha_sc_b[group], shape=n_subj)
     cnalpha_sc = pm.Deterministic('cnalpha_sc', calpha_sc.copy())
-
-    # Get parameter means and variances
+    #
+    # # Get parameter means and variances
     alpha_mu = pm.Deterministic('alpha_mu', 1 / (1 + alpha_b / alpha_a))
     alpha_var = pm.Deterministic('alpha_var', (alpha_a * alpha_b) / (np.square(alpha_a + alpha_b) * (alpha_a + alpha_b + 1)))
     beta_mu = pm.Deterministic('beta_mu', beta_a / beta_b + 1)
     beta_var = pm.Deterministic('beta_var', beta_a / np.square(beta_b))
-    # persev_mu = pm.Bound(pm.Normal, lower=-1, upper=1)('persev_mu', mu=persev_mu_mu, sd=persev_mu_sd, shape=n_groups)
-    # persev_sd = pm.HalfNormal('persev_sd', sd=persev_sd_sd, shape=n_groups)
+    # # persev_mu = pm.Bound(pm.Normal, lower=-1, upper=1)('persev_mu', mu=persev_mu_mu, sd=persev_mu_sd, shape=n_groups)
+    # # persev_sd = pm.HalfNormal('persev_sd', sd=persev_sd_sd, shape=n_groups)
     nalpha_mu = pm.Deterministic('nalpha_mu', 1 / (1 + nalpha_b / nalpha_a))
     nalpha_var = pm.Deterministic('nalpha_var', (nalpha_a * nalpha_b) / (np.square(nalpha_a + nalpha_b) * (nalpha_a + nalpha_b + 1)))
     calpha_sc_mu = pm.Deterministic('calpha_sc_mu', 1 / (1 + calpha_sc_b / calpha_sc_a))
     calpha_sc_var = pm.Deterministic('calpha_sc_var', (calpha_sc_a * calpha_sc_b) / (np.square(calpha_sc_a + calpha_sc_b) * (calpha_sc_a + calpha_sc_b + 1)))
-    # cnalpha_sc_mu = pm.Deterministic('cnalpha_sc_mu', 1 / (1 + cnalpha_sc_b / cnalpha_sc_a))
-    # cnalpha_sc_var = pm.Deterministic('cnalpha_sc_var', (cnalpha_sc_a * cnalpha_sc_b) / (np.square(cnalpha_sc_a + cnalpha_sc_b) * (cnalpha_sc_a + cnalpha_sc_b + 1)))
-
-    # Individual parameters
+    # # cnalpha_sc_mu = pm.Deterministic('cnalpha_sc_mu', 1 / (1 + cnalpha_sc_b / cnalpha_sc_a))
+    # # cnalpha_sc_var = pm.Deterministic('cnalpha_sc_var', (cnalpha_sc_a * cnalpha_sc_b) / (np.square(cnalpha_sc_a + cnalpha_sc_b) * (cnalpha_sc_a + cnalpha_sc_b + 1)))
+    #
+    # # Individual parameters
     alpha = pm.Beta('alpha', alpha=alpha_a[group], beta=alpha_b[group], shape=n_subj, testval=0.5 * T.ones(n_subj))
     b = pm.Gamma('b', alpha=beta_a[group], beta=beta_b[group], shape=n_subj, testval=T.ones(n_subj))
     beta = pm.Deterministic('beta', b + 1)
-    persev = 0  # (comment in for S and SS models)
-    # persev = pm.Normal('persev', mu=persev_mu[group], sd=persev_sd[group],
-    #                    shape=(1, n_subj, 1), testval=0.1 * T.ones((1, n_subj, 1)))  # comment in for letter model
+    persev = 0  # (comment in for S, SS, and strat models)
+    # # persev = pm.Normal('persev', mu=persev_mu[group], sd=persev_sd[group],
+    # #                    shape=(1, n_subj, 1), testval=0.1 * T.ones((1, n_subj, 1)))  # comment in for letter model
     persev_bonus = persev * choices_both
-
-    # gamma = pm.Beta('gamma', alpha=gamma_a[group], beta=gamma_b[group], shape=n_subj)
+    #
+    # # gamma = pm.Beta('gamma', alpha=gamma_a[group], beta=gamma_b[group], shape=n_subj)
     nalpha = pm.Beta('nalpha', alpha=nalpha_a[group], beta=nalpha_b[group], shape=n_subj, testval=0.5 * T.ones(n_subj))
     calpha = pm.Deterministic('calpha', alpha * calpha_sc)
     cnalpha = pm.Deterministic('cnalpha', nalpha * cnalpha_sc)
@@ -174,8 +188,8 @@ with pm.Model() as model:
     # # Comment in for S model (using prev_choice, prev_reward, choice, reward)
     # Qs = 0.5 * T.ones((n_subj, 2, 2, 2), dtype='int32')  # shape: (n_subj, prev_choice, prev_reward, choice)
     # # Comment in for SS model (using prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice, reward)
-    Qs = 0.5 * T.ones((n_subj, 2, 2, 2, 2, 2), dtype='int32')  # shape: (n_subj, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice)
-    _ = T.ones(n_subj, dtype='int32')
+    Qs = 0.5 * T.ones((n_subj, 2, 2, 2, 2, 2), dtype='float32')  # shape: (n_subj, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice)
+    _ = T.ones(n_subj, dtype='float32')
 
     # Calculate Q-values for all trials
     [Qs, _], _ = theano.scan(  # shape: (n_trials-2, n_subj, prev_choice, prev_reward, choice)
@@ -188,7 +202,7 @@ with pm.Model() as model:
         non_sequences=[alpha, nalpha, calpha, cnalpha, n_subj])
 
     # Initialize p_right for a single trial
-    p_right = 0.5 * T.ones(n_subj, dtype='int32')  # shape: (n_subj)
+    p_right = 0.5 * T.ones(n_subj, dtype='float32')  # shape: (n_subj)
 
     # Translate Q-values into probabilities for all trials
     p_right, _ = theano.scan(  # shape: (n_trials-2, n_subj)
@@ -223,10 +237,10 @@ waic = pm.waic(trace, model)
 
 if not run_on_cluster:
     pm.traceplot(trace)
-    plt.savefig("{0}plot_{1}_{2}.png".format(save_dir, save_id, np.round(np.array(waic), 2)))
+    plt.savefig("{0}plot_{1}_{2}.png".format(save_dir, save_id, np.round(waic.WAIC, 2)))
 
 # Save results
 print('Saving trace, trace plot, model, and model summary to {0}{1}...\n'.format(save_dir, save_id))
 with open(save_dir + save_id + '.pickle', 'wb') as handle:
-    pickle.dump({'trace': trace, 'model': model, 'summary': model_summary, 'waic': waic},
+    pickle.dump({'trace': trace, 'model': model, 'summary': model_summary, 'WAIC': waic.WAIC},
                 handle, protocol=pickle.HIGHEST_PROTOCOL)
