@@ -85,7 +85,7 @@ def load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_su
     return [n_subj, n_trials, seasons, aliens, actions, rewards, true_params]
 
 
-def load_data(run_on_cluster, fitted_data_name, n_groups, kids_and_teens_only, adults_only, verbose=False, n_subj='all'):
+def load_data(run_on_cluster, fitted_data_name, n_groups, kids_and_teens_only, adults_only, n_subj='all'):
 
     # Get data path and save path
     paths = get_paths(run_on_cluster)
@@ -176,11 +176,6 @@ def load_data(run_on_cluster, fitted_data_name, n_groups, kids_and_teens_only, a
     age['age'] = (age['age'] - np.nanmean(age['age'])) / np.nanstd(age['age'])
     # pd.DataFrame(age).to_csv(get_paths(run_on_cluster)['ages'])
     # print("Saved ages.csv to {}".format(get_paths(run_on_cluster)['ages']))
-
-    # Look at data
-    if verbose:
-        print("Choices - shape: {0}\n{1}\n".format(choices.shape, choices))
-        print("Rewards - shape: {0}\n{1}\n".format(rewards.shape, rewards))
 
     return [n_subj, rewards, choices, group, n_groups, age['age']]
 
