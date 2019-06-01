@@ -73,19 +73,21 @@ def p_from_Q(
         init_p, n_subj,
         beta):
 
-    # # Comment in when using choice, reward (letter model)
+    """This is the 'raw' function. Others are copied from this one."""
+
+    # # Comment in for p_from_Q_0 (letter models)
     # index0 = T.arange(n_subj), 0
     # index1 = T.arange(n_subj), 1
 
-    # # Comment in when using prev_choice, prev_reward, choice, reward (S model) or WSLS model
+    # # Comment in for p_from_Q_1 (WSLS, abS, etc.)
     # index0 = T.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 0
     # index1 = T.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 1
 
-    # Comment in when using prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice, reward (SS model) or strat model
+    # Comment in for p_from_Q_2 (strat, abSS, etc.)
     index0 = T.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 0
     index1 = T.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
 
-    # Add perseverance bonus (comment in for letter model only)
+    # Add perseverance bonus (not working)  # TD fix
     Qs_p = Qs  # + persev_bonus
 
     # softmax-transform Q-values into probabilities
@@ -102,17 +104,19 @@ def update_Q(
         Qs, _,
         alpha, nalpha, calpha, cnalpha, n_subj):
 
-    # # Comment in when using choice, reward (letter model)
+    """This is the 'raw' function. Others are copied from this one."""
+
+    # # Comment in for update_Q_0 (letter models)
     # index = T.arange(n_subj), choice
     # cindex = T.arange(n_subj), 1 - choice
 
-    # # Comment in when using prev_choice, prev_reward, choice, reward (S model)
+    # # Comment in for update_Q_1 (WSLS, abS, etc.)
     # index = T.arange(n_subj), prev_choice, prev_reward, choice  # action taken (e.g., left & reward -> left)
     # mindex = T.arange(n_subj), 1 - prev_choice, prev_reward, 1 - choice  # mirror action (e.g., right & reward -> right)
     # cindex = T.arange(n_subj), prev_choice, prev_reward, 1 - choice  # counterf. action (e.g., left & reward -> right)
     # cmindex = T.arange(n_subj), 1 - prev_choice, prev_reward, choice  # counterf. mir. ac. (e.g, right & reward -> left)
 
-    # Comment in when using prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice, reward (SS model)
+    # Comment in for update_Q_2 (strat, abSS, etc.)
     index = T.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice
     mindex = T.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice
     cindex = T.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice
@@ -126,15 +130,235 @@ def update_Q(
     Qs = T.set_subtensor(Qs[index],
                          Qs[index] + alpha * RPE + nalpha * nRPE)
 
-    # Update mirror action (comment out when using letter model)
+    # Update counterfactual action
+    Qs = T.set_subtensor(Qs[cindex],
+                         Qs[cindex] - calpha * RPE - cnalpha * nRPE)
+
+    # Update mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[mindex],
                          Qs[mindex] + alpha * RPE + nalpha * nRPE)
+
+    # Update counterfactual mirror action (comment out for letter models)
+    Qs = T.set_subtensor(Qs[cmindex],
+                         Qs[cmindex] - calpha * RPE - cnalpha * nRPE)
+
+    return Qs, _
+
+
+def p_from_Q_0(
+        Qs, persev_bonus,
+        prev_prev_choice, prev_prev_reward,
+        prev_choice, prev_reward,
+        init_p, n_subj,
+        beta):
+
+    # Comment in for p_from_Q_0 (letter models)
+    index0 = T.arange(n_subj), 0
+    index1 = T.arange(n_subj), 1
+
+    # Add perseverance bonus (not working)  # TD fix
+    Qs_p = Qs  # + persev_bonus
+
+    # softmax-transform Q-values into probabilities
+    p_right = 1 / (1 + np.exp(beta * (Qs_p[index0] - Qs_p[index1])))  # 0 = left action; 1 = right action
+    p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
+
+    return p_right
+
+
+def p_from_Q_1(
+        Qs, persev_bonus,
+        prev_prev_choice, prev_prev_reward,
+        prev_choice, prev_reward,
+        init_p, n_subj,
+        beta):
+
+    # Comment in for p_from_Q_1 (WSLS, abS, etc.)
+    index0 = T.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 0
+    index1 = T.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 1
+
+    # Add perseverance bonus (not working)  # TD fix
+    Qs_p = Qs  # + persev_bonus
+
+    # softmax-transform Q-values into probabilities
+    p_right = 1 / (1 + np.exp(beta * (Qs_p[index0] - Qs_p[index1])))  # 0 = left action; 1 = right action
+    p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
+
+    return p_right
+
+
+def p_from_Q_2(
+        Qs, persev_bonus,
+        prev_prev_choice, prev_prev_reward,
+        prev_choice, prev_reward,
+        init_p, n_subj,
+        beta):
+
+    # Comment in for p_from_Q_2 (strat, abSS, etc.)
+    index0 = T.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 0
+    index1 = T.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
+
+    # Add perseverance bonus (not working)  # TD fix
+    Qs_p = Qs  # + persev_bonus
+
+    # softmax-transform Q-values into probabilities
+    p_right = 1 / (1 + np.exp(beta * (Qs_p[index0] - Qs_p[index1])))  # 0 = left action; 1 = right action
+    p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
+
+    return p_right
+
+
+def p_from_Q_3(
+        Qs, persev_bonus,
+        prev_prev_prev_choice, prev_prev_prev_reward,
+        prev_prev_choice, prev_prev_reward,
+        prev_choice, prev_reward,
+        init_p, n_subj,
+        beta):
+
+    # Comment in for p_from_Q_2 (strat, abSS, etc.)
+    index0 = T.arange(n_subj, dtype='int32'), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 0
+    index1 = T.arange(n_subj, dtype='int32'), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
+
+    # Add perseverance bonus (not working)  # TD fix
+    Qs_p = Qs  # + persev_bonus
+
+    # softmax-transform Q-values into probabilities
+    p_right = 1 / (1 + np.exp(beta * (Qs_p[index0] - Qs_p[index1])))  # 0 = left action; 1 = right action
+    p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
+
+    return p_right
+
+
+def update_Q_0(
+        prev_prev_choice, prev_prev_reward,
+        prev_choice, prev_reward,
+        choice, reward,
+        Qs, _,
+        alpha, nalpha, calpha, cnalpha, n_subj):
+
+    # Comment in for update_Q_0 (letter models)
+    index = T.arange(n_subj), choice
+    cindex = T.arange(n_subj), 1 - choice
+
+    # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
+    RPE = (reward - Qs[index]) * reward
+    nRPE = (reward - Qs[index]) * (1 - reward)
+
+    # Update action taken
+    Qs = T.set_subtensor(Qs[index],
+                         Qs[index] + alpha * RPE + nalpha * nRPE)
 
     # Update counterfactual action
     Qs = T.set_subtensor(Qs[cindex],
                          Qs[cindex] - calpha * RPE - cnalpha * nRPE)
 
-    # Update counterfactual mirror action (comment out when using letter model)
+    return Qs, _
+
+
+def update_Q_1(
+        prev_prev_choice, prev_prev_reward,
+        prev_choice, prev_reward,
+        choice, reward,
+        Qs, _,
+        alpha, nalpha, calpha, cnalpha, n_subj):
+
+    # Comment in for update_Q_1 (WSLS, abS, etc.)
+    index = T.arange(n_subj), prev_choice, prev_reward, choice  # action taken (e.g., left & reward -> left)
+    mindex = T.arange(n_subj), 1 - prev_choice, prev_reward, 1 - choice  # mirror action (e.g., right & reward -> right)
+    cindex = T.arange(n_subj), prev_choice, prev_reward, 1 - choice  # counterf. action (e.g., left & reward -> right)
+    cmindex = T.arange(n_subj), 1 - prev_choice, prev_reward, choice  # counterf. mir. ac. (e.g, right & reward -> left)
+
+    # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
+    RPE = (reward - Qs[index]) * reward
+    nRPE = (reward - Qs[index]) * (1 - reward)
+
+    # Update action taken
+    Qs = T.set_subtensor(Qs[index],
+                         Qs[index] + alpha * RPE + nalpha * nRPE)
+
+    # Update counterfactual action
+    Qs = T.set_subtensor(Qs[cindex],
+                         Qs[cindex] - calpha * RPE - cnalpha * nRPE)
+
+    # Update mirror action (comment out for letter models)
+    Qs = T.set_subtensor(Qs[mindex],
+                         Qs[mindex] + alpha * RPE + nalpha * nRPE)
+
+    # Update counterfactual mirror action (comment out for letter models)
+    Qs = T.set_subtensor(Qs[cmindex],
+                         Qs[cmindex] - calpha * RPE - cnalpha * nRPE)
+
+    return Qs, _
+
+
+def update_Q_2(
+        prev_prev_choice, prev_prev_reward,
+        prev_choice, prev_reward,
+        choice, reward,
+        Qs, _,
+        alpha, nalpha, calpha, cnalpha, n_subj):
+
+    # Comment in for update_Q_2 (strat, abSS, etc.)
+    index = T.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice
+    mindex = T.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice
+    cindex = T.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice
+    cmindex = T.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
+
+    # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
+    RPE = (reward - Qs[index]) * reward
+    nRPE = (reward - Qs[index]) * (1 - reward)
+
+    # Update action taken
+    Qs = T.set_subtensor(Qs[index],
+                         Qs[index] + alpha * RPE + nalpha * nRPE)
+
+    # Update counterfactual action
+    Qs = T.set_subtensor(Qs[cindex],
+                         Qs[cindex] - calpha * RPE - cnalpha * nRPE)
+
+    # Update mirror action (comment out for letter models)
+    Qs = T.set_subtensor(Qs[mindex],
+                         Qs[mindex] + alpha * RPE + nalpha * nRPE)
+
+    # Update counterfactual mirror action (comment out for letter models)
+    Qs = T.set_subtensor(Qs[cmindex],
+                         Qs[cmindex] - calpha * RPE - cnalpha * nRPE)
+
+    return Qs, _
+
+
+def update_Q_3(
+        prev_prev_prev_choice, prev_prev_prev_reward,
+        prev_prev_choice, prev_prev_reward,
+        prev_choice, prev_reward,
+        choice, reward,
+        Qs, _,
+        alpha, nalpha, calpha, cnalpha, n_subj):
+
+    # Comment in for update_Q_2 (strat, abSS, etc.)
+    index = T.arange(n_subj), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice
+    mindex = T.arange(n_subj), 1 - prev_prev_prev_choice, prev_prev_prev_reward, 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice
+    cindex = T.arange(n_subj), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice
+    cmindex = T.arange(n_subj), 1 - prev_prev_prev_choice, prev_prev_prev_reward, 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
+
+    # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
+    RPE = (reward - Qs[index]) * reward
+    nRPE = (reward - Qs[index]) * (1 - reward)
+
+    # Update action taken
+    Qs = T.set_subtensor(Qs[index],
+                         Qs[index] + alpha * RPE + nalpha * nRPE)
+
+    # Update counterfactual action
+    Qs = T.set_subtensor(Qs[cindex],
+                         Qs[cindex] - calpha * RPE - cnalpha * nRPE)
+
+    # Update mirror action (comment out for letter models)
+    Qs = T.set_subtensor(Qs[mindex],
+                         Qs[mindex] + alpha * RPE + nalpha * nRPE)
+
+    # Update counterfactual mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[cmindex],
                          Qs[cmindex] - calpha * RPE - cnalpha * nRPE)
 

@@ -85,7 +85,7 @@ def load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_su
     return [n_subj, n_trials, seasons, aliens, actions, rewards, true_params]
 
 
-def load_data(run_on_cluster, fitted_data_name, n_groups, kids_and_teens_only, adults_only, n_subj='all'):
+def load_data(run_on_cluster, fitted_data_name='humans', n_groups=3, kids_and_teens_only=False, adults_only=False, n_subj='all'):
 
     # Get data path and save path
     paths = get_paths(run_on_cluster)
