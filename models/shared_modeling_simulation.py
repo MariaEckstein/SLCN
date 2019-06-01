@@ -1,6 +1,6 @@
 import numpy as np
-import theano.tensor as T
 import theano
+import theano.tensor as T
 
 
 alien_initial_Q = 5 / 3
@@ -9,18 +9,25 @@ alien_initial_Q = 5 / 3
 def get_paths(run_on_cluster):
 
     if run_on_cluster:
-        base_path = '/home/bunge/maria/Desktop/'
-        return {'human data': base_path + '/PShumanData/',
-                'fitting results': base_path + '/PSPyMC3/fitting/',
-                'SLCN info': base_path + '/PSPyMC3/SLCNinfo2.csv',
-                'simulations': base_path + 'PSPyMC3/PSsimulations/',
+        # base_path = '/home/bunge/maria/Desktop/'
+        # return {'human data': base_path + '/PShumanData/',
+        #         'fitting results': base_path + '/ProbSwitch/fitting/',
+        #         'SLCN info': base_path + '/ProbSwitch/SLCNinfo2.csv',
+        #         'simulations': base_path + 'ProbSwitch/PSsimulations/',
+        #         'old simulations': base_path + '/PShumanData/fit_par/',
+        #         'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
+        base_path = '/global/home/users/mariaeckstein/'
+        return {'human data': base_path + 'PShumanData/',
+                'fitting results': base_path + '/ProbSwitch/fitting/',
+                'SLCN info': base_path + '/ProbSwitch/SLCNinfo2.csv',
+                'simulations': base_path + 'ProbSwitch/PSsimulations/',
                 'old simulations': base_path + '/PShumanData/fit_par/',
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
     else:
         base_path = 'C:/Users/maria/MEGAsync/SLCN'
         return {'human data': base_path + 'data/ProbSwitch/',
-                'fitting results': base_path + '/PShumanData/fitting/',
+                'fitting results': base_path + '/PShumanData/fitting/map_indiv/',
                 'SLCN info': base_path + 'data/SLCNinfo2.csv',
                 'PS reward versions': base_path + 'data/ProbSwitch_rewardversions.csv',
                 'ages': base_path + 'data/ages.csv',
@@ -51,11 +58,11 @@ def get_WSLS_Qs(n_trials, n_subj):
 
     """code strategy 'stay unless you failed to receive reward twice in a row for the same action.'"""
 
-    Qs = np.zeros((n_trials, n_subj, 2, 2, 2, 2, 2))  # (..., prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice)
-    Qs[:, :, :, :, 1, 1, 1] = 1  # R & 1 -> R
-    Qs[:, :, :, :, 0, 1, 0] = 1  # L & 1 -> L
-    Qs[:, :, :, :, 1, 0, 0] = 1  # R & 0 -> L
-    Qs[:, :, :, :, 0, 0, 1] = 1  # L & 0 -> R
+    Qs = np.zeros((n_trials, n_subj, 2, 2, 2))  # (..., prev_choice, prev_reward, choice)
+    Qs[:, :, 1, 1, 1] = 1  # R & 1 -> R
+    Qs[:, :, 0, 1, 0] = 1  # L & 1 -> L
+    Qs[:, :, 1, 0, 0] = 1  # R & 0 -> L
+    Qs[:, :, 0, 0, 1] = 1  # L & 0 -> R
     return Qs
 
 
@@ -70,11 +77,11 @@ def p_from_Q(
     # index0 = T.arange(n_subj), 0
     # index1 = T.arange(n_subj), 1
 
-    # # Comment in when using prev_choice, prev_reward, choice, reward (S model)
+    # # Comment in when using prev_choice, prev_reward, choice, reward (S model) or WSLS model
     # index0 = T.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 0
     # index1 = T.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 1
 
-    # Comment in when using prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice, reward (SS model)
+    # Comment in when using prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice, reward (SS model) or strat model
     index0 = T.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 0
     index1 = T.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
 
@@ -83,24 +90,7 @@ def p_from_Q(
 
     # softmax-transform Q-values into probabilities
     p_right = 1 / (1 + np.exp(beta * (Qs_p[index0] - Qs_p[index1])))  # 0 = left action; 1 = right action
-
-    return p_right
-
-
-def p_from_Q_sim(
-        Qs, persev_bonus,
-        prev_choice, prev_reward,
-        init_p, n_subj,
-        beta):
-
-    index0 = np.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 0
-    index1 = np.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 1
-
-    # Add perseverance bonus
-    Qs_p = Qs  # + persev_bonus
-
-    # softmax-transform Q-values into probabilities
-    p_right = 1 / (1 + np.exp(beta * (Qs_p[index0] - Qs_p[index1])))  # 0 = left action; 1 = right action
+    p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
 
     return p_right
 

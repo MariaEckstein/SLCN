@@ -119,8 +119,9 @@ for trial in range(n_trials):
         p_right = p_from_Q_sim(
             Qs,
             # persev_bonus,
+            choices[trial - 3], rewards[trial - 3],
             choices[trial - 2], rewards[trial - 2],
-            p_right, n_sim,
+            p_right, #n_sim,
             np.array(parameters['beta']))
 
     # Select an action based on probabilities
