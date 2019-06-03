@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from shared_modeling_simulation import get_paths, update_Q_sim, p_from_Q_sim, get_strat_Qs
+from shared_modeling_simulation import get_paths, update_Q_sim, p_from_Q_sim#, get_strat_Qs
 from PStask import Task
 
 # Switches for this script

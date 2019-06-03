@@ -22,10 +22,10 @@ if (data == "human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSGenRec"
   patt = ".csv"
 } else if (data == "simulated_human") {
-  data_dir = "C:/Users/maria/MEGAsync/SLCN/PSsimulations" # "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
-  patt = "PSRL.*csv"
+  data_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/simulations/"  # "C:/Users/maria/MEGAsync/SLCN/PSsimulations" # "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
+  patt = "PS_RLab.*csv"
 }
-plot_dir = file.path(data_dir, "PS_plots_abcnS")
+plot_dir = file.path(data_dir, "PlotsRLab")
 # plot_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch/PS_plots"
 
 if (!dir.exists(plot_dir)) {
