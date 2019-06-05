@@ -19,19 +19,21 @@ nll_bic = nll_bic.sort_values(by=['bic'])
 
 # Plot BICs of all models
 plt.figure(figsize=(15, 10))
-ax = sns.barplot(nll_bic['model_name'], nll_bic['bic'], hue=nll_bic['color'])
+ax = sns.barplot(nll_bic['model_name'], nll_bic['bic'], hue=nll_bic['color'], dodge=False)
 ax.get_legend().remove()
 plt.xticks(rotation='vertical')
 plt.ylabel('BIC')
+plt.ylim(0, 40000)
 plt.savefig("{0}plot_bics.png".format(save_dir))
 
 # Plot NLLs of all models
 nll_bic = nll_bic.sort_values(by=['nll'])
 plt.figure(figsize=(15, 10))
-ax = sns.barplot(nll_bic['model_name'], nll_bic['nll'], hue=nll_bic['color'])
+ax = sns.barplot(nll_bic['model_name'], nll_bic['nll'], hue=nll_bic['color'], dodge=False)
 ax.get_legend().remove()
 plt.xticks(rotation='vertical')
 plt.ylabel('NLL')
+plt.ylim(0, 20000)
 plt.savefig("{0}plot_nlls.png".format(save_dir))
 
 # Bring parameter estimates in the right shape
@@ -59,6 +61,23 @@ for file_name in file_names:
         # Save the csvs to save_dir
         print("Saving csv of fitted parameters for model {0} to {1}.".format(file_name, save_dir))
         fitted_params.to_csv(save_dir + 'params_' + file_name[:-7] + '.csv', index=False)
+
+        # Plot fitted parameter distributions
+        try:
+            param_names = [key for key in map.keys() if '__' not in key]
+            n_subplots = len(param_names)
+            plt.figure(figsize=(5, 2 * n_subplots))
+            for i, param_name in enumerate(param_names):
+                plt.subplot(n_subplots, 1, i + 1)
+                # plt.hist(map[key])
+                # sns.kdeplot(map[key])
+                sns.distplot(map[param_name])
+                plt.title(param_name)
+            plt.tight_layout()
+            print("Plotting fitted parameter distributions for model {0} to {1}.".format(file_name, save_dir))
+            plt.savefig("{0}fitted_param_distr_{1}.png".format(save_dir, file_name[:-7]))
+        except:
+            print("Couldn't plot {0}.".format(file_name[:-7]))
 
 # Plot fitted against simulated nll (run after PSAllSimulations)
 nll = pd.read_csv(save_dir + 'nlls.csv')

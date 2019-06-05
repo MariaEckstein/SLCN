@@ -50,12 +50,12 @@ def create_model(choices, rewards, group,
     if 'B' in model_name:
         persev_bonus = 2 * choices - 1  # recode as -1 for choice==0 (left) and +1 for choice==1 (right)
         persev_bonus = np.concatenate([np.zeros((1, n_subj)), persev_bonus])  # add 0 bonus for first trial
-        persev_bonus = theano.shared(np.asarray(persev_bonus, dtype='int8'))
+        persev_bonus = theano.shared(np.asarray(persev_bonus, dtype='int16'))
 
     # Transform everything into theano.shared variables
-    rewards = theano.shared(np.asarray(rewards, dtype='int8'))
-    choices = theano.shared(np.asarray(choices, dtype='int8'))
-    group = theano.shared(np.asarray(group, dtype='int8'))
+    rewards = theano.shared(np.asarray(rewards, dtype='int16'))
+    choices = theano.shared(np.asarray(choices, dtype='int16'))
+    group = theano.shared(np.asarray(group, dtype='int16'))
 
     # Get n_trials_back, n_params, and file_name_suff
     n_trials_back = get_n_trials_back(model_name)
@@ -241,13 +241,13 @@ def create_model(choices, rewards, group,
 
             if 'RL' in model_name:
                 if 'a' in model_name:
-                    alpha = pm.Beta('alpha', alpha=1, beta=1, shape=n_subj)
+                    alpha = pm.Beta('alpha', alpha=1, beta=1, shape=n_subj, testval=0.5 * T.ones(n_subj, dtype='float32'))
                     if verbose:
                         print("Adding free parameter alpha.")
                 else:
                     alpha = pm.Deterministic('alpha', T.ones(n_subj, dtype='float32'))
                 if 'n' in model_name:
-                    nalpha = pm.Beta('nalpha', alpha=1, beta=1, shape=n_subj)
+                    nalpha = pm.Beta('nalpha', alpha=1, beta=1, shape=n_subj, testval=0.25 * T.ones(n_subj, dtype='float32'))
                     if verbose:
                         print("Adding free parameter nalpha.")
                 else:
@@ -255,19 +255,19 @@ def create_model(choices, rewards, group,
                     if verbose:
                         print("Setting nalpha = alpha.")
                 if 'c' in model_name:
-                    calpha_sc = pm.Beta('calpha_sc', alpha=1, beta=1, shape=n_subj)
+                    calpha_sc = pm.Beta('calpha_sc', alpha=1, beta=1, shape=n_subj, testval=0.25 * T.ones(n_subj, dtype='float32'))
                     if verbose:
                         print("Adding free parameter calpha.")
                 else:
                     calpha_sc = 0
                 if 'x' in model_name:
-                    cnalpha_sc = pm.Beta('cnalpha_sc', alpha=1, beta=1, shape=n_subj)
+                    cnalpha_sc = pm.Beta('cnalpha_sc', alpha=1, beta=1, shape=n_subj, testval=0.25 * T.ones(n_subj, dtype='float32'))
                     if verbose:
                         print("Adding free parameter cnalpha.")
                 elif 'c' in model_name:
                     cnalpha_sc = pm.Deterministic('cnalpha_sc', 1 * calpha_sc)
                     if verbose:
-                        print("Setting cnalpha = calpha.")
+                        print("Setting cnalpha_sc = calpha_sc.")
                 else:
                     cnalpha_sc = 0
                 calpha = pm.Deterministic('calpha', alpha * calpha_sc)
@@ -314,12 +314,12 @@ def create_model(choices, rewards, group,
 
             # Calculate Q-values for all trials (RL models only)
             if n_trials_back == 0:
-                [Qs, _], _ = theano.scan(  # shape: (n_trials-2, n_subj, prev_choice)
+                [Qs, _], _ = theano.scan(  # shape: (n_trials-2, n_subj, prev_choice); starts predicting at trial 3!
                     fn=update_Q_0,
                     sequences=[
-                        choices[0:-2], rewards[0:-2],  # prev_prev_choice, prev_prev_reward: 1st trial til 3rd-to-last
-                        choices[1:-1], rewards[1:-1],  # prev_choice, prev_reward: 2nd trial til 2nd-to-last
-                        choices[2:], rewards[2:]],  # choice, reward: 3rd trial til last (for updating)
+                        choices[0:-2], rewards[0:-2],  # prev_prev_choice, prev_prev_reward (state in SS models)
+                        choices[1:-1], rewards[1:-1],  # prev_choice, prev_reward (state in S and SS models)
+                        choices[2:], rewards[2:]],  # this choice (action) is updated based on this reward
                     outputs_info=[Qs, _],
                     non_sequences=[alpha, nalpha, calpha, cnalpha, n_subj])
 
@@ -327,9 +327,9 @@ def create_model(choices, rewards, group,
                 [Qs, _], _ = theano.scan(  # shape: (n_trials-2, n_subj, prev_choice, prev_reward, choice)
                     fn=update_Q_1,
                     sequences=[
-                        choices[0:-2], rewards[0:-2],  # prev_prev_choice, prev_prev_reward: 1st trial til 3rd-to-last
-                        choices[1:-1], rewards[1:-1],  # prev_choice, prev_reward: 2nd trial til 2nd-to-last
-                        choices[2:], rewards[2:]],  # choice, reward: 3rd trial til last (for updating)
+                        choices[0:-2], rewards[0:-2],
+                        choices[1:-1], rewards[1:-1],
+                        choices[2:], rewards[2:]],
                     outputs_info=[Qs, _],
                     non_sequences=[alpha, nalpha, calpha, cnalpha, n_subj])
 
@@ -337,9 +337,9 @@ def create_model(choices, rewards, group,
                 [Qs, _], _ = theano.scan(  # shape: (n_trials-2, n_subj, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice)
                     fn=update_Q_2,
                     sequences=[
-                        choices[0:-2], rewards[0:-2],  # prev_prev_choice, prev_prev_reward: 1st trial til 3rd-to-last
-                        choices[1:-1], rewards[1:-1],  # prev_choice, prev_reward: 2nd trial til 2nd-to-last
-                        choices[2:], rewards[2:]],  # choice, reward: 3rd trial til last (for updating)
+                        choices[0:-2], rewards[0:-2],
+                        choices[1:-1], rewards[1:-1],
+                        choices[2:], rewards[2:]],
                     outputs_info=[Qs, _],
                     non_sequences=[alpha, nalpha, calpha, cnalpha, n_subj])
 
@@ -353,8 +353,8 @@ def create_model(choices, rewards, group,
                 p_right, _ = theano.scan(  # shape: (n_trials-2, n_subj)
                     fn=p_from_Q_0,
                     sequences=[Qs,
-                               choices[0:-2], rewards[0:-2],
-                               choices[1:-1], rewards[1:-1]
+                               choices[0:-2], rewards[0:-2],  # prev_prev_choice, prev_prev_reward (state in SS models)
+                               choices[1:-1], rewards[1:-1]  # prev_choice, prev_reward (state in S and SS models)
                                ],
                     outputs_info=[p_right],
                     non_sequences=[n_subj, beta, persev])
@@ -385,23 +385,24 @@ def create_model(choices, rewards, group,
 
             # Get posterior & calculate probability of subsequent trial
             p_r = 0.5 * T.ones(n_subj, dtype='float32')
-            [p_r, p_right], _ = theano.scan(fn=post_from_lik,
+            [p_r, p_right], _ = theano.scan(fn=post_from_lik,  # shape (n_trials, n_subj); starts predicting at trial 1!
                                             sequences=[lik_cor, lik_inc, scaled_persev_bonus],
                                             outputs_info=[p_r, None],
                                             non_sequences=[p_switch, beta])
-            p_right = p_right[1:-1]  # predict from third trial onward (consistent with RL / strat models)
+            p_right = p_right[2:]  # predict from trial 3 onward, not trial 1 (consistent with RL / strat models)
 
         # Use Bernoulli to sample responses
-        model_choices = pm.Bernoulli('model_choices', p=p_right, observed=choices[2:])  # predict from 3rd trial on
+        model_choices = pm.Bernoulli('model_choices', p=p_right[:-1], observed=choices[3:])  # predict from trial 3 on; discard last p_right because there is no trial to predict after the last value update
 
         # Check model logp and RV logps (will crash if they are nan or -inf)
         if verbose or print_logps:
             print_logp_info(model)
-            theano.printing.Print('choices')(choices)
-            theano.printing.Print('rewards')(rewards)
+            theano.printing.Print('all choices')(choices)
+            theano.printing.Print('all rewards')(rewards)
             if 'RL' in model_name:
-                theano.printing.Print('Qs')(Qs)
-            theano.printing.Print('p_right')(p_right)
+                theano.printing.Print('predicting Qs[:-1]')(Qs[:-1])
+            theano.printing.Print('predicting p_right[:-1]')(p_right[:-1])
+            theano.printing.Print('predicted choices[3:]')(choices[3:])
 
     return model, n_params, n_trials, save_dir, save_id
 
@@ -442,51 +443,35 @@ def fit_model(model, n_params, n_subj, n_trials,
             pickle.dump({'map': map, 'nll': nll, 'bic': bic},
                         handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    # Plot results
-    if not run_on_cluster:
-        print('Making and saving a plot!')
-        if fit_mcmc:
-            pm.traceplot(trace)
-
-        if fit_map:
-            param_names = [key for key in map.keys() if '__' not in key]
-            n_subplots = len(param_names)
-            plt.figure(figsize=(5, 2 * n_subplots))
-            for i, param_name in enumerate(param_names):
-                plt.subplot(n_subplots, 1, i + 1)
-                # plt.hist(map[key])
-                # sns.kdeplot(map[key])
-                sns.distplot(map[param_name])
-                plt.title(param_name)
-            plt.tight_layout()
-
-        plt.savefig("{0}plot_{1}.png".format(save_dir, save_id))
-
     if fit_map:
         return nll, bic
 
 
 # GET LIST OF MODELS TO RUN
-model_names = ['RLab' + i for i in ['cnxSSi', 'cnxSi', 'cnxpSSi', 'cnxpSi', 'cnx', 'cnxp', 'abS', 'abSi', 'abSS', 'abSSi', 'abp']]
+# model_names = ['RLab' + i for i in
+#                ['', 'c', 'n', 'p', 'SS', 'SSi', 'S', 'Si', 'cnxp', 'cnxpS', 'cnxpSi', 'cnxpSS', 'cnxpSSi',
+#                 'cn', 'cnx']]
+
+model_names = []
 
 # Add RL models
-# for c in ['', 'c']:
-#     for n in ['', 'n']:
-#         for x in ['', 'x']:
-#             for p in ['', 'p']:
-#                 for S in ['', 'S', 'SS']:
-#                     model_names.append('RLab' + c + n + x + p + S)
-#                     if S == 'S' or S == 'SS':
-#                         model_names.append('RLab' + c + n + x + p + S + 'i')
+for c in ['', 'c']:
+    for n in ['', 'n']:
+        for x in ['', 'x']:
+            for p in ['', 'p']:
+                for S in ['', 'S', 'SS']:
+                    model_names.append('RLab' + c + n + x + p + S)
+                    if S == 'S' or S == 'SS':
+                        model_names.append('RLab' + c + n + x + p + S + 'i')
 
-# # Add strategy models
-# model_names.extend(['WSLS', 'WSLSS'])
-#
-# # Add Bayesian models
-# for s in ['', 's']:
-#     for r in ['', 'r']:
-#         for p in ['', 'p']:
-#             model_names.append('Bb' + s + r + p)
+# Add strategy models
+model_names.extend(['WSLS', 'WSLSS'])
+
+# Add Bayesian models
+for s in ['', 's']:
+    for p in ['', 'p']:
+        for r in ['', 'r']:
+            model_names.append('Bb' + s + p + r)
 
 print("Getting ready to run {0} models: {1}".format(len(model_names), model_names))
 

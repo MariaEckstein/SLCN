@@ -2,6 +2,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy import stats
 import seaborn as sns
 sns.set(style='whitegrid')
 
@@ -101,7 +102,7 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=128, n
         # Translate Q-values into action probabilities
         if 'RL' in model_name or 'WSLS' in model_name:
             if trial < 2:  # need 2 trials' info to access the right p_right
-                p_right = 0.5 * np.ones(n_sim)
+                p_right = 0.5 * np.ones(n_sim)  # Simulations are using their initialized values asap
             else:
                 p_right = p_from_Q_sim(
                     Qs,
@@ -235,7 +236,7 @@ def get_quantile_groups(params_ages, col):
     return params_ages
 
 
-def plot_parameters_against_age(parameters, ages_file_dir='C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv'):
+def plot_parameters_against_age_calculate_corr(parameters, ages_file_dir='C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv'):
 
     # Load ages dataframe
     ages = pd.read_csv(ages_file_dir)
@@ -260,6 +261,7 @@ def plot_parameters_against_age(parameters, ages_file_dir='C:/Users/maria/MEGAsy
     #                          sharex="col", sharey="row",
     #                          squeeze=False)
     i = 0
+
     for param_name in param_names:
         for col in cols:
             params_ages = get_quantile_groups(params_ages, col)
@@ -276,9 +278,23 @@ def plot_parameters_against_age(parameters, ages_file_dir='C:/Users/maria/MEGAsy
     plt.tight_layout()
     plt.savefig("{0}plot_params_ages_quant_{1}.png".format(data_dir, model_name))
 
+    # Get correlations between parameters and age etc.
+    corrs = pd.DataFrame()
+    for param_name in param_names:
+        for col in cols:
+
+            # clean_indices = ~np.logical_or(np.isnan(params_ages[col]), np.isnan(params_ages[param_name]))
+            clean_indices = 1 - np.isnan(params_ages[col]) | np.isnan(params_ages[param_name])
+            corr, p = stats.pearsonr(params_ages.loc[clean_indices, param_name], params_ages.loc[clean_indices, col])
+
+            corrs = corrs.append([[param_name, col, corr, p]])
+
+    corrs.columns = ['param_name', 'charact', 'r', 'p']
+    corrs.to_csv("{0}corrs_{1}.csv".format(data_dir, model_name), index=False)
+
 
 # Run simulations for all fitted models
-data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/'
+data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/simulate/'
 file_names = [f for f in os.listdir(data_dir) if '.csv' in f if 'params' in f]
 nlls = pd.DataFrame()
 
@@ -290,8 +306,8 @@ for file_name in file_names:
     nll = simulate_model_from_parameters(parameters, data_dir, n_subj, make_plots=False)
     nlls = nlls.append([[model_name, nll]])
 
-    # Plot parameters against age etc.
-    plot_parameters_against_age(parameters)
+    # Plot parameters against age etc., calculate correlations between parameters and age etc.
+    plot_parameters_against_age_calculate_corr(parameters)
 
 nlls.columns = ['model_name', 'simulated_nll']
 nlls.to_csv(data_dir + 'nlls.csv', index=False)

@@ -91,11 +91,11 @@ def p_from_Q(
     Qs0 = Qs[index0]
     Qs1 = Qs[index1]
 
-    one = T.ones(1, dtype='int8')  # to avoid upcasting, which crashes theano.scan, e.g.:
+    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
     # upcast problem 1: (np.array(1, dtype='float32') + np.array(1, dtype='int32')).dtype >>> dtype('float64')
-    # fix: (np.array(1, dtype='float32') + np.array(1, dtype='int8')).dtype >>> dtype('float32')
+    # fix: (np.array(1, dtype='float32') + np.array(1, dtype='int16')).dtype >>> dtype('float32')
     # upcast problem 2: (1 - np.array(1, dtype='float32')).dtype >>> dtype('float64')
-    # fix (np.array(1, dtype='int8') - np.array(1, dtype='float32')).dtype >>> dtype('float32')
+    # fix (np.array(1, dtype='int16') - np.array(1, dtype='float32')).dtype >>> dtype('float32')
 
     Qs1 = Qs1 + prev_choice * persev  # upcast problem 1
     Qs0 = Qs0 + (one - prev_choice) * persev  # upcast problem 2
@@ -132,21 +132,21 @@ def update_Q(
     cindex = T.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice
     cmindex = T.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
 
-    # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
-    RPE = (1 - Qs[index]) * reward
-    nRPE = (0 - Qs[index]) * (1 - reward)
+    # Get reward prediction errors (RPEs)
+    RPE = (1 - Qs[index]) * reward  # RPEs for positive outcomes (reward == 1)
+    nRPE = (0 - Qs[index]) * (1 - reward)  # RPEs for negative outcomes (reward == 0)
 
     # Get counterfactual prediction errors (cRPEs)
-    cRPE = (1 - Qs[cindex]) * (1 - reward)
-    cnRPE = (0 - Qs[cindex]) * reward
+    cRPE = (0 - Qs[cindex]) * reward  # actual reward was 1; I think I would have gotten 0 for the other action
+    cnRPE = (1 - Qs[cindex]) * (1 - reward)  # actual reward 0; would have gotten 1 for the other action
 
     # Update action taken
     Qs = T.set_subtensor(Qs[index],
-                         Qs[index] + alpha * RPE + nalpha * nRPE)
+                         Qs[index] + alpha * RPE + nalpha * nRPE)  # add RPE for pos. & nRPE for neg. outcomes
 
     # Update counterfactual action
     Qs = T.set_subtensor(Qs[cindex],
-                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)
+                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)  # add cRPE for pos. & cnRPE for neg. outcomes
 
     # Update mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[mindex],
@@ -174,7 +174,7 @@ def p_from_Q_0(
     Qs0 = Qs[index0]
     Qs1 = Qs[index1]
 
-    one = T.ones(1, dtype='int8')  # to avoid upcasting, which crashes theano.scan, e.g.:
+    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
 
     Qs1 = Qs1 + prev_choice * persev
     Qs0 = Qs0 + (one - prev_choice) * persev
@@ -201,7 +201,7 @@ def p_from_Q_1(
     Qs0 = Qs[index0]
     Qs1 = Qs[index1]
 
-    one = T.ones(1, dtype='int8')  # to avoid upcasting, which crashes theano.scan, e.g.:
+    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
 
     Qs1 = Qs1 + prev_choice * persev
     Qs0 = Qs0 + (one - prev_choice) * persev
@@ -228,7 +228,7 @@ def p_from_Q_2(
     Qs0 = Qs[index0]
     Qs1 = Qs[index1]
 
-    one = T.ones(1, dtype='int8')  # to avoid upcasting, which crashes theano.scan, e.g.:
+    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
 
     Qs1 = Qs1 + prev_choice * persev
     Qs0 = Qs0 + (one - prev_choice) * persev
@@ -258,7 +258,7 @@ def p_from_Q_3(
     Qs0 = Qs[index0]
     Qs1 = Qs[index1]
 
-    one = T.ones(1, dtype='int8')  # to avoid upcasting, which crashes theano.scan, e.g.:
+    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
 
     Qs1 = Qs1 + prev_choice * persev
     Qs0 = Qs0 + (one - prev_choice) * persev
@@ -281,21 +281,21 @@ def update_Q_0(
     index = T.arange(n_subj), choice
     cindex = T.arange(n_subj), 1 - choice
 
-    # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
-    RPE = (1 - Qs[index]) * reward
-    nRPE = (0 - Qs[index]) * (1 - reward)
+    # Get reward prediction errors (RPEs)
+    RPE = (1 - Qs[index]) * reward  # RPEs for positive outcomes (reward == 1)
+    nRPE = (0 - Qs[index]) * (1 - reward)  # RPEs for negative outcomes (reward == 0)
 
     # Get counterfactual prediction errors (cRPEs)
-    cRPE = (1 - Qs[cindex]) * (1 - reward)
-    cnRPE = (0 - Qs[cindex]) * reward
+    cRPE = (0 - Qs[cindex]) * reward  # actual reward was 1; I think I would have gotten 0 for the other action
+    cnRPE = (1 - Qs[cindex]) * (1 - reward)  # actual reward 0; would have gotten 1 for the other action
 
     # Update action taken
     Qs = T.set_subtensor(Qs[index],
-                         Qs[index] + alpha * RPE + nalpha * nRPE)
+                         Qs[index] + alpha * RPE + nalpha * nRPE)  # add RPE for pos. & nRPE for neg. outcomes
 
     # Update counterfactual action
     Qs = T.set_subtensor(Qs[cindex],
-                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)
+                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)  # add cRPE for pos. & cnRPE for neg. outcomes
 
     return Qs, _
 
@@ -313,21 +313,21 @@ def update_Q_1(
     cindex = T.arange(n_subj), prev_choice, prev_reward, 1 - choice  # counterf. action (e.g., left & reward -> right)
     cmindex = T.arange(n_subj), 1 - prev_choice, prev_reward, choice  # counterf. mir. ac. (e.g, right & reward -> left)
 
-    # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
-    RPE = (1 - Qs[index]) * reward
-    nRPE = (0 - Qs[index]) * (1 - reward)
+    # Get reward prediction errors (RPEs)
+    RPE = (1 - Qs[index]) * reward  # RPEs for positive outcomes (reward == 1)
+    nRPE = (0 - Qs[index]) * (1 - reward)  # RPEs for negative outcomes (reward == 0)
 
     # Get counterfactual prediction errors (cRPEs)
-    cRPE = (1 - Qs[cindex]) * (1 - reward)
-    cnRPE = (0 - Qs[cindex]) * reward
+    cRPE = (0 - Qs[cindex]) * reward  # actual reward was 1; I think I would have gotten 0 for the other action
+    cnRPE = (1 - Qs[cindex]) * (1 - reward)  # actual reward 0; would have gotten 1 for the other action
 
     # Update action taken
     Qs = T.set_subtensor(Qs[index],
-                         Qs[index] + alpha * RPE + nalpha * nRPE)
+                         Qs[index] + alpha * RPE + nalpha * nRPE)  # add RPE for pos. & nRPE for neg. outcomes
 
     # Update counterfactual action
     Qs = T.set_subtensor(Qs[cindex],
-                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)
+                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)  # add cRPE for pos. & cnRPE for neg. outcomes
 
     # Update mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[mindex],
@@ -353,21 +353,21 @@ def update_Q_2(
     cindex = T.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice
     cmindex = T.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
 
-    # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
-    RPE = (1 - Qs[index]) * reward
-    nRPE = (0 - Qs[index]) * (1 - reward)
+    # Get reward prediction errors (RPEs)
+    RPE = (1 - Qs[index]) * reward  # RPEs for positive outcomes (reward == 1)
+    nRPE = (0 - Qs[index]) * (1 - reward)  # RPEs for negative outcomes (reward == 0)
 
     # Get counterfactual prediction errors (cRPEs)
-    cRPE = (1 - Qs[cindex]) * (1 - reward)
-    cnRPE = (0 - Qs[cindex]) * reward
+    cRPE = (0 - Qs[cindex]) * reward  # actual reward was 1; I think I would have gotten 0 for the other action
+    cnRPE = (1 - Qs[cindex]) * (1 - reward)  # actual reward 0; would have gotten 1 for the other action
 
     # Update action taken
     Qs = T.set_subtensor(Qs[index],
-                         Qs[index] + alpha * RPE + nalpha * nRPE)
+                         Qs[index] + alpha * RPE + nalpha * nRPE)  # add RPE for pos. & nRPE for neg. outcomes
 
     # Update counterfactual action
     Qs = T.set_subtensor(Qs[cindex],
-                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)
+                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)  # add cRPE for pos. & cnRPE for neg. outcomes
 
     # Update mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[mindex],
@@ -437,14 +437,14 @@ def update_Q_sim(
 
     elif n_trials_back == 1:
         index = np.arange(n_subj), prev_choice, prev_reward, choice  # action taken (e.g., left & reward -> left)
-        mindex = np.arange(n_subj), 1 - prev_choice, prev_reward, 1 - choice  # mirror action (e.g., right & reward -> right)
         cindex = np.arange(n_subj), prev_choice, prev_reward, 1 - choice  # counterf. action (e.g., left & reward -> right)
+        mindex = np.arange(n_subj), 1 - prev_choice, prev_reward, 1 - choice  # mirror action (e.g., right & reward -> right)
         cmindex = np.arange(n_subj), 1 - prev_choice, prev_reward, choice  # counterf. mir. ac. (e.g, right & reward -> left)
 
     elif n_trials_back == 2:
         index = np.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice  # action taken (e.g., left & reward -> left)
-        mindex = np.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice  # mirror action (e.g., right & reward -> right)
         cindex = np.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice  # counterf. action (e.g., left & reward -> right)
+        mindex = np.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice  # mirror action (e.g., right & reward -> right)
         cmindex = np.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice  # counterf. mir. ac. (e.g, right & reward -> left)
 
     # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
@@ -456,10 +456,10 @@ def update_Q_sim(
     cnRPE = (0 - Qs[cindex]) * reward
 
     # Update action taken
-    Qs[index] += alpha * RPE + nalpha * nRPE
+    Qs[index] += alpha * RPE + nalpha * nRPE  # add RPE at all pos. outcomes, and nRPE at all neg. outcomes
 
     # Update counterfactual action
-    Qs[cindex] += calpha * cRPE + cnalpha * cnRPE
+    Qs[cindex] += calpha * cRPE + cnalpha * cnRPE  # add cRPE at all pos. outcomes, and cnRPE at all neg. outcomes
 
     if n_trials_back > 0:
         # Update mirror action (comment out for letter models)
