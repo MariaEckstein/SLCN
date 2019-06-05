@@ -32,7 +32,7 @@ target_accept = 0.8
 
 def create_model(choices, rewards, group,
                  n_subj='all', n_trials='all',  # 'all' or int
-                 model_name='ab',  # ab, abc, abn, abcn, abcnnc, abcnS, abcnSS, WSLS, WSLSS, etc. etc.
+                 model_name='ab',  # ab, abc, abn, abcn, abcnx, abcnS, abcnSS, WSLS, WSLSS, etc. etc.
                  verbose=False, print_logps=False,
                  fitted_data_name='humans',  # 'humans', 'simulations'
                  n_groups=3, fit_individuals=True,
@@ -47,18 +47,15 @@ def create_model(choices, rewards, group,
         rewards = rewards[:n_trials]
 
     # Create choices_both (first trial is persev_bonus for second trial = where Qs starts)
-    # choices_both = np.array([1 - choices, choices])  # left, right
-    # choices_both = np.transpose(choices_both, (1, 2, 0))[:-1]  # make same shape as Qs (n_trials-1, n_subj, 2); remove last trial because it's not needed
     if 'B' in model_name:
-        persev_bonus = 2 * choices - 1  # recode as -1 for choice==0 (right?) and +1 for choice==1 (left?)
+        persev_bonus = 2 * choices - 1  # recode as -1 for choice==0 (left) and +1 for choice==1 (right)
         persev_bonus = np.concatenate([np.zeros((1, n_subj)), persev_bonus])  # add 0 bonus for first trial
-        persev_bonus = theano.shared(np.asarray(persev_bonus, dtype='int16'))
+        persev_bonus = theano.shared(np.asarray(persev_bonus, dtype='int8'))
 
     # Transform everything into theano.shared variables
-    rewards = theano.shared(np.asarray(rewards, dtype='int16'))
-    choices = theano.shared(np.asarray(choices, dtype='int16'))
-    # choices_both = theano.shared(np.asarray(choices_both, dtype='int16'))
-    group = theano.shared(np.asarray(group, dtype='int16'))
+    rewards = theano.shared(np.asarray(rewards, dtype='int8'))
+    choices = theano.shared(np.asarray(choices, dtype='int8'))
+    group = theano.shared(np.asarray(group, dtype='int8'))
 
     # Get n_trials_back, n_params, and file_name_suff
     n_trials_back = get_n_trials_back(model_name)
@@ -232,45 +229,65 @@ def create_model(choices, rewards, group,
         else:  # if fit_individuals == True:
 
             beta = pm.Gamma('beta', alpha=1, beta=1, shape=n_subj)
+            if verbose:
+                print("Adding free parameter beta.")
             if 'p' in model_name:
                 persev = pm.Bound(pm.Normal, lower=-1, upper=1)(
                     'persev', mu=0, sd=0.2, shape=(n_subj), testval=0.1 * T.ones(n_subj, dtype='float32'))
+                if verbose:
+                    print("Adding free parameter persev.")
             else:
                 persev = pm.Deterministic('persev', T.zeros(n_subj, dtype='float32'))
 
             if 'RL' in model_name:
                 if 'a' in model_name:
                     alpha = pm.Beta('alpha', alpha=1, beta=1, shape=n_subj)
+                    if verbose:
+                        print("Adding free parameter alpha.")
                 else:
-                    alpha = pm.Deterministic('alpha', T.ones(1, dtype='float32'))
+                    alpha = pm.Deterministic('alpha', T.ones(n_subj, dtype='float32'))
                 if 'n' in model_name:
                     nalpha = pm.Beta('nalpha', alpha=1, beta=1, shape=n_subj)
+                    if verbose:
+                        print("Adding free parameter nalpha.")
                 else:
                     nalpha = pm.Deterministic('nalpha', 1 * alpha)
+                    if verbose:
+                        print("Setting nalpha = alpha.")
                 if 'c' in model_name:
                     calpha_sc = pm.Beta('calpha_sc', alpha=1, beta=1, shape=n_subj)
+                    if verbose:
+                        print("Adding free parameter calpha.")
                 else:
                     calpha_sc = 0
-                if 'nc' in model_name:
+                if 'x' in model_name:
                     cnalpha_sc = pm.Beta('cnalpha_sc', alpha=1, beta=1, shape=n_subj)
+                    if verbose:
+                        print("Adding free parameter cnalpha.")
                 elif 'c' in model_name:
                     cnalpha_sc = pm.Deterministic('cnalpha_sc', 1 * calpha_sc)
+                    if verbose:
+                        print("Setting cnalpha = calpha.")
                 else:
                     cnalpha_sc = 0
                 calpha = pm.Deterministic('calpha', alpha * calpha_sc)
                 cnalpha = pm.Deterministic('cnalpha', nalpha * cnalpha_sc)
 
             elif 'B' in model_name:
-                p_noisy = pm.Deterministic('p_noisy', 1e-5 * T.as_tensor_variable(1))
                 scaled_persev_bonus = persev_bonus * persev
+                p_noisy = pm.Deterministic('p_noisy', 1e-5 * T.ones(n_subj, dtype='float32'))
                 if 's' in model_name:
                     p_switch = pm.Beta('p_switch', alpha=1, beta=1, shape=n_subj, testval=0.1 * T.ones(n_subj))
+                    if verbose:
+                        print("Adding free parameter p_switch.")
                 else:
-                    p_switch = pm.Deterministic('p_switch', 0.07 * T.ones(n_subj))  # TODO: Find the correct numbers!
+                    p_switch = pm.Deterministic('p_switch', 0.05081582 * T.ones(n_subj))  # checked on 2019-06-03 in R: `mean(all_files$switch_trial)`
                 if 'r' in model_name:
                     p_reward = pm.Beta('p_reward', alpha=1, beta=1, shape=n_subj, testval=0.75 * T.ones(n_subj))
+                    if verbose:
+                        print("Adding free p_reward.")
                 else:
-                    p_reward = pm.Deterministic('p_reward', 0.75 * T.ones(n_subj))  # TODO: Does this make sense?
+                    p_reward = pm.Deterministic('p_reward', 0.75 * T.ones(n_subj))  # 0.75 because p_reward is the prob. of getting reward if choice is correct
 
         # Initialize Q-values (with and without bias, i.e., option 'i')
         if 'RL' in model_name:
@@ -279,12 +296,16 @@ def create_model(choices, rewards, group,
                 if 'i' in model_name:
                     Qs = get_WSLSS_Qs(2, n_subj)[0]
                     Qs = theano.shared(np.array(Qs, dtype='float32'))  # initialize at WSLSS Qs
+                    if verbose:
+                        print("Initializing Qs at WSLSS.")
                 else:
                     Qs = 0.5 * T.ones((n_subj, 2, 2, 2, 2, 2), dtype='float32')  # (n_subj, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice)
             elif 'S' in model_name:  # S models
                 if 'i' in model_name:
                     Qs = get_WSLS_Qs(2, n_subj)[0]
                     Qs = theano.shared(np.array(Qs, dtype='float32'))  # initialize at WSLS Qs
+                    if verbose:
+                        print("Initializing Qs at WSLS.")
                 else:
                     Qs = 0.5 * T.ones((n_subj, 2, 2, 2), dtype='float32')  # (n_subj, prev_choice, prev_reward, choice)
             elif 'ab' in model_name:  # letter models
@@ -363,17 +384,12 @@ def create_model(choices, rewards, group,
             lik_cor, lik_inc = get_likelihoods(rewards, choices, p_reward, p_noisy)
 
             # Get posterior & calculate probability of subsequent trial
-            p_right = 0.5 * T.ones(n_subj, dtype='float32')  # TODO check if it still works or crashes scan because of upcasting!
-            [p_right_, p_right], _ = theano.scan(fn=post_from_lik,
-                                                 sequences=[lik_cor, lik_inc, scaled_persev_bonus],
-                                                 outputs_info=[p_right, None],
-                                                 non_sequences=[p_switch, beta])
-
-            # # Add p=0.5 for the first trial
-            # initial_p = 0.5 * T.ones((1, n_subj))
-            # p_right = T.concatenate([initial_p, p_right[:-1]], axis=0)
-            # p_right = p_right[2:]
-            p_right = p_right[1:-1]
+            p_r = 0.5 * T.ones(n_subj, dtype='float32')
+            [p_r, p_right], _ = theano.scan(fn=post_from_lik,
+                                            sequences=[lik_cor, lik_inc, scaled_persev_bonus],
+                                            outputs_info=[p_r, None],
+                                            non_sequences=[p_switch, beta])
+            p_right = p_right[1:-1]  # predict from third trial onward (consistent with RL / strat models)
 
         # Use Bernoulli to sample responses
         model_choices = pm.Bernoulli('model_choices', p=p_right, observed=choices[2:])  # predict from 3rd trial on
@@ -390,10 +406,10 @@ def create_model(choices, rewards, group,
     return model, n_params, n_trials, save_dir, save_id
 
 
-def get_results(model, n_params, n_subj, n_trials,
-                save_dir, save_id,
-                fit_mcmc=False, fit_map=True,
-                n_samples=100, n_tune=100, n_chains=1, n_cores=2, target_accept=0.8):
+def fit_model(model, n_params, n_subj, n_trials,
+              save_dir, save_id,
+              fit_mcmc=False, fit_map=True,
+              n_samples=100, n_tune=100, n_chains=1, n_cores=2, target_accept=0.8):
 
     # Sample the model
     if fit_mcmc:
@@ -409,7 +425,9 @@ def get_results(model, n_params, n_subj, n_trials,
 
     if fit_map:
         nll = opt_result['fun']
-        bic = np.log(n_subj * n_trials) * n_params + 2 * nll
+        # bic = np.log(n_subj * n_trials) * n_params + 2 * nll
+        # should be:
+        bic = np.log(n_trials) * n_subj * n_params + 2 * nll
         print("NLL: {0},\nBIC: {1}".format(nll, bic))
 
     # Save results
@@ -431,9 +449,9 @@ def get_results(model, n_params, n_subj, n_trials,
             pm.traceplot(trace)
 
         if fit_map:
-            n_subplots = len(map.keys())
-            plt.figure(figsize=(5, 2 * n_subplots))
             param_names = [key for key in map.keys() if '__' not in key]
+            n_subplots = len(param_names)
+            plt.figure(figsize=(5, 2 * n_subplots))
             for i, param_name in enumerate(param_names):
                 plt.subplot(n_subplots, 1, i + 1)
                 # plt.hist(map[key])
@@ -449,39 +467,31 @@ def get_results(model, n_params, n_subj, n_trials,
 
 
 # GET LIST OF MODELS TO RUN
-# Strategy models
-model_names = ['WSLS', 'WSLSS']
-
-# Add Bayesian models
-for s in ['', 's']:
-    for r in ['', 'r']:
-        for p in ['', 'p']:
-            model_names.append('Bb' + s + r + p)
+model_names = ['RLab' + i for i in ['cnxSSi', 'cnxSi', 'cnxpSSi', 'cnxpSi', 'cnx', 'cnxp', 'abS', 'abSi', 'abSS', 'abSSi', 'abp']]
 
 # Add RL models
-for c in ['', 'c']:
-    for n in ['', 'n']:
-        for nc in ['', 'nc']:
-            for p in ['', 'p']:
-                for S in ['', 'S', 'SS']:
-                    model_names.append('RLab' + c + n + nc + p + S)
-                    if S == 'S' or S == 'SS':
-                        model_names.append('RLab' + c + n + nc + p + S + 'i')
+# for c in ['', 'c']:
+#     for n in ['', 'n']:
+#         for x in ['', 'x']:
+#             for p in ['', 'p']:
+#                 for S in ['', 'S', 'SS']:
+#                     model_names.append('RLab' + c + n + x + p + S)
+#                     if S == 'S' or S == 'SS':
+#                         model_names.append('RLab' + c + n + x + p + S + 'i')
+
+# # Add strategy models
+# model_names.extend(['WSLS', 'WSLSS'])
+#
+# # Add Bayesian models
+# for s in ['', 's']:
+#     for r in ['', 'r']:
+#         for p in ['', 'p']:
+#             model_names.append('Bb' + s + r + p)
 
 print("Getting ready to run {0} models: {1}".format(len(model_names), model_names))
 
 # Load behavioral data on which to run the model(s)
-n_subj, rewards, choices, group, n_groups, age_z = load_data(run_on_cluster)
-
-# # Debug 1 model
-# model, n_params, n_trials, save_dir, save_id = create_model(
-#     choices=choices, rewards=rewards, group=group, model_name='RLabcnnc', n_subj=n_subj)
-#
-# # Fit parameters, calculate model fits, make plots, and save everything
-# nll, bic = get_results(model, n_params, n_subj, n_trials,
-#                        fit_mcmc, fit_map,
-#                        n_samples, n_tune, n_chains, n_cores, target_accept,
-#                        save_dir, save_id)
+n_subj, rewards, choices, group, n_groups, age_z = load_data(run_on_cluster, n_subj='all')
 
 # Run all models
 nll_bics = pd.DataFrame()
@@ -489,11 +499,10 @@ for model_name in model_names:
 
     # Create model
     model, n_params, n_trials, save_dir, save_id = create_model(
-        choices=choices, rewards=rewards, group=group, model_name=model_name, n_subj=n_subj)
+        choices=choices, rewards=rewards, group=group, model_name=model_name, n_subj=n_subj, n_trials='all', verbose=False)
 
     # Fit parameters, calculate model fits, make plots, and save everything
-    nll, bic = get_results(model, n_params, n_subj, n_trials,
-                           save_dir, save_id)
+    nll, bic = fit_model(model, n_params, n_subj, n_trials, save_dir, save_id)
 
     nll_bics = nll_bics.append([[model_name, n_params, nll, bic]])
     nll_bics.to_csv(save_dir + '/nll_bics_temp.csv', index=False)

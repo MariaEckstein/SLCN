@@ -91,11 +91,11 @@ def p_from_Q(
     Qs0 = Qs[index0]
     Qs1 = Qs[index1]
 
-    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
+    one = T.ones(1, dtype='int8')  # to avoid upcasting, which crashes theano.scan, e.g.:
     # upcast problem 1: (np.array(1, dtype='float32') + np.array(1, dtype='int32')).dtype >>> dtype('float64')
-    # fix: (np.array(1, dtype='float32') + np.array(1, dtype='int16')).dtype >>> dtype('float32')
+    # fix: (np.array(1, dtype='float32') + np.array(1, dtype='int8')).dtype >>> dtype('float32')
     # upcast problem 2: (1 - np.array(1, dtype='float32')).dtype >>> dtype('float64')
-    # fix (np.array(1, dtype='int16') - np.array(1, dtype='float32')).dtype >>> dtype('float32')
+    # fix (np.array(1, dtype='int8') - np.array(1, dtype='float32')).dtype >>> dtype('float32')
 
     Qs1 = Qs1 + prev_choice * persev  # upcast problem 1
     Qs0 = Qs0 + (one - prev_choice) * persev  # upcast problem 2
@@ -133,8 +133,12 @@ def update_Q(
     cmindex = T.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
 
     # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
-    RPE = (reward - Qs[index]) * reward
-    nRPE = (reward - Qs[index]) * (1 - reward)
+    RPE = (1 - Qs[index]) * reward
+    nRPE = (0 - Qs[index]) * (1 - reward)
+
+    # Get counterfactual prediction errors (cRPEs)
+    cRPE = (1 - Qs[cindex]) * (1 - reward)
+    cnRPE = (0 - Qs[cindex]) * reward
 
     # Update action taken
     Qs = T.set_subtensor(Qs[index],
@@ -142,7 +146,7 @@ def update_Q(
 
     # Update counterfactual action
     Qs = T.set_subtensor(Qs[cindex],
-                         Qs[cindex] - calpha * RPE - cnalpha * nRPE)
+                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)
 
     # Update mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[mindex],
@@ -150,7 +154,7 @@ def update_Q(
 
     # Update counterfactual mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[cmindex],
-                         Qs[cmindex] - calpha * RPE - cnalpha * nRPE)
+                         Qs[cmindex] + calpha * cRPE + cnalpha * cnRPE)
 
     return Qs, _
 
@@ -170,7 +174,7 @@ def p_from_Q_0(
     Qs0 = Qs[index0]
     Qs1 = Qs[index1]
 
-    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
+    one = T.ones(1, dtype='int8')  # to avoid upcasting, which crashes theano.scan, e.g.:
 
     Qs1 = Qs1 + prev_choice * persev
     Qs0 = Qs0 + (one - prev_choice) * persev
@@ -197,7 +201,7 @@ def p_from_Q_1(
     Qs0 = Qs[index0]
     Qs1 = Qs[index1]
 
-    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
+    one = T.ones(1, dtype='int8')  # to avoid upcasting, which crashes theano.scan, e.g.:
 
     Qs1 = Qs1 + prev_choice * persev
     Qs0 = Qs0 + (one - prev_choice) * persev
@@ -224,7 +228,7 @@ def p_from_Q_2(
     Qs0 = Qs[index0]
     Qs1 = Qs[index1]
 
-    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
+    one = T.ones(1, dtype='int8')  # to avoid upcasting, which crashes theano.scan, e.g.:
 
     Qs1 = Qs1 + prev_choice * persev
     Qs0 = Qs0 + (one - prev_choice) * persev
@@ -254,7 +258,7 @@ def p_from_Q_3(
     Qs0 = Qs[index0]
     Qs1 = Qs[index1]
 
-    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
+    one = T.ones(1, dtype='int8')  # to avoid upcasting, which crashes theano.scan, e.g.:
 
     Qs1 = Qs1 + prev_choice * persev
     Qs0 = Qs0 + (one - prev_choice) * persev
@@ -278,8 +282,12 @@ def update_Q_0(
     cindex = T.arange(n_subj), 1 - choice
 
     # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
-    RPE = (reward - Qs[index]) * reward
-    nRPE = (reward - Qs[index]) * (1 - reward)
+    RPE = (1 - Qs[index]) * reward
+    nRPE = (0 - Qs[index]) * (1 - reward)
+
+    # Get counterfactual prediction errors (cRPEs)
+    cRPE = (1 - Qs[cindex]) * (1 - reward)
+    cnRPE = (0 - Qs[cindex]) * reward
 
     # Update action taken
     Qs = T.set_subtensor(Qs[index],
@@ -287,7 +295,7 @@ def update_Q_0(
 
     # Update counterfactual action
     Qs = T.set_subtensor(Qs[cindex],
-                         Qs[cindex] - calpha * RPE - cnalpha * nRPE)
+                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)
 
     return Qs, _
 
@@ -306,8 +314,12 @@ def update_Q_1(
     cmindex = T.arange(n_subj), 1 - prev_choice, prev_reward, choice  # counterf. mir. ac. (e.g, right & reward -> left)
 
     # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
-    RPE = (reward - Qs[index]) * reward
-    nRPE = (reward - Qs[index]) * (1 - reward)
+    RPE = (1 - Qs[index]) * reward
+    nRPE = (0 - Qs[index]) * (1 - reward)
+
+    # Get counterfactual prediction errors (cRPEs)
+    cRPE = (1 - Qs[cindex]) * (1 - reward)
+    cnRPE = (0 - Qs[cindex]) * reward
 
     # Update action taken
     Qs = T.set_subtensor(Qs[index],
@@ -315,7 +327,7 @@ def update_Q_1(
 
     # Update counterfactual action
     Qs = T.set_subtensor(Qs[cindex],
-                         Qs[cindex] - calpha * RPE - cnalpha * nRPE)
+                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)
 
     # Update mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[mindex],
@@ -323,7 +335,7 @@ def update_Q_1(
 
     # Update counterfactual mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[cmindex],
-                         Qs[cmindex] - calpha * RPE - cnalpha * nRPE)
+                         Qs[cmindex] + calpha * cRPE + cnalpha * cnRPE)
 
     return Qs, _
 
@@ -342,8 +354,12 @@ def update_Q_2(
     cmindex = T.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
 
     # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
-    RPE = (reward - Qs[index]) * reward
-    nRPE = (reward - Qs[index]) * (1 - reward)
+    RPE = (1 - Qs[index]) * reward
+    nRPE = (0 - Qs[index]) * (1 - reward)
+
+    # Get counterfactual prediction errors (cRPEs)
+    cRPE = (1 - Qs[cindex]) * (1 - reward)
+    cnRPE = (0 - Qs[cindex]) * reward
 
     # Update action taken
     Qs = T.set_subtensor(Qs[index],
@@ -351,7 +367,7 @@ def update_Q_2(
 
     # Update counterfactual action
     Qs = T.set_subtensor(Qs[cindex],
-                         Qs[cindex] - calpha * RPE - cnalpha * nRPE)
+                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)
 
     # Update mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[mindex],
@@ -359,7 +375,7 @@ def update_Q_2(
 
     # Update counterfactual mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[cmindex],
-                         Qs[cmindex] - calpha * RPE - cnalpha * nRPE)
+                         Qs[cmindex] + calpha * cRPE + cnalpha * cnRPE)
 
     return Qs, _
 
@@ -379,8 +395,12 @@ def update_Q_3(
     cmindex = T.arange(n_subj), 1 - prev_prev_prev_choice, prev_prev_prev_reward, 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
 
     # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
-    RPE = (reward - Qs[index]) * reward
-    nRPE = (reward - Qs[index]) * (1 - reward)
+    RPE = (1 - Qs[index]) * reward
+    nRPE = (0 - Qs[index]) * (1 - reward)
+
+    # Get counterfactual prediction errors (cRPEs)
+    cRPE = (1 - Qs[cindex]) * (1 - reward)
+    cnRPE = (0 - Qs[cindex]) * reward
 
     # Update action taken
     Qs = T.set_subtensor(Qs[index],
@@ -388,7 +408,7 @@ def update_Q_3(
 
     # Update counterfactual action
     Qs = T.set_subtensor(Qs[cindex],
-                         Qs[cindex] - calpha * RPE - cnalpha * nRPE)
+                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)
 
     # Update mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[mindex],
@@ -396,7 +416,7 @@ def update_Q_3(
 
     # Update counterfactual mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[cmindex],
-                         Qs[cmindex] - calpha * RPE - cnalpha * nRPE)
+                         Qs[cmindex] + calpha * cRPE + cnalpha * cnRPE)
 
     return Qs, _
 
@@ -428,27 +448,33 @@ def update_Q_sim(
         cmindex = np.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice  # counterf. mir. ac. (e.g, right & reward -> left)
 
     # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
-    RPE = (reward - Qs[index]) * reward
-    nRPE = (reward - Qs[index]) * (1 - reward)
+    RPE = (1 - Qs[index]) * reward
+    nRPE = (0 - Qs[index]) * (1 - reward)
+
+    # Get counterfactual prediction errors (cRPEs)
+    cRPE = (1 - Qs[cindex]) * (1 - reward)
+    cnRPE = (0 - Qs[cindex]) * reward
 
     # Update action taken
     Qs[index] += alpha * RPE + nalpha * nRPE
 
     # Update counterfactual action
-    Qs[cindex] += - calpha * RPE - cnalpha * nRPE
+    Qs[cindex] += calpha * cRPE + cnalpha * cnRPE
 
     if n_trials_back > 0:
-        # Update mirror action
+        # Update mirror action (comment out for letter models)
         Qs[mindex] += alpha * RPE + nalpha * nRPE
 
-        # Update counterfactual mirror action
-        Qs[cmindex] += - calpha * RPE - cnalpha * nRPE
+        # Update counterfactual mirror action (comment out for letter models)
+        Qs[cmindex] += calpha * cRPE + cnalpha * cnRPE
 
     if verbose:
         print('upd_Q - index: ', index)
         print('upd_Q - cindex: ', cindex)
         print('upd_Q - RPE: ', np.round(RPE, 2))
         print('upd_Q - nRPE: ', np.round(nRPE, 2))
+        print('upd_Q - cRPE: ', np.round(cRPE, 2))
+        print('upd_Q - cnRPE: ', np.round(cnRPE, 2))
         print('upd_Q - new Qs:\n', np.round(Qs, 2))
 
     return Qs, _
@@ -477,8 +503,8 @@ def p_from_Q_sim(
         index1 = np.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
 
     # Add perseverance bonus
-    Qs0 = Qs[index0]
     Qs1 = Qs[index1]
+    Qs0 = Qs[index0]
 
     Qs1 += prev_choice * persev
     Qs0 += (1 - prev_choice) * persev
@@ -524,38 +550,40 @@ def get_likelihoods(rewards, choices, p_reward, p_noisy):
 
 
 def post_from_lik(lik_cor, lik_inc, scaled_persev_bonus,
-                  p_right,
+                  p_r,
                   p_switch, beta, verbose=False):
 
     if verbose:
-        print('old p_right:\n{0}'.format(p_right.round(3)))
+        print('old p_r:\n{0}'.format(p_r.round(3)))
 
     # Apply Bayes rule: Posterior prob. that right action is correct, based on likelihood (i.e., received feedback)
-    p_right = lik_cor * p_right / (lik_cor * p_right + lik_inc * (1 - p_right))
-    # theano.printing.Print('p_right after integr prior')(p_right)
+    p_r = lik_cor * p_r / (lik_cor * p_r + lik_inc * (1 - p_r))
+    # theano.printing.Print('p_r after integr prior')(p_r)
     if verbose:
-        print('p_right after likelihood:\n{0}'.format(p_right.round(3)))
+        print('p_r after likelihood:\n{0}'.format(p_r.round(3)))
 
     # Take into account that a switch might occur
-    p_right = (1 - p_switch) * p_right + p_switch * (1 - p_right)
-    # theano.printing.Print('p_right after taking switch')(p_right)
+    p_r = (1 - p_switch) * p_r + p_switch * (1 - p_r)
+    # theano.printing.Print('p_r after taking switch')(p_r)
     if verbose:
-        print('p_right after taking switch into account:\n{0}'.format(p_right.round(3)))
+        print('p_r after taking switch into account:\n{0}'.format(p_r.round(3)))
 
     # Add perseverance bonus
-    p_choice = p_right + scaled_persev_bonus
-    # theano.printing.Print('p_right after adding persevation bonus')(p_choice)
+    p_right = p_r + scaled_persev_bonus
+    # theano.printing.Print('p_r after adding persevation bonus')(p_right)
     if verbose:
-        print('p_choice after adding perseveration bonus:\n{0}'.format(p_choice.round(3)))
+        print('p_right after adding perseveration bonus:\n{0}'.format(p_right.round(3)))
 
     # Log-transform probabilities
-    p_choice = 1 / (1 + np.exp(-beta * (p_choice - (1 - p_choice))))
-    p_choice = 0.0001 + 0.9998 * p_choice  # make 0.0001 < p_choice < 0.9999
-    # theano.printing.Print('p_right after softmax')(p_choice)
+    p_right = 1 / (1 + np.exp(-beta * (p_right - (1 - p_right))))
+    p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
+    # theano.printing.Print('p_r after softmax')(p_right)
     if verbose:
-        print('p_choice after sigmoid transform:\n{0}'.format(p_choice.round(3)))
+        print('p_right after sigmoid transform:\n{0}'.format(p_right.round(3)))
 
-    return p_right, p_choice
+    # p_r is the actual probability of right, which is the prior for the next trial
+    # p_right is p_r after adding perseveration and log-transform, used to select actions
+    return p_r, p_right
 
 
 def get_n_trials_back(model_name):
@@ -570,13 +598,13 @@ def get_n_trials_back(model_name):
 
 
 def get_n_params(model_name):
-    if all(i in model_name for i in 'abcnp') and 'nc' in model_name:  # abcnncp, abcnncpS, abcnncpSS, etc.
+    if all(i in model_name for i in 'abcnxp'):  # abcnxp, abcnxpS, abcnxpSS, etc.
         return 6
-    elif all(i in model_name for i in 'abcn') and 'cn' in model_name or all(i in model_name for i in 'abcnp'):  # abcnnc, abcnncS, abcnncSS, etc.
+    elif all(i in model_name for i in 'abcnx') or all(i in model_name for i in 'abcnp') or all(i in model_name for i in 'abcxp') or all(i in model_name for i in 'abnxp'):  # abcnx, abcnxS, abcnxSS, etc.
         return 5
-    elif all(i in model_name for i in 'abcn') or all(i in model_name for i in 'abpn') or all(i in model_name for i in 'abcp') or all(i in model_name for i in 'bpsr'):
+    elif all(i in model_name for i in 'abcn') or all(i in model_name for i in 'abcx') or all(i in model_name for i in 'abcp') or all(i in model_name for i in 'abnx') or all(i in model_name for i in 'abnp') or all(i in model_name for i in 'abnp') or all(i in model_name for i in 'abxp') or all(i in model_name for i in 'bpsr'):
         return 4
-    elif all(i in model_name for i in 'abc') or all(i in model_name for i in 'abn') or all(i in model_name for i in 'abp') or all(i in model_name for i in 'bsr') or all(i in model_name for i in 'bpr') or all(i in model_name for i in 'bsp'):
+    elif all(i in model_name for i in 'abc') or all(i in model_name for i in 'abn') or all(i in model_name for i in 'abp') or all(i in model_name for i in 'abx') or all(i in model_name for i in 'bsr') or all(i in model_name for i in 'bpr') or all(i in model_name for i in 'bsp'):
         return 3
     elif 'ab' in model_name or all(i in model_name for i in 'bs') or all(i in model_name for i in 'br') or all(i in model_name for i in 'bp'):
         return 2

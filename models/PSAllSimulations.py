@@ -1,32 +1,35 @@
 import os
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
+sns.set(style='whitegrid')
 
 from PStask import Task
 from shared_modeling_simulation import get_paths, update_Q_sim, get_n_trials_back, p_from_Q_sim, get_WSLS_Qs, get_WSLSS_Qs, get_likelihoods, post_from_lik
 
 
-# TODO Make plots for all models (early RL ones are wrong)
-# TODO Save simulated NLLs (same table as fitted NLL?)
+def get_parameters(data_dir, file_name, n_subj='all', n_sim_per_subj=2):
 
-
-def simulate_model_from_filename(file_name, data_dir, n_trials=128, n_subj='all', n_sim_per_subj=2, verbose=False):
-
-    """Simulate agents for the model specified in file_name, with the parameters indicated in the referenced file."""
-
-    # GET MODEL PARAMETERS
-    model_name = [part for part in file_name.split('_') if 'RL' in part or 'B' in part or 'WSLS' in part][0]
     orig_parameters = pd.read_csv(data_dir + file_name)
-    # orig_parameters['persev'] += 0.1  # TODO remove after debug!!!
     print("Loaded parameters for model {2} from {0}. parameters.head():\n{1}".format(data_dir, orig_parameters.head(), model_name))
 
     # Adjust n_subj
     if n_subj == 'all':
         n_subj = len(orig_parameters['sID'])
-    n_sim = n_sim_per_subj * n_subj
     parameters = np.tile(orig_parameters[:n_subj], (n_sim_per_subj, 1))  # Same parameters for each simulation of a subject
     parameters = pd.DataFrame(parameters)
     parameters.columns = orig_parameters.columns
+
+    return n_subj, parameters
+
+
+def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=128, n_sim_per_subj=2, verbose=False, make_plots=False):
+
+    """Simulate agents for the model specified in file_name, with the parameters indicated in the referenced file."""
+
+    # GET MODEL PARAMETERS
+    n_sim = n_sim_per_subj * n_subj
 
     # SIMULATE AGENTS ON THE TASK
     # Get n_trials_back
@@ -93,11 +96,10 @@ def simulate_model_from_filename(file_name, data_dir, n_trials=128, n_subj='all'
                     choices[trial - 1], rewards[trial - 1],  # prev_choice, prev_reward -> used for updating Q-values
                     Qs, _,
                     parameters['alpha'], parameters['nalpha'], parameters['calpha'], parameters['cnalpha'],
-                    n_sim, n_trials_back, verbose=False)
+                    n_sim, n_trials_back, verbose=verbose)
 
         # Translate Q-values into action probabilities
         if 'RL' in model_name or 'WSLS' in model_name:
-            # persev_bonus = np.zeros(n_sim)  # walk-around for avoiding perseverance
             if trial < 2:  # need 2 trials' info to access the right p_right
                 p_right = 0.5 * np.ones(n_sim)
             else:
@@ -107,7 +109,7 @@ def simulate_model_from_filename(file_name, data_dir, n_trials=128, n_subj='all'
                     choices[trial - 1], rewards[trial - 1],
                     p_right, n_sim,
                     np.array(parameters['beta']), parameters['persev'],
-                    n_trials_back, verbose=True)
+                    n_trials_back, verbose=verbose)
 
         elif 'B' in model_name:
             if trial == 0:
@@ -152,6 +154,30 @@ def simulate_model_from_filename(file_name, data_dir, n_trials=128, n_subj='all'
 
     print("Final LL: {0}".format(np.sum(LL)))
 
+    # Plot development of Q-values
+    if 'RL' in model_name and make_plots:
+        for subj in range(min(n_sim, 5)):
+            plt.figure()
+            if n_trials_back == 0:
+                plt.plot(Qs_trials[:, subj, 0], label='L')
+                plt.plot(Qs_trials[:, subj, 1], label='R')
+
+            elif n_trials_back == 1:
+                # what I should see:
+                # LOL & R0R overlap perfectly (also L1L & R1R, L0R & R0L, and L1R & R1L)
+                # L0L & L0R trade off (also L1L & L1R, etc.)
+                plt.plot(Qs_trials[:, subj, 0, 0, 0], label='L0L')
+                plt.plot(Qs_trials[:, subj, 1, 0, 1], label='R0R')
+                plt.plot(Qs_trials[:, subj, 0, 0, 1], label='L0R')
+                plt.plot(Qs_trials[:, subj, 1, 0, 0], label='R0L')
+                plt.plot(Qs_trials[:, subj, 1, 1, 1], label='R1R')
+                plt.plot(Qs_trials[:, subj, 0, 1, 0], label='L1L')
+                plt.plot(Qs_trials[:, subj, 0, 1, 1], label='L1R')
+                plt.plot(Qs_trials[:, subj, 1, 1, 0], label='R1L')
+            plt.ylim((0, 1))
+            plt.legend()
+        plt.show()
+
     # SAVE DATA
     # Get save_dir
     save_dir = data_dir + 'simulations/' + model_name + '/'
@@ -172,8 +198,6 @@ def simulate_model_from_filename(file_name, data_dir, n_trials=128, n_subj='all'
         subj_data["sID"] = sID
         subj_data["simID"] = simID
         subj_data["LL"] = LLs[:, i]
-        # subj_data["Q_left"] = Qs_left[:, i]
-        # subj_data["Q_right"] = Qs_right[:, i]
         param_names = [col for col in parameters.columns if 'sID' not in col]
         for param_name in param_names:
             subj_data[param_name] = np.array(parameters.loc[i, param_name])
@@ -185,31 +209,95 @@ def simulate_model_from_filename(file_name, data_dir, n_trials=128, n_subj='all'
     print("Ran and saved {0} simulations ({1} * {2}) to {3}!".
           format(len(parameters['sID']), n_subj, n_sim_per_subj, file_name))
 
-    return model_name, -np.sum(LL)
+    return -np.sum(LL)
 
 
-# Run simulations for all fitted models# file_name = 'params_RLab_2019_6_1_12_46_humans_n_samples100.csv'
-# file_name = 'params_RLabc_2019_6_1_12_46_humans_n_samples100.csv'
-# file_name = 'params_RLabcn_2019_6_1_12_48_humans_n_samples100.csv'
-# file_name = 'params_RLabcnnc_2019_6_1_12_48_humans_n_samples100.csv'
-# file_name = 'params_RLabcnncS_2019_6_1_12_53_humans_n_samples100.csv'
-# file_name = 'params_RLabcnncSi_2019_6_1_13_12_humans_n_samples100.csv'
-# file_name = 'params_RLabcnncSS_2019_6_1_13_1_humans_n_samples100.csv'
-# file_name = 'params_RLabcnncSSi_2019_6_1_13_20_humans_n_samples100.csv'
-# file_name = 'params_WSLS_2019_6_1_12_45_humans_n_samples100.csv'
-# file_name = 'params_WSLSS_2019_6_1_12_46_humans_n_samples100.csv'
-# file_name = 'params_Bbsr_2019_6_1_12_44_humans_n_samples100.csv'
-# file_name = 'params_Bbpsr_2019_6_1_12_45_humans_n_samples100.csv'
+def get_quantile_groups(params_ages, col):
 
+    qcol = col + '_quant'
+    params_ages[qcol] = np.nan
+
+    # Set adult quantile to 2
+    params_ages.loc[params_ages['PreciseYrs'] > 20, qcol] = 2
+
+    # Determine quantiles, separately for both genders
+    for gender in [1, 2]:
+
+        # Get 3 quantiles
+        cut_off_values = np.nanquantile(
+            params_ages.loc[(params_ages.PreciseYrs < 20) & (params_ages.Gender == gender), col],
+            [0, 1 / 3, 2 / 3])
+        for cut_off_value, quantile in zip(cut_off_values, np.round([1 / 3, 2 / 3, 1], 2)):
+            params_ages.loc[
+                (params_ages.PreciseYrs < 20) & (params_ages[col] >= cut_off_value) & (params_ages.Gender == gender),
+                qcol] = quantile
+
+    return params_ages
+
+
+def plot_parameters_against_age(parameters, ages_file_dir='C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv'):
+
+    # Load ages dataframe
+    ages = pd.read_csv(ages_file_dir)
+    ages = ages.rename(columns={'ID': 'sID'})
+
+    # Add age etc. to parameters
+    params_ages = parameters.merge(ages)
+
+    # # Plot raw parameters against raw age etc.
+    # sns.pairplot(params_ages, hue='Gender',
+    #              x_vars=['PDS', 'BMI', 'PreciseYrs', 'T1'], y_vars=list(parameters.columns),
+    #              plot_kws=dict(size=1))
+    # print("Saving plot_params_ages_{1} to {0}".format(data_dir, model_name))
+    # plt.savefig("{0}plot_params_ages_{1}.png".format(data_dir, model_name))
+
+    # Same, but with quantile groups for age etc.
+    cols = ['PDS', 'BMI', 'PreciseYrs', 'T1']
+    param_names = parameters.columns
+    plt.figure(figsize=(4 * len(cols), 3 * len(param_names)))
+    # fig, axes = plt.subplots(len(cols), len(param_names),
+    #                          figsize=(4 * len(cols), 4 * len(param_names)),
+    #                          sharex="col", sharey="row",
+    #                          squeeze=False)
+    i = 0
+    for param_name in param_names:
+        for col in cols:
+            params_ages = get_quantile_groups(params_ages, col)
+
+            # plt.figure()
+            # plt.scatter(params_ages[col], params_ages[col + '_quant'], c=params_ages['Gender'])  # check that it worked
+            # plt.show()
+
+            plt.subplot(len(param_names), len(cols), i + 1)
+            sns.barplot(x=col + '_quant', y=param_name, hue='Gender', data=params_ages)  # , ax=axes[i])
+            plt.xlabel(col)
+            i += 1
+
+    plt.tight_layout()
+    plt.savefig("{0}plot_params_ages_quant_{1}.png".format(data_dir, model_name))
+
+
+# Run simulations for all fitted models
 data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/'
 file_names = [f for f in os.listdir(data_dir) if '.csv' in f if 'params' in f]
 nlls = pd.DataFrame()
-for file_name in file_names[:2]:
-    model_name, nll = simulate_model_from_filename(file_name, data_dir)
+
+for file_name in file_names:
+    model_name = [part for part in file_name.split('_') if 'RL' in part or 'B' in part or 'WSLS' in part][0]
+    n_subj, parameters = get_parameters(data_dir, file_name)
+
+    # Simulate agents
+    nll = simulate_model_from_parameters(parameters, data_dir, n_subj, make_plots=False)
     nlls = nlls.append([[model_name, nll]])
+
+    # Plot parameters against age etc.
+    plot_parameters_against_age(parameters)
 
 nlls.columns = ['model_name', 'simulated_nll']
 nlls.to_csv(data_dir + 'nlls.csv', index=False)
 
-# file_name = '2019_06_02/params_RLabci_2019_6_1_13_5_humans_n_samples100.csv'  # TODO remove after debug
-# simulate_model_from_filename(file_name, data_dir, n_subj=1, verbose=True)
+# # Debug individual models
+# file_name = '2019_06_03/params_RLabcn_2019_6_3_3_7_humans_n_samples100.csv'
+# model_name = 'RLabcn'
+# n_subj, parameters = get_parameters(data_dir, file_name, n_subj=2)
+# simulate_model_from_parameters(parameters, data_dir, n_subj=n_subj, verbose=True)

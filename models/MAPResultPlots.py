@@ -3,6 +3,8 @@ import numpy as np
 import os
 import pandas as pd
 import pickle
+import seaborn as sns
+sns.set(style='whitegrid')
 
 from shared_modeling_simulation import get_paths
 
@@ -10,19 +12,24 @@ from shared_modeling_simulation import get_paths
 save_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/'
 n_subj = 233
 
-# Plot BICs of all models
+# Read in nll_bic
 nll_bic = pd.read_csv(save_dir + 'nll_bics.csv')
+nll_bic['color'] = nll_bic['model_name'].astype(str).str[:2]
 nll_bic = nll_bic.sort_values(by=['bic'])
-plt.figure()
-plt.bar(nll_bic['model_name'], nll_bic['bic'])
+
+# Plot BICs of all models
+plt.figure(figsize=(15, 10))
+ax = sns.barplot(nll_bic['model_name'], nll_bic['bic'], hue=nll_bic['color'])
+ax.get_legend().remove()
 plt.xticks(rotation='vertical')
 plt.ylabel('BIC')
 plt.savefig("{0}plot_bics.png".format(save_dir))
 
 # Plot NLLs of all models
 nll_bic = nll_bic.sort_values(by=['nll'])
-plt.figure()
-plt.bar(nll_bic['model_name'], nll_bic['nll'])
+plt.figure(figsize=(15, 10))
+ax = sns.barplot(nll_bic['model_name'], nll_bic['nll'], hue=nll_bic['color'])
+ax.get_legend().remove()
 plt.xticks(rotation='vertical')
 plt.ylabel('NLL')
 plt.savefig("{0}plot_nlls.png".format(save_dir))
@@ -52,3 +59,15 @@ for file_name in file_names:
         # Save the csvs to save_dir
         print("Saving csv of fitted parameters for model {0} to {1}.".format(file_name, save_dir))
         fitted_params.to_csv(save_dir + 'params_' + file_name[:-7] + '.csv', index=False)
+
+# Plot fitted against simulated nll (run after PSAllSimulations)
+nll = pd.read_csv(save_dir + 'nlls.csv')
+nll_all = nll.merge(nll_bic)
+ax = sns.scatterplot('nll', 'simulated_nll', hue='color', data=nll_all)
+for row in range(nll_all.shape[0]):
+    ax.text(nll_all.nll[row]+0.2, nll_all.simulated_nll[row], nll_all.model_name[row],
+            horizontalalignment='left', size='small', color='black')
+ax.get_legend().remove()
+plt.xlabel('Fitted NLL')
+plt.ylabel('Simulated NLL')
+plt.savefig("{0}plot_nll_sim_rec.png".format(save_dir))
