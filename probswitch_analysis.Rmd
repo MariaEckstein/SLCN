@@ -22,10 +22,11 @@ if (data == "human") {
   data_dir = "C:/Users/maria/MEGAsync/SLCN/PSGenRec"
   patt = ".csv"
 } else if (data == "simulated_human") {
-  data_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/simulations/"  # "C:/Users/maria/MEGAsync/SLCN/PSsimulations" # "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
-  patt = "PS_RLab.*csv"
+  model = "Bbpsr"
+  data_dir = paste0("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/simulations/", model)  # "C:/Users/maria/MEGAsync/SLCN/PSsimulations" # "C:/Users/maria/MEGAsync/SLCN/PShumanData/fit_par/simulations"
+  patt = paste0(model, ".*csv")
 }
-plot_dir = file.path(data_dir, "PlotsRLab")
+plot_dir = file.path(data_dir, paste0("Plots_", model))
 # plot_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch/PS_plots"
 
 if (!dir.exists(plot_dir)) {
@@ -838,6 +839,9 @@ if (data != "simulated_human") {
     ggsave(file.path(plot_dir, "gg_age_RT_slope.png"), gg_age_RT_slope)
   }
 }
+```
+```{r}
+mean(all_files$switch_trial)
 ```
 ```{r Start button}
 ```
