@@ -568,14 +568,14 @@ def post_from_lik(lik_cor, lik_inc, scaled_persev_bonus,
     if verbose:
         print('p_r after taking switch into account:\n{0}'.format(p_r.round(3)))
 
-    # Add perseverance bonus
-    p_right = p_r + scaled_persev_bonus
-    # theano.printing.Print('p_r after adding persevation bonus')(p_right)
+    # Add perseverance bonus  # TODO not sure what happens when there is no softmax but persev; values > 1 or < 0?
+    p_r = p_r + scaled_persev_bonus
+    # theano.printing.Print('p_r after adding persevation bonus')(p_r)
     if verbose:
-        print('p_right after adding perseveration bonus:\n{0}'.format(p_right.round(3)))
+        print('p_r after adding perseveration bonus:\n{0}'.format(p_r.round(3)))
 
     # Log-transform probabilities
-    p_right = 1 / (1 + np.exp(-beta * (p_right - (1 - p_right))))
+    p_right = 1 / (1 + np.exp(-beta * (p_r - (1 - p_r))))
     p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
     # theano.printing.Print('p_r after softmax')(p_right)
     if verbose:
@@ -608,8 +608,10 @@ def get_n_params(model_name):
         return 3
     elif 'ab' in model_name or all(i in model_name for i in 'bs') or all(i in model_name for i in 'br') or all(i in model_name for i in 'bp'):
         return 2
-    elif 'WSLS' in model_name or 'b' in model_name:  # WSLS, WSLSS, Bayesian b model
+    elif 'WSLS' in model_name or 'b' in model_name or 'n' in model_name:  # WSLS, WSLSS, Bayesian b model
         return 1  # just beta
+    elif model_name == 'B':
+        return 0
     else:
         raise ValueError("I don't have n_params stored for this model. Please add your model to `get_n_params`.")
 

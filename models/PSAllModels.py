@@ -231,6 +231,7 @@ def create_model(choices, rewards, group,
             beta = pm.Gamma('beta', alpha=1, beta=1, shape=n_subj)
             if verbose:
                 print("Adding free parameter beta.")
+
             if 'p' in model_name:
                 persev = pm.Bound(pm.Normal, lower=-1, upper=1)(
                     'persev', mu=0, sd=0.2, shape=(n_subj), testval=0.1 * T.ones(n_subj, dtype='float32'))
@@ -389,7 +390,10 @@ def create_model(choices, rewards, group,
                                             sequences=[lik_cor, lik_inc, scaled_persev_bonus],
                                             outputs_info=[p_r, None],
                                             non_sequences=[p_switch, beta])
-            p_right = p_right[2:]  # predict from trial 3 onward, not trial 1 (consistent with RL / strat models)
+            if 'b' in model_name:
+                p_right = p_right[2:]  # predict from trial 3 onward, not trial 1 (consistent with RL / strat models)
+            else:
+                p_right = p_r[2:]  # use pure probability, without adding perseverance or pushing through softmax
 
         # Use Bernoulli to sample responses
         model_choices = pm.Bernoulli('model_choices', p=p_right[:-1], observed=choices[3:])  # predict from trial 3 on; discard last p_right because there is no trial to predict after the last value update
@@ -426,9 +430,8 @@ def fit_model(model, n_params, n_subj, n_trials,
 
     if fit_map:
         nll = opt_result['fun']
-        # bic = np.log(n_subj * n_trials) * n_params + 2 * nll
-        # should be:
-        bic = np.log(n_trials) * n_subj * n_params + 2 * nll
+        bic = np.log(n_trials * n_subj) * n_subj * n_params + 2 * nll
+        aic = 2 * n_subj * n_params + 2 * nll
         print("NLL: {0},\nBIC: {1}".format(nll, bic))
 
     # Save results
@@ -444,7 +447,7 @@ def fit_model(model, n_params, n_subj, n_trials,
                         handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     if fit_map:
-        return nll, bic
+        return nll, bic, aic
 
 
 # GET LIST OF MODELS TO RUN
@@ -452,26 +455,26 @@ def fit_model(model, n_params, n_subj, n_trials,
 #                ['', 'c', 'n', 'p', 'SS', 'SSi', 'S', 'Si', 'cnxp', 'cnxpS', 'cnxpSi', 'cnxpSS', 'cnxpSSi',
 #                 'cn', 'cnx']]
 
-model_names = []
+model_names = ['B', 'Bb', 'Bp']
 
-# Add RL models
-for c in ['', 'c']:
-    for n in ['', 'n']:
-        for x in ['', 'x']:
-            for p in ['', 'p']:
-                for S in ['', 'S', 'SS']:
-                    model_names.append('RLab' + c + n + x + p + S)
-                    if S == 'S' or S == 'SS':
-                        model_names.append('RLab' + c + n + x + p + S + 'i')
-
-# Add strategy models
-model_names.extend(['WSLS', 'WSLSS'])
-
-# Add Bayesian models
-for s in ['', 's']:
-    for p in ['', 'p']:
-        for r in ['', 'r']:
-            model_names.append('Bb' + s + p + r)
+# # Add RL models
+# for c in ['', 'c']:
+#     for n in ['', 'n']:
+#         for x in ['', 'x']:
+#             for p in ['', 'p']:
+#                 for S in ['', 'S', 'SS']:
+#                     model_names.append('RLab' + c + n + x + p + S)
+#                     if S == 'S' or S == 'SS':
+#                         model_names.append('RLab' + c + n + x + p + S + 'i')
+#
+# # Add strategy models
+# model_names.extend(['WSLS', 'WSLSS'])
+#
+# # Add Bayesian models
+# for s in ['', 's']:
+#     for p in ['', 'p']:
+#         for r in ['', 'r']:
+#             model_names.append('Bb' + s + p + r)
 
 print("Getting ready to run {0} models: {1}".format(len(model_names), model_names))
 
@@ -487,10 +490,10 @@ for model_name in model_names:
         choices=choices, rewards=rewards, group=group, model_name=model_name, n_subj=n_subj, n_trials='all', verbose=False)
 
     # Fit parameters, calculate model fits, make plots, and save everything
-    nll, bic = fit_model(model, n_params, n_subj, n_trials, save_dir, save_id)
+    nll, bic, aic = fit_model(model, n_params, n_subj, n_trials, save_dir, save_id)
 
-    nll_bics = nll_bics.append([[model_name, n_params, nll, bic]])
+    nll_bics = nll_bics.append([[model_name, n_params, nll, bic, aic]])
     nll_bics.to_csv(save_dir + '/nll_bics_temp.csv', index=False)
 
-nll_bics.columns = ['model_name', 'n_params', 'nll', 'bic']
+nll_bics.columns = ['model_name', 'n_params', 'nll', 'bic', 'aic']
 nll_bics.to_csv(save_dir + '/nll_bics.csv', index=False)

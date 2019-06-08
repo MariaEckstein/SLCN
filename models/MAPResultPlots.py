@@ -14,10 +14,10 @@ n_subj = 233
 
 # Read in nll_bic
 nll_bic = pd.read_csv(save_dir + 'nll_bics.csv')
-nll_bic['color'] = nll_bic['model_name'].astype(str).str[:2]
-nll_bic = nll_bic.sort_values(by=['bic'])
+nll_bic['color'] = nll_bic['model_name'].astype(str).str[:1]
 
 # Plot BICs of all models
+nll_bic = nll_bic.sort_values(by=['bic'])
 plt.figure(figsize=(15, 10))
 ax = sns.barplot(nll_bic['model_name'], nll_bic['bic'], hue=nll_bic['color'], dodge=False)
 ax.get_legend().remove()
@@ -25,6 +25,16 @@ plt.xticks(rotation='vertical')
 plt.ylabel('BIC')
 plt.ylim(0, 40000)
 plt.savefig("{0}plot_bics.png".format(save_dir))
+
+# Plot AICs of all models
+nll_bic = nll_bic.sort_values(by=['aic'])
+plt.figure(figsize=(15, 10))
+ax = sns.barplot(nll_bic['model_name'], nll_bic['aic'], hue=nll_bic['color'], dodge=False)
+ax.get_legend().remove()
+plt.xticks(rotation='vertical')
+plt.ylabel('BIC')
+plt.ylim(0, 40000)
+plt.savefig("{0}plot_aics.png".format(save_dir))
 
 # Plot NLLs of all models
 nll_bic = nll_bic.sort_values(by=['nll'])
@@ -78,15 +88,15 @@ for file_name in file_names:
             plt.savefig("{0}fitted_param_distr_{1}.png".format(save_dir, file_name[:-7]))
         except:
             print("Couldn't plot {0}.".format(file_name[:-7]))
-
-# Plot fitted against simulated nll (run after PSAllSimulations)
-nll = pd.read_csv(save_dir + 'nlls.csv')
-nll_all = nll.merge(nll_bic)
-ax = sns.scatterplot('nll', 'simulated_nll', hue='color', data=nll_all)
-for row in range(nll_all.shape[0]):
-    ax.text(nll_all.nll[row]+0.2, nll_all.simulated_nll[row], nll_all.model_name[row],
-            horizontalalignment='left', size='small', color='black')
-ax.get_legend().remove()
-plt.xlabel('Fitted NLL')
-plt.ylabel('Simulated NLL')
-plt.savefig("{0}plot_nll_sim_rec.png".format(save_dir))
+#
+# # Plot fitted against simulated nll (run after PSAllSimulations)
+# nll = pd.read_csv(save_dir + 'nlls.csv')
+# nll_all = nll.merge(nll_bic)
+# ax = sns.scatterplot('nll', 'simulated_nll', hue='color', data=nll_all)
+# for row in range(nll_all.shape[0]):
+#     ax.text(nll_all.nll[row]+0.2, nll_all.simulated_nll[row], nll_all.model_name[row],
+#             horizontalalignment='left', size='small', color='black')
+# ax.get_legend().remove()
+# plt.xlabel('Fitted NLL')
+# plt.ylabel('Simulated NLL')
+# plt.savefig("{0}plot_nll_sim_rec.png".format(save_dir))

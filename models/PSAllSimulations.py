@@ -116,6 +116,8 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=128, n
             if trial == 0:
                 scaled_persev_bonus = np.zeros(n_sim)
                 p_right = 0.5 * np.ones(n_sim)
+                if model_name == 'B':
+                    p_right_ = 0.5 * np.ones(n_sim)
             else:
                 persev_bonus = 2 * choice - 1  # recode as -1 for choice==0 (left) and +1 for choice==1 (right)
                 scaled_persev_bonus = persev_bonus * parameters['persev']  # TODO make sure it has the right shape
@@ -128,10 +130,13 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=128, n
                                                   parameters['p_switch'], parameters['beta'])
 
         # Select an action based on probabilities
-        choice = np.random.binomial(n=1, p=p_right)  # produces "1" with p_right, and "0" with (1 - p_right)
+        if model_name == 'B':
+            choice = np.random.binomial(n=1, p=p_right_)  # don't use persev, don't use softmax
+        else:
+            choice = np.random.binomial(n=1, p=p_right)  # produces "1" with p_right, and "0" with (1 - p_right)
 
         # Obtain reward
-        reward = task.produce_reward(choice)
+        reward = task.produce_reward(choice, replace_rewards=False)
 
         # Update log-likelihood
         LL += np.log(p_right * choice + (1 - p_right) * (1 - choice))
@@ -222,7 +227,7 @@ def get_quantile_groups(params_ages, col):
     params_ages.loc[params_ages['PreciseYrs'] > 20, qcol] = 2
 
     # Determine quantiles, separately for both genders
-    for gender in [1, 2]:
+    for gender in ['Male', 'Female']:
 
         # Get 3 quantiles
         cut_off_values = np.nanquantile(
@@ -244,6 +249,8 @@ def plot_parameters_against_age_calculate_corr(parameters, ages_file_dir='C:/Use
 
     # Add age etc. to parameters
     params_ages = parameters.merge(ages)
+    params_ages.loc[params_ages['Gender'] == 1, 'Gender'] = 'Female'
+    params_ages.loc[params_ages['Gender'] == 2, 'Gender'] = 'Male'
 
     # # Plot raw parameters against raw age etc.
     # sns.pairplot(params_ages, hue='Gender',
@@ -260,8 +267,8 @@ def plot_parameters_against_age_calculate_corr(parameters, ages_file_dir='C:/Use
     #                          figsize=(4 * len(cols), 4 * len(param_names)),
     #                          sharex="col", sharey="row",
     #                          squeeze=False)
-    i = 0
 
+    i = 0
     for param_name in param_names:
         for col in cols:
             params_ages = get_quantile_groups(params_ages, col)
@@ -271,30 +278,39 @@ def plot_parameters_against_age_calculate_corr(parameters, ages_file_dir='C:/Use
             # plt.show()
 
             plt.subplot(len(param_names), len(cols), i + 1)
-            sns.barplot(x=col + '_quant', y=param_name, hue='Gender', data=params_ages)  # , ax=axes[i])
+            # sns.barplot(x=col + '_quant', y=param_name, hue='Gender', data=params_ages)  # , ax=axes[i])
+            sns.lineplot(x=col + '_quant', y=param_name, hue='Gender', data=params_ages, legend=False)  # , ax=axes[i])
             plt.xlabel(col)
             i += 1
 
     plt.tight_layout()
-    plt.savefig("{0}plot_params_ages_quant_{1}.png".format(data_dir, model_name))
+    plt.savefig("{0}plot_params_ages_quant_lines_{1}.png".format(data_dir, model_name))
 
     # Get correlations between parameters and age etc.
     corrs = pd.DataFrame()
     for param_name in param_names:
         for col in cols:
+            for gen in ('Male', 'Female'):
 
-            # clean_indices = ~np.logical_or(np.isnan(params_ages[col]), np.isnan(params_ages[param_name]))
-            clean_indices = 1 - np.isnan(params_ages[col]) | np.isnan(params_ages[param_name])
-            corr, p = stats.pearsonr(params_ages.loc[clean_indices, param_name], params_ages.loc[clean_indices, col])
+                # clean_idx = ~np.logical_or(np.isnan(params_ages[col]), np.isnan(params_ages[param_name]))
+                clean_idx = 1 - np.isnan(params_ages[col]) | np.isnan(params_ages[param_name])
+                gen_idx = params_ages['Gender'] == gen
 
-            corrs = corrs.append([[param_name, col, corr, p]])
+                corr, p = stats.pearsonr(
+                    params_ages.loc[clean_idx & gen_idx, param_name], params_ages.loc[clean_idx & gen_idx, col])
 
-    corrs.columns = ['param_name', 'charact', 'r', 'p']
+                clean_idx_young = clean_idx & (params_ages['PreciseYrs'] < 20) & gen_idx
+                corr_young, p_young = stats.pearsonr(
+                    params_ages.loc[clean_idx_young, param_name], params_ages.loc[clean_idx_young, col])
+
+                corrs = corrs.append([[param_name, col, gen, corr, p, corr_young, p_young]])
+
+    corrs.columns = ['param_name', 'charact', 'gender', 'r', 'p', 'r_young', 'p_young']
     corrs.to_csv("{0}corrs_{1}.csv".format(data_dir, model_name), index=False)
 
 
 # Run simulations for all fitted models
-data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/simulate/'
+data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/simulate_without_replace_rewards/'
 file_names = [f for f in os.listdir(data_dir) if '.csv' in f if 'params' in f]
 nlls = pd.DataFrame()
 

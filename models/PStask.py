@@ -39,7 +39,7 @@ class Task(object):
         self.n_rewards[self.switched] = 0
         self.i_episode[self.switched] += 1
 
-    def produce_reward(self, action):
+    def produce_reward(self, action, replace_rewards=True):
 
         # Check if action was correct
         correct_choice = action == self.correct_box
@@ -48,16 +48,19 @@ class Task(object):
         scheduled_coin_wins = np.array([self.coin_wins[self.n_correct[subj], subj] for subj in range(self.n_subj)])
 
         # Check for which subjects rewards need to be exchanged
-        needs_reward_switch = np.array(self.switched * np.invert(scheduled_coin_wins))
-        for subj in self.subj_ids:
-            if needs_reward_switch[subj]:
-                subj_scheduled_rewards = np.argwhere(self.coin_wins[:, subj])
-                next_scheduled_reward = min(subj_scheduled_rewards[subj_scheduled_rewards > self.n_correct[subj]])
-                self.coin_wins[self.n_correct[subj], subj] = True  # add reward to current index
-                self.coin_wins[next_scheduled_reward, subj] = False  # remove reward from next index
+        if replace_rewards:
+            needs_reward_switch = np.array(self.switched * np.invert(scheduled_coin_wins))
+            for subj in self.subj_ids:
+                if needs_reward_switch[subj]:
+                    subj_scheduled_rewards = np.argwhere(self.coin_wins[:, subj])
+                    next_scheduled_reward = min(subj_scheduled_rewards[subj_scheduled_rewards > self.n_correct[subj]])
+                    self.coin_wins[self.n_correct[subj], subj] = True  # add reward to current index
+                    self.coin_wins[next_scheduled_reward, subj] = False  # remove reward from next index
 
-        # Recalculate scheduled rewards based on updated coin_wins
-        scheduled_coin_wins = np.array([self.coin_wins[self.n_correct[subj], subj] for subj in range(self.n_subj)])
+            # Recalculate scheduled rewards based on updated coin_wins
+            scheduled_coin_wins = np.array([self.coin_wins[self.n_correct[subj], subj] for subj in range(self.n_subj)])
+
+        # Determine which trials will actually be rewarded
         scheduled_coin_wins[np.invert(correct_choice)] = False  # no coins for incorrect actions
 
         # Keep track of things
