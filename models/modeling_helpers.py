@@ -85,19 +85,17 @@ def load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_su
     return [n_subj, n_trials, seasons, aliens, actions, rewards, true_params]
 
 
-def load_data(run_on_cluster, fitted_data_name='humans', n_groups=3, kids_and_teens_only=False, adults_only=False, n_subj='all'):
+def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids_and_teens_only=False, adults_only=False, n_subj='all', n_trials=120):
 
     # Get data path and save path
     paths = get_paths(run_on_cluster)
     if fitted_data_name == 'humans':
         data_dir = paths['human data']
         file_name_pattern = 'PS*.csv'
-        n_trials = 128
     else:
         learning_style = 'hierarchical'
         data_dir = paths['simulations']
         file_name_pattern = 'PS' + learning_style + '*.csv'
-        n_trials = 200
 
     # Prepare things for loading data
     print("Preparing to load {0} datasets with pattern {1} from {2}...\n".format(n_subj, file_name_pattern, data_dir))
@@ -109,30 +107,33 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups=3, kids_and_te
     assert len(filenames) > 0, "Error: There are no files with pattern {0} in {1}".format(file_name_pattern, data_dir)
     choices = np.zeros((n_trials, len(filenames)))
     rewards = np.zeros(choices.shape)
-    age = pd.DataFrame(np.full((n_subj, 2), np.nan), columns=['sID', 'age'])
+    age = pd.DataFrame()
 
     # Load data and bring in the right format
     SLCNinfo = pd.read_csv(paths['SLCN info'])
     file_idx = 0
     for filename in filenames:
         agent_data = pd.read_csv(filename)
-        if agent_data.shape[0] > n_trials:
+        if agent_data.shape[0] >= n_trials:
             choices[:, file_idx] = np.array(agent_data['selected_box'])[:n_trials]
             rewards[:, file_idx] = agent_data['reward'].tolist()[:n_trials]
             sID = agent_data['sID'][0]
             subj_age = SLCNinfo[SLCNinfo['ID'] == sID]['PreciseYrs'].values
+            subj_gender = SLCNinfo[SLCNinfo['ID'] == sID]['Gender'].values
             if not subj_age:
                 subj_age = [np.nan]
-            age.loc[file_idx, :] = [sID, *subj_age]
+            if not subj_gender:
+                subj_gender = [np.nan]
+            age = age.append([[sID, *subj_age, *subj_gender]])
             file_idx += 1
         else:
             print("file {0} has only {2} rows (minimum is {1}) and will be excluded from analyses!".
                   format(filename, n_trials, agent_data.shape[0]))
 
     # Remove excess columns
+    age.columns = ['sID', 'age', 'gender']
     rewards = np.delete(rewards, range(file_idx, n_subj), 1)
     choices = np.delete(choices, range(file_idx, n_subj), 1)
-    age = age[:file_idx]
 
     # Delete kid/teen or adult data sets
     if kids_and_teens_only:
@@ -156,28 +157,41 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups=3, kids_and_te
         group[age['age'] > 11] = 1
         group[age['age'] > 15] = 2
         group[age['age'] > 20] = 3
+    elif n_groups == 'gender':
+        group = age['gender'] - 1  # gender is coded as 1, 2
+        group[np.invert((group >= 0) * (group <= 1))] = np.nan  # exclude gender == 3 (non-gender-binary)
     else:
-        raise(ValueError('n_groups can only be 1, 3, or 4!'))
-    n_groups = len(np.unique(group))
+        raise(ValueError('n_groups can only be 1, 3, 4, or "gender"!'))
 
-    # Remove subjects that are missing age
+    # Find subjects that are missing age
     idxs_without_age = np.isnan(age['age'])
     print("Subjects {} are missing age and are removed from analyses!".format(age.loc[idxs_without_age, 'sID'].values))
-    keep = np.invert(idxs_without_age)
+    idxs_without_gender = np.isnan(age['gender'])
+    print("Subjects {} are missing gender and are removed from analyses!".format(age.loc[idxs_without_gender, 'sID'].values))
+
+    # Find subjects with outlier performance (checked in R on 2019-06-11)
+    # "Participants with n_switches < 5: 45, 102, 1004"
+    # "Participants with mean_ACC < 0.58: 24, 45, 101, 102, 124"
+    idxs_with_bad_perf = [id in [24, 45, 101, 102, 124, 1004] for id in age['sID']]
+    print("Subjects {} have bad performance (n_switches < 5 | mean_ACC < 0.58) and are removed from analyses!".format(age.loc[idxs_with_bad_perf, 'sID'].values))
+
+    # Remove marked subjects
+    keep = np.invert(idxs_without_age | idxs_without_gender | idxs_with_bad_perf)
     n_subj = np.sum(keep)
-    print("Number of subjects after exluding: {}".format(n_subj))
     age = age[keep]
-    age = age.reset_index(drop=True)
     group = group[keep]
+    n_groups = len(np.unique(group))
     rewards = rewards[:, keep]
     choices = choices[:, keep]
+    print("Number of subjects after exluding: {0}; number of trials: {1}; number of groups: {2}".format(n_subj, n_trials, n_groups))
 
     # z-score age
-    age['age'] = (age['age'] - np.nanmean(age['age'])) / np.nanstd(age['age'])
-    # pd.DataFrame(age).to_csv(get_paths(run_on_cluster)['ages'])
-    # print("Saved ages.csv to {}".format(get_paths(run_on_cluster)['ages']))
+    age['age_z'] = (age['age'] - np.nanmean(age['age'])) / np.nanstd(age['age'])
+    age['pymc3_idx'] = range(len(age))
+    pd.DataFrame(age).to_csv(get_paths(run_on_cluster)['ages'], index=False)
+    print("Saved ages.csv to {}".format(get_paths(run_on_cluster)['ages']))
 
-    return [n_subj, rewards, choices, group, n_groups, age['age']]
+    return [n_subj, rewards, choices, group, n_groups, age['age'], age['sID']]
 
 
 def get_save_dir_and_save_id(run_on_cluster, file_name_suff, fitted_data_name, n_samples):

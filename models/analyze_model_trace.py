@@ -15,24 +15,30 @@ from modeling_helpers import plot_gen_rec
 
 # Which models should be analyzed and compared?
 create_pairplot = False
-analyze_indiv_models = False
+analyze_indiv_models = True
 test_group_differences = False
-compare_models = True
-calculate_waic = True
+compare_models = False
+calculate_waic = False
 do_plot_gen_rec = False
-param_names = ['beta', 'p_switch', 'p_reward', 'persev']
-model_names = ['no', 'beta', 'swi', 'rew', 'per', 'all']
+param_names = ['alpha', 'beta', 'calpha', 'nalpha', 'persev']
+model_names = ['ab', 'abcnp']
 # param_names = ['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high']  # necessary for do_plot_genrec
 # model_names = ['Bsr', 'Bbsr', 'Bbpsr', 'Rab', 'Rabc', 'Rabn', 'Rabnp', 'Rabcn', 'Rabcncn', 'Rabcnp', 'Rabcncnp']  # for compare_models
 
 
 file_names = [
-    'Bayes_cont/bpsr_noslope_2018_12_18_14_29_humans_n_samples10000',
-    'Bayes_cont/bpsr_betaslope_2018_12_18_13_41_humans_n_samples10000',
-    'Bayes_cont/bpsr_switchslope_2018_12_18_13_47_humans_n_samples10000',
-    'Bayes_cont/bpsr_rewardslope_2018_12_18_14_24_humans_n_samples10000',
-    'Bayes_cont/bpsr_persevslope_2018_12_18_13_43_humans_n_samples10000',
-    'Bayes_cont/bpsr_2018_12_18_12_16_humans_n_samples10000',
+    # 'RLab_2019_6_10_22_53_humans_n_samples500',
+    # 'RLabcnp_2019_6_11_0_58_humans_n_samples500',
+    # 'RLabcxp_2019_6_11_3_43_humans_n_samples500',
+    'RLabcxpSi_2019_6_11_12_52_humans_n_samples500',
+    'RLabcxpS_2019_6_11_9_21_humans_n_samples500'
+
+    # 'Bayes_cont/bpsr_noslope_2018_12_18_14_29_humans_n_samples10000',
+    # 'Bayes_cont/bpsr_betaslope_2018_12_18_13_41_humans_n_samples10000',
+    # 'Bayes_cont/bpsr_switchslope_2018_12_18_13_47_humans_n_samples10000',
+    # 'Bayes_cont/bpsr_rewardslope_2018_12_18_14_24_humans_n_samples10000',
+    # 'Bayes_cont/bpsr_persevslope_2018_12_18_13_43_humans_n_samples10000',
+    # 'Bayes_cont/bpsr_2018_12_18_12_16_humans_n_samples10000',
 
     # 'Bayes_3groups/swirew_2018_11_15_11_31_humans_n_samples5000',
     # 'Bayes_3groups/betswirew_2018_11_15_11_24_humans_n_samples5000',
@@ -60,6 +66,7 @@ print("Working on {0}.\n".format(file_names))
 
 model_dict = {}
 for file_name, model_name in zip(file_names, model_names):
+    model_name = [part for part in file_name.split('_') if ('RL' in part) or ('B' in part) or ('WSLS' in part)][0]
 
     print('\n\tMODEL {0}'.format(file_name))
     with open(parameter_dir + file_name + '.pickle', 'rb') as handle:

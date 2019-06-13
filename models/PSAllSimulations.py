@@ -13,7 +13,7 @@ from shared_modeling_simulation import get_paths, update_Q_sim, get_n_trials_bac
 def get_parameters(data_dir, file_name, n_subj='all', n_sim_per_subj=2):
 
     orig_parameters = pd.read_csv(data_dir + file_name)
-    print("Loaded parameters for model {2} from {0}. parameters.head():\n{1}".format(data_dir, orig_parameters.head(), model_name))
+    print("Loaded parameters for model {2} from {0}\nParameters.head():\n{1}".format(data_dir, orig_parameters.head(), model_name))
 
     # Adjust n_subj
     if n_subj == 'all':
@@ -25,7 +25,7 @@ def get_parameters(data_dir, file_name, n_subj='all', n_sim_per_subj=2):
     return n_subj, parameters
 
 
-def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=128, n_sim_per_subj=2, verbose=False, make_plots=False):
+def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n_sim_per_subj=2, verbose=False, make_plots=False):
 
     """Simulate agents for the model specified in file_name, with the parameters indicated in the referenced file."""
 
@@ -241,23 +241,23 @@ def get_quantile_groups(params_ages, col):
     return params_ages
 
 
-def plot_parameters_against_age_calculate_corr(parameters, ages_file_dir='C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv'):
+def plot_parameters_against_age_calculate_corr(parameters, SLCN_info_file_dir='C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv'):
 
-    # Load ages dataframe
-    ages = pd.read_csv(ages_file_dir)
-    ages = ages.rename(columns={'ID': 'sID'})
+    # Load SLCN_info dataframe
+    SLCN_info = pd.read_csv(SLCN_info_file_dir)
+    SLCN_info = SLCN_info.rename(columns={'ID': 'sID'})
 
     # Add age etc. to parameters
-    params_ages = parameters.merge(ages)
-    params_ages.loc[params_ages['Gender'] == 1, 'Gender'] = 'Female'
-    params_ages.loc[params_ages['Gender'] == 2, 'Gender'] = 'Male'
+    params_SLCN_info = parameters.merge(SLCN_info)
+    params_SLCN_info.loc[params_SLCN_info['Gender'] == 1, 'Gender'] = 'Female'
+    params_SLCN_info.loc[params_SLCN_info['Gender'] == 2, 'Gender'] = 'Male'
 
     # # Plot raw parameters against raw age etc.
-    # sns.pairplot(params_ages, hue='Gender',
+    # sns.pairplot(params_SLCN_info, hue='Gender',
     #              x_vars=['PDS', 'BMI', 'PreciseYrs', 'T1'], y_vars=list(parameters.columns),
     #              plot_kws=dict(size=1))
-    # print("Saving plot_params_ages_{1} to {0}".format(data_dir, model_name))
-    # plt.savefig("{0}plot_params_ages_{1}.png".format(data_dir, model_name))
+    # print("Saving plot_params_SLCN_info_{1} to {0}".format(data_dir, model_name))
+    # plt.savefig("{0}plot_params_SLCN_info_{1}.png".format(data_dir, model_name))
 
     # Same, but with quantile groups for age etc.
     cols = ['PDS', 'BMI', 'PreciseYrs', 'T1']
@@ -271,37 +271,37 @@ def plot_parameters_against_age_calculate_corr(parameters, ages_file_dir='C:/Use
     i = 0
     for param_name in param_names:
         for col in cols:
-            params_ages = get_quantile_groups(params_ages, col)
+            params_SLCN_info = get_quantile_groups(params_SLCN_info, col)
 
             # plt.figure()
-            # plt.scatter(params_ages[col], params_ages[col + '_quant'], c=params_ages['Gender'])  # check that it worked
+            # plt.scatter(params_SLCN_info[col], params_SLCN_info[col + '_quant'], c=params_SLCN_info['Gender'])  # check that it worked
             # plt.show()
 
             plt.subplot(len(param_names), len(cols), i + 1)
-            # sns.barplot(x=col + '_quant', y=param_name, hue='Gender', data=params_ages)  # , ax=axes[i])
-            sns.lineplot(x=col + '_quant', y=param_name, hue='Gender', data=params_ages, legend=False)  # , ax=axes[i])
+            # sns.barplot(x=col + '_quant', y=param_name, hue='Gender', data=params_SLCN_info)  # , ax=axes[i])
+            sns.lineplot(x=col + '_quant', y=param_name, hue='Gender', data=params_SLCN_info, legend=False)  # , ax=axes[i])
             plt.xlabel(col)
             i += 1
 
     plt.tight_layout()
-    plt.savefig("{0}plot_params_ages_quant_lines_{1}.png".format(data_dir, model_name))
+    plt.savefig("{0}plot_params_SLCN_info_quant_lines_{1}.png".format(data_dir, model_name))
 
     # Get correlations between parameters and age etc.
     corrs = pd.DataFrame()
     for param_name in param_names:
         for col in cols:
-            for gen in ('Male', 'Female'):
+            for gen in np.unique(params_SLCN_info['Gender']):
 
-                # clean_idx = ~np.logical_or(np.isnan(params_ages[col]), np.isnan(params_ages[param_name]))
-                clean_idx = 1 - np.isnan(params_ages[col]) | np.isnan(params_ages[param_name])
-                gen_idx = params_ages['Gender'] == gen
+                # clean_idx = ~np.logical_or(np.isnan(params_SLCN_info[col]), np.isnan(params_SLCN_info[param_name]))
+                clean_idx = 1 - np.isnan(params_SLCN_info[col]) | np.isnan(params_SLCN_info[param_name])
+                gen_idx = params_SLCN_info['Gender'] == gen
 
                 corr, p = stats.pearsonr(
-                    params_ages.loc[clean_idx & gen_idx, param_name], params_ages.loc[clean_idx & gen_idx, col])
+                    params_SLCN_info.loc[clean_idx & gen_idx, param_name], params_SLCN_info.loc[clean_idx & gen_idx, col])
 
-                clean_idx_young = clean_idx & (params_ages['PreciseYrs'] < 20) & gen_idx
+                clean_idx_young = clean_idx & (params_SLCN_info['PreciseYrs'] < 20) & gen_idx
                 corr_young, p_young = stats.pearsonr(
-                    params_ages.loc[clean_idx_young, param_name], params_ages.loc[clean_idx_young, col])
+                    params_SLCN_info.loc[clean_idx_young, param_name], params_SLCN_info.loc[clean_idx_young, col])
 
                 corrs = corrs.append([[param_name, col, gen, corr, p, corr_young, p_young]])
 
@@ -310,20 +310,20 @@ def plot_parameters_against_age_calculate_corr(parameters, ages_file_dir='C:/Use
 
 
 # Run simulations for all fitted models
-data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/simulate_without_replace_rewards/'
+data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/cluster_fits/'
 file_names = [f for f in os.listdir(data_dir) if '.csv' in f if 'params' in f]
 nlls = pd.DataFrame()
 
 for file_name in file_names:
-    model_name = [part for part in file_name.split('_') if 'RL' in part or 'B' in part or 'WSLS' in part][0]
+    model_name = [part for part in file_name.split('_') if ('RL' in part) or ('B' in part) or ('WSLS' in part)][0]
     n_subj, parameters = get_parameters(data_dir, file_name)
 
     # Simulate agents
     nll = simulate_model_from_parameters(parameters, data_dir, n_subj, make_plots=False)
     nlls = nlls.append([[model_name, nll]])
 
-    # Plot parameters against age etc., calculate correlations between parameters and age etc.
-    plot_parameters_against_age_calculate_corr(parameters)
+    # # Plot parameters against age etc., calculate correlations between parameters and age etc.
+    # plot_parameters_against_age_calculate_corr(parameters)
 
 nlls.columns = ['model_name', 'simulated_nll']
 nlls.to_csv(data_dir + 'nlls.csv', index=False)

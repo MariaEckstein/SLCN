@@ -20,6 +20,7 @@ def get_paths(run_on_cluster):
         return {'human data': base_path + 'PShumanData/',
                 'fitting results': base_path + '/ProbSwitch/fitting/',
                 'SLCN info': base_path + '/ProbSwitch/SLCNinfo2.csv',
+                'ages': base_path + '/ProbSwitch/ages.csv',
                 'simulations': base_path + 'ProbSwitch/PSsimulations/',
                 'old simulations': base_path + '/PShumanData/fit_par/',
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
@@ -31,6 +32,7 @@ def get_paths(run_on_cluster):
                 'SLCN info': base_path + 'data/SLCNinfo2.csv',
                 'PS reward versions': base_path + 'data/ProbSwitch_rewardversions.csv',
                 'ages': base_path + 'data/ages.csv',
+                'ages_cluster': base_path + 'data/ages_cluster.csv',
                 'simulations': base_path + '/PSsimulations/',
                 'old simulations': base_path + '/PSGenRecCluster/fit_par/',
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
@@ -87,6 +89,10 @@ def p_from_Q(
     index0 = T.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 0
     index1 = T.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
 
+    # Comment in for p_from_Q_3 (WSLSS, abSS, etc.)
+    index0 = T.arange(n_subj, dtype='int32'), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 0
+    index1 = T.arange(n_subj, dtype='int32'), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
+
     # Add perseverance bonus
     Qs0 = Qs[index0]
     Qs1 = Qs[index1]
@@ -112,7 +118,7 @@ def update_Q(
         prev_choice, prev_reward,
         choice, reward,
         Qs, _,
-        alpha, nalpha, calpha, cnalpha, n_subj):
+        alpha, nalpha, calpha, cnalpha, m, n_subj):
 
     """This is the 'raw' function. Others are copied from this one."""
 
@@ -132,6 +138,12 @@ def update_Q(
     cindex = T.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice
     cmindex = T.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
 
+    # Comment in for update_Q_3 (WSLSS, abSS, etc.)
+    index = T.arange(n_subj), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice
+    mindex = T.arange(n_subj), 1 - prev_prev_prev_choice, prev_prev_prev_reward, 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice
+    cindex = T.arange(n_subj), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice
+    cmindex = T.arange(n_subj), 1 - prev_prev_prev_choice, prev_prev_prev_reward, 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
+
     # Get reward prediction errors (RPEs)
     RPE = (1 - Qs[index]) * reward  # RPEs for positive outcomes (reward == 1)
     nRPE = (0 - Qs[index]) * (1 - reward)  # RPEs for negative outcomes (reward == 0)
@@ -150,11 +162,11 @@ def update_Q(
 
     # Update mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[mindex],
-                         Qs[mindex] + alpha * RPE + nalpha * nRPE)
+                         Qs[mindex] + m * (alpha * RPE + nalpha * nRPE))
 
     # Update counterfactual mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[cmindex],
-                         Qs[cmindex] + calpha * cRPE + cnalpha * cnRPE)
+                         Qs[cmindex] + m * (calpha * cRPE + cnalpha * cnRPE))
 
     return Qs, _
 
@@ -250,7 +262,7 @@ def p_from_Q_3(
 
     """Draft - not tested"""
 
-    # Comment in for p_from_Q_2 (WSLSS, abSS, etc.)
+    # Comment in for p_from_Q_3 (WSLSS, abSS, etc.)
     index0 = T.arange(n_subj, dtype='int32'), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 0
     index1 = T.arange(n_subj, dtype='int32'), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
 
@@ -275,7 +287,7 @@ def update_Q_0(
         prev_choice, prev_reward,
         choice, reward,
         Qs, _,
-        alpha, nalpha, calpha, cnalpha, n_subj):
+        alpha, nalpha, calpha, cnalpha, m, n_subj):
 
     # Comment in for update_Q_0 (letter models)
     index = T.arange(n_subj), choice
@@ -305,7 +317,7 @@ def update_Q_1(
         prev_choice, prev_reward,
         choice, reward,
         Qs, _,
-        alpha, nalpha, calpha, cnalpha, n_subj):
+        alpha, nalpha, calpha, cnalpha, m, n_subj):
 
     # Comment in for update_Q_1 (WSLS, abS, etc.)
     index = T.arange(n_subj), prev_choice, prev_reward, choice  # action taken (e.g., left & reward -> left)
@@ -331,11 +343,11 @@ def update_Q_1(
 
     # Update mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[mindex],
-                         Qs[mindex] + alpha * RPE + nalpha * nRPE)
+                         Qs[mindex] + m * (alpha * RPE + nalpha * nRPE))
 
     # Update counterfactual mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[cmindex],
-                         Qs[cmindex] + calpha * cRPE + cnalpha * cnRPE)
+                         Qs[cmindex] + m * (calpha * cRPE + cnalpha * cnRPE))
 
     return Qs, _
 
@@ -345,7 +357,7 @@ def update_Q_2(
         prev_choice, prev_reward,
         choice, reward,
         Qs, _,
-        alpha, nalpha, calpha, cnalpha, n_subj):
+        alpha, nalpha, calpha, cnalpha, m, n_subj):
 
     # Comment in for update_Q_2 (WSLSS, abSS, etc.)
     index = T.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice
@@ -371,11 +383,11 @@ def update_Q_2(
 
     # Update mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[mindex],
-                         Qs[mindex] + alpha * RPE + nalpha * nRPE)
+                         Qs[mindex] + m * (alpha * RPE + nalpha * nRPE))
 
     # Update counterfactual mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[cmindex],
-                         Qs[cmindex] + calpha * cRPE + cnalpha * cnRPE)
+                         Qs[cmindex] + m * (calpha * cRPE + cnalpha * cnRPE))
 
     return Qs, _
 
@@ -386,37 +398,37 @@ def update_Q_3(
         prev_choice, prev_reward,
         choice, reward,
         Qs, _,
-        alpha, nalpha, calpha, cnalpha, n_subj):
+        alpha, nalpha, calpha, cnalpha, m, n_subj):
 
-    # Comment in for update_Q_2 (WSLSS, abSS, etc.)
+    # Comment in for update_Q_3 (WSLSS, abSS, etc.)
     index = T.arange(n_subj), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice
     mindex = T.arange(n_subj), 1 - prev_prev_prev_choice, prev_prev_prev_reward, 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice
     cindex = T.arange(n_subj), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice
     cmindex = T.arange(n_subj), 1 - prev_prev_prev_choice, prev_prev_prev_reward, 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
 
-    # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
-    RPE = (1 - Qs[index]) * reward
-    nRPE = (0 - Qs[index]) * (1 - reward)
+    # Get reward prediction errors (RPEs)
+    RPE = (1 - Qs[index]) * reward  # RPEs for positive outcomes (reward == 1)
+    nRPE = (0 - Qs[index]) * (1 - reward)  # RPEs for negative outcomes (reward == 0)
 
     # Get counterfactual prediction errors (cRPEs)
-    cRPE = (1 - Qs[cindex]) * (1 - reward)
-    cnRPE = (0 - Qs[cindex]) * reward
+    cRPE = (0 - Qs[cindex]) * reward  # actual reward was 1; I think I would have gotten 0 for the other action
+    cnRPE = (1 - Qs[cindex]) * (1 - reward)  # actual reward 0; would have gotten 1 for the other action
 
     # Update action taken
     Qs = T.set_subtensor(Qs[index],
-                         Qs[index] + alpha * RPE + nalpha * nRPE)
+                         Qs[index] + alpha * RPE + nalpha * nRPE)  # add RPE for pos. & nRPE for neg. outcomes
 
     # Update counterfactual action
     Qs = T.set_subtensor(Qs[cindex],
-                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)
+                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)  # add cRPE for pos. & cnRPE for neg. outcomes
 
     # Update mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[mindex],
-                         Qs[mindex] + alpha * RPE + nalpha * nRPE)
+                         Qs[mindex] + m * (alpha * RPE + nalpha * nRPE))
 
     # Update counterfactual mirror action (comment out for letter models)
     Qs = T.set_subtensor(Qs[cmindex],
-                         Qs[cmindex] + calpha * cRPE + cnalpha * cnRPE)
+                         Qs[cmindex] + m * (calpha * cRPE + cnalpha * cnRPE))
 
     return Qs, _
 
@@ -510,7 +522,7 @@ def p_from_Q_sim(
     Qs0 += (1 - prev_choice) * persev
 
     # softmax-transform Q-values into probabilities
-    p_right = 1 / (1 + np.exp(beta * (Qs0 - Qs1)))  # 0 = left action; 1 = right action
+    p_right = 1 / (1 + np.exp(list(beta * (Qs0 - Qs1))))  # 0 = left action; 1 = right action
     p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
 
     if verbose:
@@ -598,22 +610,23 @@ def get_n_trials_back(model_name):
 
 
 def get_n_params(model_name):
-    if all(i in model_name for i in 'abcnxp'):  # abcnxp, abcnxpS, abcnxpSS, etc.
-        return 6
-    elif all(i in model_name for i in 'abcnx') or all(i in model_name for i in 'abcnp') or all(i in model_name for i in 'abcxp') or all(i in model_name for i in 'abnxp'):  # abcnx, abcnxS, abcnxSS, etc.
-        return 5
-    elif all(i in model_name for i in 'abcn') or all(i in model_name for i in 'abcx') or all(i in model_name for i in 'abcp') or all(i in model_name for i in 'abnx') or all(i in model_name for i in 'abnp') or all(i in model_name for i in 'abnp') or all(i in model_name for i in 'abxp') or all(i in model_name for i in 'bpsr'):
-        return 4
-    elif all(i in model_name for i in 'abc') or all(i in model_name for i in 'abn') or all(i in model_name for i in 'abp') or all(i in model_name for i in 'abx') or all(i in model_name for i in 'bsr') or all(i in model_name for i in 'bpr') or all(i in model_name for i in 'bsp'):
-        return 3
-    elif 'ab' in model_name or all(i in model_name for i in 'bs') or all(i in model_name for i in 'br') or all(i in model_name for i in 'bp'):
-        return 2
-    elif 'WSLS' in model_name or 'b' in model_name or 'n' in model_name:  # WSLS, WSLSS, Bayesian b model
-        return 1  # just beta
-    elif model_name == 'B':
-        return 0
+    if 'RL' in model_name:
+        if 'SSS' in model_name:
+            return len(model_name) - 2 - 3  # -2 for 'RL' and -3 for 'SSS'; remaining chars are for free parameters
+        if 'SS' in model_name:
+            return len(model_name) - 2 - 2
+        if 'S' in model_name:
+            return len(model_name) - 2 - 1
+        else:
+            return len(model_name) - 2
+    elif 'B' in model_name:
+        return len(model_name) - 1
+    elif 'WSLSS' in model_name:
+        return len(model_name) - 5
+    elif 'WSLS' in model_name:
+        return len(model_name) - 4
     else:
-        raise ValueError("I don't have n_params stored for this model. Please add your model to `get_n_params`.")
+        raise ValueError("I don't have n_params stored for this model. Please add model to `get_n_params`.")
 
 
 

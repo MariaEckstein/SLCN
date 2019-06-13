@@ -176,8 +176,6 @@ finish_all_files = function(all_files, ages) {
   assertthat::assert_that(nrow(all_files) == old_nrows)
   # summary(all_files)
   
-  all_files = subset(all_files, !is.na(PreciseYrs) & !is.na(PDS))
-  
   xyz = ddply(all_files, .(sID, Gender, age_group), x = NA, summarize)
   ddply(xyz, .(age_group, Gender), summarize, n=length(age_group))
   
@@ -285,16 +283,61 @@ plot_sample_composition = function(all_files, gg_save, run_regression) {
 ## Analyzing behavior
 
 ```{r Count switches for each participant}
-plot_switch_counts = function(all_files, gg_save) {
+plot_indivduals_for_exclusion = function(all_files, gg_save) {
   
-  switch_counts = ddply(all_files, .(sID, PreciseYrs, age_group), summarize, n_switches=sum(switch_trial, na.rm=T))
-  mean(switch_counts$n_switches)
-  sd(switch_counts$n_switches)
-  gg_switch_counts = ggplot(switch_counts, aes(PreciseYrs, n_switches)) + geom_point()
+  # Overall behavior for each participant
+  ACCs = ddply(all_files, .(sID, PreciseYrs, Gender, PDS, age_group), summarize,
+               mean_ACC = mean(ACC, na.rm=T),
+               n_switches=sum(switch_trial, na.rm=T),
+               n_fast_RTs=sum(RT<100, na.rm=T),
+               mean_RT=mean(RT, na.rm=T),
+               n_trials=length(RT))
   
+  mean(ACCs$n_switches)
+  sd(ACCs$n_switches)
+  
+  # Sort by ACC
+  ACCs = ACCs[order(ACCs$mean_ACC),]
+  ACCs$ACC_ix = 1:nrow(ACCs)
+  
+  # Sort by number of switches
+  ACCs = ACCs[order(ACCs$n_switches),]
+  ACCs$switch_ix = 1:nrow(ACCs)
+  
+  # Sort by number of <100msec trial
+  ACCs = ACCs[order(ACCs$n_fast_RTs),]
+  ACCs$fast_ix = 1:nrow(ACCs)
+  
+  # Plot each one
+  gg_0excl_ACC = ggplot(ACCs, aes(ACC_ix, mean_ACC, color=PreciseYrs)) +
+    geom_point()
+  
+  gg_0excl_switch = ggplot(ACCs, aes(switch_ix, n_switches, color=PreciseYrs)) +
+    geom_point()
+  
+  gg_0excl_fast = ggplot(ACCs, aes(fast_ix, n_fast_RTs, color=PreciseYrs)) +
+    geom_point()
+  
+  # Tell us who'll be excluded
+  gender_excl = sort(subset(ACCs, is.na(Gender))$sID)
+  PDS_excl = sort(subset(ACCs, is.na(PDS))$sID)
+  n_trials_excl = sort(subset(ACCs, n_trials < 120)$sID)
+  switch_excl = sort(subset(ACCs, n_switches < 5)$sID)
+  ACC_excl = sort(subset(ACCs, mean_ACC < 0.58)$sID)
+  print(paste("Participants missing gender:", paste(gender_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% gender_excl)$PreciseYrs, collapse=', ')))
+  print(paste("Participants missing PDS:", paste(PDS_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% PDS_excl)$PreciseYrs, collapse=', ')))
+  print(paste("Participants with < 120 trials:", paste(n_trials_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% n_trials_excl)$PreciseYrs, collapse=', ')))
+  print(paste("Participants with n_switches < 5:", paste(switch_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% switch_excl)$PreciseYrs, collapse=', ')))
+  print(paste("Participants with mean_ACC < 0.58:", paste(ACC_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% ACC_excl)$PreciseYrs, collapse=', ')))
+  
+  # Save plots
   if (gg_save) {
-    ggsave(file.path(plot_dir, "/gg_switch_counts.png"), gg_switch_counts)
+    ggsave(file.path(plot_dir, "/gg_0excl_ACC.png"), gg_0excl_ACC)
+    ggsave(file.path(plot_dir, "/gg_0excl_switch.png"), gg_0excl_switch)
+    ggsave(file.path(plot_dir, "/gg_0excl_fast.png"), gg_0excl_fast)
   }
+  
+  return(unique(c(gender_excl, PDS_excl, n_trials_excl, switch_excl, ACC_excl)))
 }
 ```
 ```{r Basic behavioral analyses}
@@ -525,7 +568,7 @@ ages_file_dir = "C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv"
 #   
 #   # Sample overview
 #   plot_sample_composition(all_files, gg_save, run_regression)
-#   plot_switch_counts(all_files, gg_save)
+#   excl_subj = plot_indivduals_for_exclusion(all_files, gg_save)
 #   plot_switch_age_T_PDS(ACC_subj, reward_subj, run_regression, gg_save)
 #     
 #   # Behavioral analyses
@@ -553,13 +596,18 @@ if (data_name == "simulated_human") {
     ages = get_ages(ages_file_dir)
     all_files = get_data(data_dir, data_name, patt)
     all_files = finish_all_files(all_files, ages)
+    
+    # Exclude subjects
+    excl_subj = plot_indivduals_for_exclusion(all_files, gg_save)
+    all_files = subset(all_files, !sID %in% excl_subj)
+    
+    # Create summary data
     ACC_subj = get_ACC_reward_subj(all_files)[[1]]
     reward_subj = get_ACC_reward_subj(all_files)[[2]]
     wsls = get_wsls(all_files)
     all_files_sum = get_all_files_sum(all_files)
     
     # Sample overview
-    plot_switch_counts(all_files, gg_save)
     plot_switch_age_T_PDS(ACC_subj, reward_subj, run_regression, gg_save)
       
     # Behavioral analyses
@@ -581,16 +629,19 @@ if (data_name == "simulated_human") {
   # Get data
   ages = get_ages(ages_file_dir)
   all_files = get_data(data_dir, data_name, patt)
-  orig_all_files = all_files
   all_files = finish_all_files(all_files, ages)
+  
+  # Exclude subjects
+  excl_subj = plot_indivduals_for_exclusion(all_files, gg_save)
+  all_files = subset(all_files, !sID %in% excl_subj)
+  
+  # Create summary data
   ACC_subj = get_ACC_reward_subj(all_files)[[1]]
   reward_subj = get_ACC_reward_subj(all_files)[[2]]
   wsls = get_wsls(all_files)
   all_files_sum = get_all_files_sum(all_files)
   
   # Sample overview
-  plot_sample_composition(all_files, gg_save, run_regression)
-  plot_switch_counts(all_files, gg_save)
   plot_switch_age_T_PDS(ACC_subj, reward_subj, run_regression, gg_save)
     
   # Behavioral analyses
@@ -632,7 +683,7 @@ for (since in 1:10) {
   }
 }
 
-# Indeed, younger children showed greater sensitivity to negative reward in a logistic regression predicting actions on trial $t+i$ from actions and outcomes on trial $t$, as revealed by significant effect of age on the regression coefficients (females: $\beta=0.54$, $p=0.0026$, males: $\beta=0.33$, $p=0.019$, Fig. \ref{figure:BehaviorHuman}). 
+# Indeed, younger children showed greater sensitivity to negative reward in a logistic regression predicting actions on trial $t+i$ from actions and outcomes on trial $t$, as revealed by significant effect of age on the regression coefficients (females: $\beta=0.54$, $p=0.0026$, males: $\beta=0.33$, $p=0.019$, Fig. \ref{figure:BehaviorHuman}).
 nback_regr_dat = read.csv("nback_regr_dat.csv")
 summary(lmer(Estimate ~ PreciseYrs + (1 | sID), subset(nback_regr_dat, model == "rewardNoReward" & predictor != "(Intercept)" & PreciseYrs < 20 & Gender == "Female" & back == 1)))
 summary(lmer(Estimate ~ PreciseYrs + (1 | sID), subset(nback_regr_dat, model == "rewardNoReward" & predictor != "(Intercept)" & PreciseYrs < 20 & Gender == "Male" & back == 1)))
