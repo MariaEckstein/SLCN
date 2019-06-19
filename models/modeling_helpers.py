@@ -120,18 +120,20 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids
             sID = agent_data['sID'][0]
             subj_age = SLCNinfo[SLCNinfo['ID'] == sID]['PreciseYrs'].values
             subj_gender = SLCNinfo[SLCNinfo['ID'] == sID]['Gender'].values
+            subj_PDS = SLCNinfo[SLCNinfo['ID'] == sID]['PDS'].values
+            subj_T1 = SLCNinfo[SLCNinfo['ID'] == sID]['T1'].values
             if not subj_age:
                 subj_age = [np.nan]
             if not subj_gender:
                 subj_gender = [np.nan]
-            age = age.append([[sID, *subj_age, *subj_gender]])
+            age = age.append([[sID, *subj_age, *subj_gender, *subj_PDS, *subj_T1]])
             file_idx += 1
         else:
             print("file {0} has only {2} rows (minimum is {1}) and will be excluded from analyses!".
                   format(filename, n_trials, agent_data.shape[0]))
 
     # Remove excess columns
-    age.columns = ['sID', 'age', 'gender']
+    age.columns = ['sID', 'age', 'gender', 'PDS', 'T1']
     rewards = np.delete(rewards, range(file_idx, n_subj), 1)
     choices = np.delete(choices, range(file_idx, n_subj), 1)
 
@@ -168,6 +170,10 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids
     print("Subjects {} are missing age and are removed from analyses!".format(age.loc[idxs_without_age, 'sID'].values))
     idxs_without_gender = np.isnan(age['gender'])
     print("Subjects {} are missing gender and are removed from analyses!".format(age.loc[idxs_without_gender, 'sID'].values))
+    idxs_without_PDS = np.isnan(age['PDS'])
+    print("Subjects {} are missing PDS and are removed from analyses!".format(age.loc[idxs_without_PDS, 'sID'].values))
+    idxs_without_T1 = np.isnan(age['T1'])
+    print("Subjects {} are missing T1 and are removed from analyses!".format(age.loc[idxs_without_T1, 'sID'].values))
 
     # Find subjects with outlier performance (checked in R on 2019-06-11)
     # "Participants with n_switches < 5: 45, 102, 1004"
@@ -176,22 +182,26 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids
     print("Subjects {} have bad performance (n_switches < 5 | mean_ACC < 0.58) and are removed from analyses!".format(age.loc[idxs_with_bad_perf, 'sID'].values))
 
     # Remove marked subjects
-    keep = np.invert(idxs_without_age | idxs_without_gender | idxs_with_bad_perf)
+    keep = np.invert(idxs_without_age | idxs_without_gender | idxs_with_bad_perf | idxs_without_T1 | idxs_without_PDS)
     n_subj = np.sum(keep)
     age = age[keep]
     group = group[keep]
     n_groups = len(np.unique(group))
     rewards = rewards[:, keep]
     choices = choices[:, keep]
-    print("Number of subjects after exluding: {0}; number of trials: {1}; number of groups: {2}".format(n_subj, n_trials, n_groups))
+    print("Number of subjects after exluding: {0}; number of trials: {1}; (if hierarchical fitting, number of groups: {2})".format(n_subj, n_trials, n_groups))
 
     # z-score age
     age['age_z'] = (age['age'] - np.nanmean(age['age'])) / np.nanstd(age['age'])
+    age['PDS_z'] = (age['PDS'] - np.nanmean(age['PDS'])) / np.nanstd(age['PDS'])
+    age['T1_z'] = (age['T1'] - np.nanmean(age['T1'])) / np.nanstd(age['T1'])
+    age['T1_log'] = np.log(age['T1'])
+    age['T1_log_z'] = (age['T1_log'] - np.nanmean(age['T1_log'])) / np.nanstd(age['T1_log'])
     age['pymc3_idx'] = range(len(age))
     pd.DataFrame(age).to_csv(get_paths(run_on_cluster)['ages'], index=False)
     print("Saved ages.csv to {}".format(get_paths(run_on_cluster)['ages']))
 
-    return [n_subj, rewards, choices, group, n_groups, age['age'], age['sID']]
+    return [n_subj, rewards, choices, group, n_groups, age]
 
 
 def get_save_dir_and_save_id(run_on_cluster, file_name_suff, fitted_data_name, n_samples):

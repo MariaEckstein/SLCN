@@ -1,15 +1,33 @@
 run_on_cluster = False
+save_dir_appx = 'slope_tests/'
+import itertools
 
 # GET LIST OF MODELS TO RUN
 # List of selected models
-model_names = [
-    # 'RLabcnp',
-    # 'RLabcxp',
-    'Bbspr',
-    # 'RLab', 'RLabcxpS', 'RLabcxpSi', 'RLabcxpSS', 'RLabcxpSSi', 'RLabcxpSm',
-    # 'WSLS', 'WSLSS',
-    # 'Bbpr', 'B'
-]
+slope_appxs_abcnp = []
+slope_appxs_abcxp = []
+slope_appxs_bspr = []
+
+for i in range(6):
+    slope_appxs_abcnp.extend([''.join(i) for i in list(itertools.combinations('lyoqt', i))])
+    slope_appxs_abcxp.extend([''.join(i) for i in list(itertools.combinations('lyout', i))])
+for i in range(5):
+    slope_appxs_bspr.extend([''.join(i) for i in list(itertools.combinations('ywtv', i))])
+
+model_names = ['RLabcnp' + appx for appx in slope_appxs_abcnp]
+model_names.extend(['RLabcxp' + appx for appx in slope_appxs_abcxp])
+model_names.extend(['Bbspr' + appx for appx in slope_appxs_bspr])
+
+model_names = ['RLabcnp']
+
+# model_names = [
+#     'RLabcnp',
+#     'RLabcxp',
+#     'Bbspr',
+#     # 'RLab', 'RLabcxpS', 'RLabcxpSi', 'RLabcxpSS', 'RLabcxpSSi', 'RLabcxpSm',
+#     # 'WSLS', 'WSLSS',
+#     # 'Bbpr', 'B'
+# ]
 
 # # All possible models
 # model_names = []
@@ -37,6 +55,7 @@ print("Getting ready to run {0} models: {1}".format(len(model_names), model_name
 
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import pandas as pd
 import pickle
 import pymc3 as pm
@@ -51,9 +70,10 @@ from shared_modeling_simulation import *
 from modeling_helpers import load_data, get_save_dir_and_save_id, print_logp_info
 
 
-def create_model(choices, rewards, group,
+def create_model(choices, rewards, group, age,
                  n_subj='all', n_trials='all',  # 'all' or int
                  model_name='ab',  # ab, abc, abn, abcn, abcnx, abcnS, abcnSS, WSLS, WSLSS, etc. etc.
+                 slope_variable='age_z', contrast='linear',
                  verbose=False, print_logps=False,
                  fitted_data_name='humans',  # 'humans', 'simulations'
                  n_groups=3, fit_individuals=True,
@@ -77,13 +97,17 @@ def create_model(choices, rewards, group,
     rewards = theano.shared(np.asarray(rewards, dtype='int16'))
     choices = theano.shared(np.asarray(choices, dtype='int16'))
     group = theano.shared(np.asarray(group, dtype='int16'))
+    slope_variable = theano.shared(np.asarray(age[slope_variable], dtype='float32'))
 
     # Get n_trials_back, n_params, and file_name_suff
     n_trials_back = get_n_trials_back(model_name)
-    n_params = get_n_params(model_name)
+    n_params = get_n_params(model_name, n_subj, n_groups, contrast=contrast)  # TODO adjust for slope parameters
     file_name_suff = model_name + ''
     save_dir, save_id = get_save_dir_and_save_id(run_on_cluster, file_name_suff, fitted_data_name, n_samples)
-    print("Working on model '{0}', which has {1} free parameters.".format(model_name, n_params))
+    save_dir += save_dir_appx
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    print("Working on model '{0}', which has {1} free parameters. Save_dir: {2}".format(model_name, n_params, save_dir))
 
     # Get fixed Q-values for WSLS and WSLSS
     if 'WSLSS' in model_name:  # "stay unless you fail to receive reward twice in a row for the same action."
@@ -281,59 +305,122 @@ def create_model(choices, rewards, group,
 
         else:  # if fit_individuals == True:
 
-            beta = pm.Gamma('beta', alpha=1, beta=1, shape=n_subj)
-            if verbose:
-                print("Adding free parameter beta.")
+            if 'y' in model_name:  # model with slope
+                beta_intercept = pm.Gamma('beta_intercept', alpha=1, beta=1, shape=n_groups)  # , testval=0.5 * T.ones(n_groups, dtype='int32'))
+                beta_slope = pm.Uniform('beta_slope', lower=-10, upper=10, shape=n_groups, testval=0.5 * T.ones(n_groups, dtype='int32'))
+                if contrast == 'quadratic':
+                    beta_slope2 = pm.Uniform('beta_slope2', lower=-1, upper=1, shape=n_groups)  # , testval=0.1 * T.ones(n_groups, dtype='int32'))
+                else:
+                    beta_slope2 = T.zeros(n_groups, dtype='int16')
+                beta = pm.Deterministic('beta', beta_intercept[group] + beta_slope[group] * slope_variable + beta_slope2[group] * slope_variable * slope_variable)
+                print("Drawing slope, intercept, and noise for beta.")
+            else:
+                beta = pm.Gamma('beta', alpha=1, beta=1, shape=n_subj)
+            print("Adding free parameter beta.")
 
             if 'p' in model_name:
-                persev = pm.Bound(pm.Normal, lower=-1, upper=1)(
-                    'persev', mu=0, sd=0.2, shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
-                if verbose:
-                    print("Adding free parameter persev.")
+                if 't' in model_name:
+                    persev_intercept = pm.Uniform('persev_intercept', lower=-1, upper=1, shape=n_groups, testval=0.1 * T.ones(n_groups, dtype='int32'))
+                    persev_slope = pm.Uniform('persev_slope', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                    if contrast == 'quadratic':
+                        persev_slope2 = pm.Uniform('persev_slope2', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                    else:
+                        persev_slope2 = T.zeros(n_groups, dtype='int16')
+                    persev = pm.Deterministic('persev', persev_intercept[group] + persev_slope[group] * slope_variable + persev_slope2[group] * slope_variable * slope_variable)
+                    print("Drawing slope, intercept, and noise for persev.")
+                else:
+                    persev = pm.Uniform('persev', lower=-1, upper=1, shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                print("Adding free parameter persev.")
             else:
                 persev = pm.Deterministic('persev', T.zeros(n_subj, dtype='float32'))
 
             if 'RL' in model_name:
                 if 'a' in model_name:
-                    alpha = pm.Beta('alpha', alpha=1, beta=1, shape=n_subj, testval=0.5 * T.ones(n_subj, dtype='float32'))
-                    if verbose:
-                        print("Adding free parameter alpha.")
+                    if 'l' in model_name:
+                        alpha_intercept = pm.Beta('alpha_intercept', alpha=1, beta=1, shape=n_groups, testval=0.75 * T.ones(n_groups, dtype='int32'))
+                        alpha_slope = pm.Uniform('alpha_slope', lower=-1, upper=1, shape=n_groups, testval=0.1 * T.ones(n_groups, dtype='int32'))
+                        if contrast == 'quadratic':
+                            alpha_slope2 = pm.Uniform('alpha_slope2', lower=-1, upper=1, shape=n_groups, testval=0.1 * T.ones(n_groups, dtype='int32'))
+                        else:
+                            alpha_slope2= T.zeros(n_groups, dtype='int16')
+                        alpha = pm.Deterministic('alpha', alpha_intercept[group] + alpha_slope[group] * slope_variable + alpha_slope2[group] * slope_variable * slope_variable)
+                        print("Drawing slope, intercept, and noise for alpha.")
+                    else:
+                        alpha = pm.Beta('alpha', alpha=1, beta=1, shape=n_subj, testval=0.5 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter alpha.")
                 else:
                     alpha = pm.Deterministic('alpha', T.ones(n_subj, dtype='float32'))
+                    print("Setting alpha = 1.")
 
                 if 'n' in model_name:
-                    nalpha = pm.Beta('nalpha', alpha=1, beta=1, shape=n_subj, testval=0.25 * T.ones(n_subj, dtype='float32'))
-                    if verbose:
-                        print("Adding free parameter nalpha.")
+                    if 'q' in model_name:
+                        nalpha_intercept = pm.Beta('nalpha_intercept', alpha=1, beta=1, shape=n_groups, testval=0.5 * T.ones(n_groups, dtype='int32'))
+                        nalpha_slope = pm.Uniform('nalpha_slope', lower=-1, upper=1, shape=n_groups, testval=0.1 * T.ones(n_groups, dtype='int32'))
+                        if contrast == 'quadratic':
+                            nalpha_slope2 = pm.Uniform('nalpha_slope2', lower=-1, upper=1, shape=n_groups, testval=0.1 * T.ones(n_groups, dtype='int32'))
+                        else:
+                            nalpha_slope2= T.zeros(n_groups, dtype='int16')
+                        nalpha = pm.Deterministic('nalpha', nalpha_intercept[group] + nalpha_slope[group] * slope_variable + nalpha_slope2[group] * slope_variable * slope_variable )
+                        print("Drawing slope, intercept, and noise for nalpha.")
+                    else:
+                        nalpha = pm.Beta('nalpha', alpha=1, beta=1, shape=n_subj, testval=0.25 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter nalpha.")
                 else:
                     nalpha = pm.Deterministic('nalpha', 1 * alpha)
-                    if verbose:
-                        print("Setting nalpha = alpha.")
+                    print("Setting nalpha = alpha.")
 
                 if 'c' in model_name:
-                    calpha_sc = pm.Beta('calpha_sc', alpha=1, beta=1, shape=n_subj, testval=0.25 * T.ones(n_subj, dtype='float32'))
-                    if verbose:
-                        print("Adding free parameter calpha.")
+                    if 'o' in model_name:
+                        calpha_sc_intercept = pm.Beta('calpha_sc_intercept', alpha=1, beta=1, shape=n_groups, testval=0.5 * T.ones(n_groups, dtype='int32'))
+                        calpha_sc_slope = pm.Uniform('calpha_sc_slope', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                        if contrast == 'quadratic':
+                            calpha_sc_slope2 = pm.Uniform('calpha_sc_slope2', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                        else:
+                            calpha_sc_slope2= T.zeros(n_groups, dtype='int16')
+                        calpha_sc = pm.Deterministic('calpha_sc', calpha_sc_intercept[group] + calpha_sc_slope[group] * slope_variable + calpha_sc_slope2[group] * slope_variable * slope_variable)
+                        print("Drawing slope, intercept, and noise for calpha_sc.")
+                    else:
+                        calpha_sc = pm.Beta('calpha_sc', alpha=1, beta=1, shape=n_subj, testval=0.25 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter calpha_sc.")
                 else:
                     calpha_sc = 0
+                    print("Setting calpha_sc = 0.")
 
                 if 'x' in model_name:
-                    cnalpha_sc = pm.Beta('cnalpha_sc', alpha=1, beta=1, shape=n_subj, testval=0.25 * T.ones(n_subj, dtype='float32'))
-                    if verbose:
-                        print("Adding free parameter cnalpha.")
+                    if 'u' in model_name:
+                        cnalpha_sc_intercept = pm.Beta('cnalpha_sc_intercept', alpha=1, beta=1, shape=n_groups, testval=0.5 * T.ones(n_groups, dtype='int32'))
+                        cnalpha_sc_slope = pm.Uniform('cnalpha_sc_slope', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                        if contrast == 'quadratic':
+                            cnalpha_sc_slope2 = pm.Uniform('cnalpha_sc_slope2', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                        else:
+                            cnalpha_sc_slope2= T.zeros(n_groups, dtype='int16')
+                        cnalpha_sc = pm.Deterministic('cnalpha_sc', cnalpha_sc_intercept[group] + cnalpha_sc_slope[group] * slope_variable + cnalpha_sc_slope2[group] * slope_variable * slope_variable)
+                        print("Drawing slope, intercept, and noise for cnalpha_sc.")
+                    else:
+                        cnalpha_sc = pm.Beta('cnalpha_sc', alpha=1, beta=1, shape=n_subj, testval=0.25 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter cnalpha.")
                 elif 'c' in model_name:
                     cnalpha_sc = pm.Deterministic('cnalpha_sc', 1 * calpha_sc)
-                    if verbose:
-                        print("Setting cnalpha_sc = calpha_sc.")
+                    print("Setting cnalpha_sc = calpha_sc.")
                 else:
                     cnalpha_sc = 0
 
                 if 'm' in model_name:
-                    m = pm.Beta('m', alpha=1, beta=1, shape=n_subj, testval=0.5 * T.ones(n_subj, dtype='float32'))
-                    if verbose:
-                        print("Adding free parameter m (multiplier for mirror alpha, nalpha, calpha, cnalpha).")
+                    if 'z' in model_name:
+                        m_intercept = pm.Beta('m_intercept', alpha=1, beta=1, shape=n_groups, testval=0.5 * T.ones(n_groups, dtype='int32'))
+                        m_slope = pm.Uniform('m_slope', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                        if contrast == 'quadratic':
+                            m_slope2 = pm.Uniform('m_slope2', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                        else:
+                            m_slope2= T.zeros(n_groups, dtype='int16')
+                        m = pm.Deterministic('m', m_intercept[group] + m_slope[group] * slope_variable + m_slope2[group] * slope_variable * slope_variable)
+                        print("Drawing slope, intercept, and noise for m.")
+                    else:
+                        m = pm.Beta('m', alpha=1, beta=1, shape=n_subj, testval=0.5 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter m (multiplier for mirror alpha, nalpha, calpha, cnalpha).")
                 else:
                     m = pm.Deterministic('m', 0 * alpha)
+                    print("Setting m = 0.")
 
                 calpha = pm.Deterministic('calpha', alpha * calpha_sc)
                 cnalpha = pm.Deterministic('cnalpha', nalpha * cnalpha_sc)
@@ -342,18 +429,30 @@ def create_model(choices, rewards, group,
                 scaled_persev_bonus = persev_bonus * persev
                 p_noisy = pm.Deterministic('p_noisy', 1e-5 * T.ones(n_subj, dtype='float32'))
                 if 's' in model_name:
-                    p_switch = pm.Beta('p_switch', alpha=1, beta=1, shape=n_subj, testval=0.1 * T.ones(n_subj))
-                    if verbose:
-                        print("Adding free parameter p_switch.")
+                    if 'w' in model_name:
+                        p_switch_intercept = pm.Beta('p_switch_intercept', alpha=1, beta=1, shape=n_groups, testval=0.05 * T.ones(n_groups, dtype='int32'))
+                        p_switch_slope = pm.Uniform('p_switch_slope', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                        p_switch = pm.Deterministic('p_switch', p_switch_intercept[group] + p_switch_slope[group] * slope_variable)
+                        print("Drawing slope, intercept, and noise for p_switch.")
+                    else:
+                        p_switch = pm.Beta('p_switch', alpha=1, beta=1, shape=n_subj)
+                    print("Adding free parameter p_switch.")
                 else:
                     p_switch = pm.Deterministic('p_switch', 0.05081582 * T.ones(n_subj))  # checked on 2019-06-03 in R: `mean(all_files$switch_trial)`
+                    print("Setting p_switch = 0.05081582.")
 
                 if 'r' in model_name:
-                    p_reward = pm.Beta('p_reward', alpha=1, beta=1, shape=n_subj, testval=0.75 * T.ones(n_subj))
-                    if verbose:
-                        print("Adding free p_reward.")
+                    if 'v' in model_name:
+                        p_reward_intercept = pm.Beta('p_reward_intercept', alpha=1, beta=1, shape=n_groups, testval=0.75 * T.ones(n_groups, dtype='int32'))
+                        p_reward_slope = pm.Uniform('p_reward_slope', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                        p_reward = pm.Deterministic('p_reward', p_reward_intercept[group] + p_reward_slope[group] * slope_variable)
+                        print("Drawing slope, intercept, and noise for p_reward.")
+                    else:
+                        p_reward = pm.Beta('p_reward', alpha=1, beta=1, shape=n_subj)
+                    print("Adding free parmeter p_reward.")
                 else:
                     p_reward = pm.Deterministic('p_reward', 0.75 * T.ones(n_subj))  # 0.75 because p_reward is the prob. of getting reward if choice is correct
+                    print("Setting p_reward = 0.75.")
 
         # Initialize Q-values (with and without bias, i.e., option 'i')
         if 'RL' in model_name:
@@ -504,10 +603,10 @@ def create_model(choices, rewards, group,
     return model, n_params, n_trials, save_dir, save_id
 
 
-def fit_model_and_save(model, n_params, n_subj, n_trials,
-              save_dir, save_id,
-              fit_mcmc=False, fit_map=True,
-              n_samples=100, n_tune=100, n_chains=1, n_cores=2, target_accept=0.8):
+def fit_model_and_save(model, n_params, n_subj, n_trials, sIDs, slope_variable,
+                       save_dir, save_id,
+                       fit_mcmc=False, fit_map=True,
+                       n_samples=100, n_tune=100, n_chains=1, n_cores=2, target_accept=0.8):
 
     # Sample the model
     if fit_mcmc:
@@ -523,32 +622,34 @@ def fit_model_and_save(model, n_params, n_subj, n_trials,
 
     if fit_map:
         nll = opt_result['fun']
-        bic = np.log(n_trials * n_subj) * n_subj * n_params + 2 * nll
-        aic = 2 * n_subj * n_params + 2 * nll
-        print("NLL: {0},\nBIC: {1}".format(nll, bic))
+        bic = np.log(n_trials * n_subj) * n_params + 2 * nll  # n_params incorporates all subj
+        aic = 2 * n_params + 2 * nll
+        print("NLL: {0}\nBIC: {1}\nAIC: {2}".format(nll, bic, aic))
 
     # Save results
     if fit_mcmc:
-        print('Saving trace, trace plot, model, and model summary to {0}{1}...\n'.format(save_dir, save_id))
+        print('Saving trace, model, summary, WAIC, and sIDs to {0}{1}\n'.format(save_dir, save_id))
         with open(save_dir + save_id + '_mcmc.pickle', 'wb') as handle:
-            pickle.dump({'trace': trace, 'model': model, 'summary': model_summary, 'WAIC': waic.WAIC},
+            pickle.dump({'trace': trace, 'model': model, 'summary': model_summary, 'WAIC': waic.WAIC, 'sIDs': list(sIDs)},
                         handle, protocol=pickle.HIGHEST_PROTOCOL)
         pm.traceplot(trace)
         plt.savefig(save_dir + save_id + 'plot.png')
         return 0, 0, waic
 
     if fit_map:
-        print('Saving map estimate, nll, and bic to {0}{1}...\n'.format(save_dir, save_id))
+        print('Saving map estimate, nll, bic, aic, sIDs to {0}{1}\n'.format(save_dir, save_id))
         with open(save_dir + save_id + '_map.pickle', 'wb') as handle:
-            pickle.dump({'map': map, 'nll': nll, 'bic': bic},
+            pickle.dump({'map': map, 'nll': nll, 'bic': bic, 'aic': aic, 'sIDs': list(sIDs), 'slope_variable': slope_variable},
                         handle, protocol=pickle.HIGHEST_PROTOCOL)
         return nll, bic, aic
 
 
 # Determine the basics
+contrast = 'linear'
+n_groups = 1
 if not run_on_cluster:
-    fit_mcmc = True
-    fit_map = False
+    fit_mcmc = False
+    fit_map = True
     n_tune = 200
     n_samples = 200
     n_cores = 2
@@ -568,27 +669,27 @@ else:
     fit_individuals = True
 
 # Load behavioral data on which to run the model(s)
-n_subj, rewards, choices, group, n_groups, age_z, sIDs = load_data(run_on_cluster, n_groups='gender', n_subj='all', n_trials=120)  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
+n_subj, rewards, choices, group, n_groups, age = load_data(run_on_cluster, n_groups=1, n_subj='all', kids_and_teens_only=True, n_trials=120)  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
 
 # Run all models
 nll_bics = pd.DataFrame()
-for model_name in model_names:
+for slope_variable in ['age_z']:  # TODO, 'PDS_z', 'T1_z']:
+    for model_name in model_names:
 
-    # Create model
-    model, n_params, n_trials, save_dir, save_id = create_model(
-        choices=choices, rewards=rewards, group=group, model_name=model_name, fit_individuals=fit_individuals,
-        n_subj=n_subj, n_trials='all', verbose=False)
+        # Create model
+        model, n_params, n_trials, save_dir, save_id = create_model(
+            choices=choices, rewards=rewards, group=group, age=age, n_groups=n_groups,
+            model_name=model_name, slope_variable=slope_variable, contrast=contrast, fit_individuals=fit_individuals,
+            n_subj=n_subj, n_trials='all', verbose=False)
 
-    # Fit parameters, calculate model fits, make plots, and save everything
-    try:
-        nll, bic, aic = fit_model_and_save(model, n_params, n_subj, n_trials, save_dir, save_id,
+        # Fit parameters, calculate model fits, make plots, and save everything
+        nll, bic, aic = fit_model_and_save(model, n_params, n_subj, n_trials, age['sID'], slope_variable,
+                                           save_dir, save_id,
                                            fit_mcmc=fit_mcmc, fit_map=fit_map,
                                            n_samples=n_samples, n_tune=n_tune, n_chains=n_chains, n_cores=n_cores)
-    except ValueError:
-        nll, bic, aic = ['model crashed'] * 3
 
-    nll_bics = nll_bics.append([[model_name, n_params, nll, bic, aic]])
-    nll_bics.to_csv(save_dir + '/nll_bics_temp.csv', index=False)
+        nll_bics = nll_bics.append([[model_name, slope_variable, n_params, nll, bic, aic]])
+        nll_bics.to_csv(save_dir + '/nll_bics_temp.csv', index=False)
 
-nll_bics.columns = ['model_name', 'n_params', 'nll', 'bic', 'aic']
+nll_bics.columns = ['model_name', 'slope_variable', 'n_params', 'nll', 'bic', 'aic']
 nll_bics.to_csv(save_dir + '/nll_bics.csv', index=False)

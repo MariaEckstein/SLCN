@@ -609,24 +609,66 @@ def get_n_trials_back(model_name):
         return 0
 
 
-def get_n_params(model_name):
+def get_n_params(model_name, n_subj, n_groups, contrast='linear'):
+
+    if contrast == 'linear':
+        n_params_per_group = 2 * n_groups  # slope & intercept for each group
+    elif contrast == 'quadratic':
+        n_params_per_group = 3 * n_groups  # plus slope2
+    elif contrast == 'cubic':
+        n_params_per_group = 4 * n_groups  # plus slope3
+
     if 'RL' in model_name:
+
+        # Flat model: subtract 2 letters for 'RL'; remaining chars are free parameters; every subj has 1 param
+        n_params = n_subj * (len(model_name) - 2)
+
         if 'SSS' in model_name:
-            return len(model_name) - 2 - 3  # -2 for 'RL' and -3 for 'SSS'; remaining chars are for free parameters
+            n_params = n_params - 3 * n_subj  # -3 chars for 'SSS'
         if 'SS' in model_name:
-            return len(model_name) - 2 - 2
+            n_params = n_params - 2 * n_subj
         if 'S' in model_name:
-            return len(model_name) - 2 - 1
-        else:
-            return len(model_name) - 2
+            n_params = n_params - 1 * n_subj
+
+        # Slope models
+        if 'z' in model_name:  # slope for m
+            n_params = n_params - 2 * n_subj + n_params_per_group  # not 1 param / subj, but 4 params / group ([slope, int] * [male, female])
+        if 'l' in model_name:  # slope for alpha
+            n_params = n_params - 2 * n_subj + n_params_per_group
+        if 'y' in model_name:  # slope for beta
+            n_params = n_params - 2 * n_subj + n_params_per_group
+        if 'o' in model_name:  # slope for calpha
+            n_params = n_params - 2 * n_subj + n_params_per_group
+        if 'q' in model_name:  # slope for nalpha
+            n_params = n_params - 2 * n_subj + n_params_per_group
+        if 'u' in model_name:  # slope for cnalpha
+            n_params = n_params - 2 * n_subj + n_params_per_group
+        if 't' in model_name:  # slope for persev
+            n_params = n_params - 2 * n_subj + n_params_per_group
+
     elif 'B' in model_name:
-        return len(model_name) - 1
+
+        # Flat model
+        n_params = n_subj * (len(model_name) - 1)  # subtract 1 letter for 'B'
+
+        # Slope models
+        if 'y' in model_name:
+            n_params = n_params - 2 * n_subj + n_params_per_group
+        if 'v' in model_name:  # slope for p_reward
+            n_params = n_params - 2 * n_subj + n_params_per_group
+        if 'w' in model_name:  # slope for p_switch
+            n_params = n_params - 2 * n_subj + n_params_per_group
+        if 't' in model_name:  # slope for persev
+            n_params = n_params - 2 * n_subj + n_params_per_group
+
     elif 'WSLSS' in model_name:
-        return len(model_name) - 5
+        n_params = len(model_name) - 5
     elif 'WSLS' in model_name:
-        return len(model_name) - 4
+        n_params = len(model_name) - 4
     else:
-        raise ValueError("I don't have n_params stored for this model. Please add model to `get_n_params`.")
+        raise(ValueError, "I don't know the n_params for this model. Please go and update get_n_params.")
+
+    return n_params
 
 
 
