@@ -11,15 +11,15 @@ from shared_modeling_simulation import get_paths
 import scipy.stats as stats
 
 
-save_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/slope_tests/'  # linear_age_PDS_T_2019_06_15/'
+save_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/slope_tests/2019_06_20_add_age/'  # linear_age_PDS_T_2019_06_15/'
 SLCN_info_file_dir = 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv'
 n_subj = 160  # all: 234  # just kids & teens: 160
 fit_map = False
 fit_mcmc = True
 make_traceplot = False
 plot_nlls_bics_aics = False
-# ages = pd.read_csv(get_paths(False)['ages_cluster'])  # TODO model fitted on cluster or on laptop??? Orders differ!!!
-ages = pd.read_csv(get_paths(False)['ages'])  # TODO model fitted on cluster or on laptop??? Orders differ!!!
+# ages = pd.read_csv(get_paths(False)['ages_cluster'])  # TODO model fitted on cluster or laptop??? Orders differ!!!
+ages = pd.read_csv(get_paths(False)['ages'])  # TODO model fitted on cluster or laptop??? Orders differ!!!
 SLCN_info = pd.read_csv(SLCN_info_file_dir)
 SLCN_info = SLCN_info.rename(columns={'ID': 'sID'})
 waic_criterion_for_analysis = 1e6
