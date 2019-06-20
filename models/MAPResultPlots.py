@@ -13,9 +13,9 @@ import scipy.stats as stats
 
 save_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/slope_tests/'  # linear_age_PDS_T_2019_06_15/'
 SLCN_info_file_dir = 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv'
-n_subj = 234
-fit_map = True
-fit_mcmc = False
+n_subj = 160  # all: 234  # just kids & teens: 160
+fit_map = False
+fit_mcmc = True
 make_traceplot = False
 plot_nlls_bics_aics = False
 # ages = pd.read_csv(get_paths(False)['ages_cluster'])  # TODO model fitted on cluster or on laptop??? Orders differ!!!
@@ -48,31 +48,32 @@ def get_quantile_groups(params_ages, col):
     return params_ages
 
 
-def get_param_names_from_model_name(model_name, fit_mcmc, fit_map, map=None):
+def get_param_names_from_model_name(model_name, fit_mcmc, fit_map, summary=None):
 
     if fit_mcmc:
-        param_names = []
+        group_level_param_names = [key for key in summary.keys() if ('__' not in key) or ('sd' in key) or ('int' in key) or ('slope' in key)]
+        indiv_param_names = []
         if 'a' in model_name:
-            param_names.append('alpha')
+            indiv_param_names.append('alpha')
         if 'b' in model_name:
-            param_names.append('beta')
+            indiv_param_names.append('beta')
         if 'c' in model_name:
-            param_names.append('calpha')
+            indiv_param_names.append('calpha')
         if 'n' in model_name:
-            param_names.append('nalpha')
+            indiv_param_names.append('nalpha')
         if 'x' in model_name:
-            param_names.append('cnalpha')
+            indiv_param_names.append('cnalpha')
         if 'p' in model_name:
-            param_names.append('persev')
+            indiv_param_names.append('persev')
         if 's' in model_name:
-            param_names.append('p_switch')
+            indiv_param_names.append('p_switch')
         if 'r' in model_name:
-            param_names.append('p_reward')
-        group_level_param_names, indiv_param_names = None, None
+            indiv_param_names.append('p_reward')
+        param_names = indiv_param_names + group_level_param_names
 
     elif fit_map:
-        param_names = [key for key in map.keys() if '__' not in key]
-        group_level_param_names = [name for name in param_names if ('intercept' in name) or ('slope' in name) or ('sd' in name)]
+        param_names = [key for key in summary.keys() if ('__' not in key) or ('sd' in key) or ('int' in key) or ('slope' in key)]
+        group_level_param_names = [name for name in param_names if ('int' in name) or ('slope' in name) or ('sd' in name)]
         indiv_param_names = [name for name in param_names if name not in group_level_param_names]
 
     return param_names, group_level_param_names, indiv_param_names
@@ -161,16 +162,15 @@ for file_name in file_names:
         data = pickle.load(handle)
 
     # Unpack it
+    sID = data['sIDs']
+    slope_variable = data['slope_variable']
     if fit_mcmc:
-        summary = data['summary']
+        summary = data['summary'].T
         waic = data['WAIC']
         trace = data['trace']
-        # sID = data['sIDs']  # TODO add for the new models
     elif fit_map:
-        map = data['map']
-        sID = data['sIDs']
+        summary = data['map']
         waic = data['aic']
-        slope_variable = data['slope_variable']
 
     # Make traceplot
     if fit_mcmc and make_traceplot:
@@ -179,7 +179,7 @@ for file_name in file_names:
 
     # Get model_name and param_names
     model_name = [part for part in file_name.split('_') if ('RL' in part) or ('B' in part) or ('WSLS' in part)][0]
-    param_names, group_level_param_names, indiv_param_names = get_param_names_from_model_name(model_name, fit_mcmc, fit_map, map)
+    param_names, group_level_param_names, indiv_param_names = get_param_names_from_model_name(model_name, fit_mcmc, fit_map, summary)
 
     # Add model WAIC score
     waics = waics.append([[model_name, slope_variable, waic]])
@@ -192,10 +192,13 @@ for file_name in file_names:
     #     param_values = summary.loc[[param_name + '__' + str(i) for i in fitted_params['pymc3_idx']], 'mean'].values
     #     fitted_params[param_name] = param_values
 
-    if (waic < waic_criterion_for_analysis):  # TODO and (waic > 0):
+    if (waic < waic_criterion_for_analysis) and (waic > 0):
         fitted_params = []
         for param_name in indiv_param_names:
-            fitted_params.append(map[param_name])
+            if fit_map:
+                fitted_params.append(summary[param_name])  # TODO seems like calpha reappears in calpha_sc plots?
+            elif fit_mcmc:
+                fitted_params.append(list(summary.loc['mean', [param_name + '__' + str(i) for i in range(n_subj)]]))
         fitted_params = np.array(fitted_params).T
         fitted_params = pd.DataFrame(fitted_params, columns=indiv_param_names)
         fitted_params['sID'] = list(sID)
@@ -217,10 +220,13 @@ for file_name in file_names:
         fitted_params.to_csv(save_dir + 'params_' + file_name[:-7] + '.csv', index=False)
 
         # Create csv for group-level fitted parameters
-        if group_level_param_names:
-            fitted_params_g = []
-            for param_name in group_level_param_names:
-                fitted_params_g.append(map[param_name])
+        if group_level_param_names and False:  # TODO
+            if fit_mcmc:
+                fitted_params_g = summary.loc['mean', group_level_param_names][:, None]
+            elif fit_map:
+                fitted_params_g = []
+                for param_name in group_level_param_names:
+                    fitted_params_g.append(summary[param_name])
             fitted_params_g = np.array(fitted_params_g).T
             fitted_params_g = pd.DataFrame(fitted_params_g, columns=group_level_param_names)  # TODO , index=['Male', 'Female'])
             fitted_params_g['slope_variable'] = slope_variable

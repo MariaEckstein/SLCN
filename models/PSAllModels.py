@@ -15,10 +15,10 @@ for i in range(5):
     slope_appxs_bspr.extend([''.join(i) for i in list(itertools.combinations('ywtv', i))])
 
 model_names = ['RLabcnp' + appx for appx in slope_appxs_abcnp]
-model_names.extend(['RLabcxp' + appx for appx in slope_appxs_abcxp])
 model_names.extend(['Bbspr' + appx for appx in slope_appxs_bspr])
+model_names.extend(['RLabcxp' + appx for appx in slope_appxs_abcxp])
 
-model_names = ['RLabcnp']
+model_names = ['RLabcnplyoqt', 'Bbsprywtv', 'RLabcxplyout']
 
 # model_names = [
 #     'RLabcnp',
@@ -62,12 +62,81 @@ import pymc3 as pm
 import seaborn as sns
 import theano
 import theano.tensor as T
+from shared_modeling_simulation import *
+from modeling_helpers import load_data, get_save_dir_and_save_id, print_logp_info
+
 floatX = 'float32'
 theano.config.floatX = 'float32'
 theano.config.warn_float64 = 'warn'
 
-from shared_modeling_simulation import *
-from modeling_helpers import load_data, get_save_dir_and_save_id, print_logp_info
+
+def create_01_parameter(param_name, fit_slope, n_groups, group, n_subj, upper, slope_variable):
+
+    if fit_slope:
+        param_sd = pm.HalfNormal(param_name + '_sd', sd=0.5, shape=n_groups, testval=0.5 * T.ones(n_groups, dtype='int32'))
+        param_slope = pm.Normal(param_name + '_slope', mu=0, sd=0.5, shape=n_groups, testval=T.ones(n_groups, dtype='int32'))
+        param_int = pm.Beta(param_name + '_int', alpha=1, beta=1, shape=n_groups, testval=0.1 * T.ones(n_groups, dtype='int32'))
+        param_unbound = pm.Normal(param_name + '_unbound', shape=n_subj, testval=2 * T.ones(n_subj, dtype='int32'),
+                                  mu=param_int[group] + param_slope[group] * slope_variable,
+                                  sd=param_sd[group])
+        return pm.Deterministic(param_name, T.nnet.sigmoid(param_unbound))
+
+    else:
+        param_a_a = pm.Uniform(param_name + '_a_a', lower=0, upper=upper)
+        param_a_b = pm.Uniform(param_name + '_a_b', lower=0, upper=upper)
+        param_b_a = pm.Uniform(param_name + '_b_a', lower=0, upper=upper)
+        param_b_b = pm.Uniform(param_name + '_b_b', lower=0, upper=upper)
+        param_a = pm.Gamma(param_name + '_a', alpha=param_a_a, beta=param_a_b, shape=n_groups)
+        param_b = pm.Gamma(param_name + '_b', alpha=param_b_a, beta=param_b_b, shape=n_groups)
+
+        param_mu = pm.Deterministic(param_name + '_mu', 1 / (1 + param_b / param_a))
+        param_var = pm.Deterministic(param_name + '_var', (param_a * param_b) / (np.square(param_a + param_b) * (param_a + param_b + 1)))
+
+        return pm.Beta(param_name, alpha=param_a[group], beta=param_b[group], shape=n_subj, testval=0.5 * T.ones(n_subj))
+
+
+def create_infinf_parameter(param_name, fit_slope, n_groups, group, n_subj, upper, slope_variable):
+
+    if fit_slope:
+        param_sd = pm.HalfNormal(param_name + '_sd', sd=0.5, shape=n_groups, testval=0.5 * T.ones(n_groups, dtype='int32'))
+        param_slope = pm.Normal(param_name + '_slope', mu=0, sd=0.5, shape=n_groups, testval=T.ones(n_groups, dtype='int32'))
+        param_int = pm.Normal(param_name + '_int', mu=0, sd=1, shape=n_groups, testval=0.1 * T.ones(n_groups, dtype='int32'))
+        return pm.Normal(param_name, shape=n_subj, testval=2 * T.ones(n_subj, dtype='int32'),
+                         mu=param_int[group] + param_slope[group] * slope_variable,
+                         sd=param_sd[group])
+    else:
+        param_mu_mu = pm.Normal(param_name + '_mu_mu', mu=0, sd=0.1)
+        param_mu_sd = pm.HalfNormal(param_name + '_mu_sd', sd=0.1)
+        param_sd_sd = pm.HalfNormal(param_name + '_sd_sd', sd=0.1)
+        param_mu = pm.Bound(pm.Normal, lower=-1, upper=1)(
+            param_name + '_mu', mu=param_mu_mu, sd=param_mu_sd, shape=n_groups)
+        param_sd = pm.HalfNormal(param_name + '_sd', sd=param_sd_sd, shape=n_groups)
+        return pm.Bound(pm.Normal, lower=-1, upper=1)(
+            param_name, mu=param_mu[group], sd=param_sd[group], shape=n_subj,
+            testval=0.1 * T.ones(n_subj, dtype='float32'))
+
+
+def create_0inf_parameter(param_name, fit_slope, n_groups, group, n_subj, upper, slope_variable):
+
+    if fit_slope:
+        param_sd = pm.HalfNormal(param_name + '_sd', sd=1, shape=n_groups, testval=0.5 * T.ones(n_groups, dtype='int32'))
+        param_slope = pm.Normal(param_name + '_slope', mu=0, sd=5, shape=n_groups, testval=T.ones(n_groups, dtype='int32'))
+        param_int = pm.Gamma(param_name + '_int', alpha=1, beta=1, shape=n_groups, testval=2 * T.ones(n_groups, dtype='int32'))
+        return pm.Normal(param_name, shape=n_subj, testval=2 * T.ones(n_subj, dtype='int32'),
+                         mu=param_int[group] + param_slope[group] * slope_variable,
+                         sd=param_sd[group])
+    else:
+        param_a_a = pm.Uniform(param_name + '_a_a', lower=0, upper=upper)
+        param_a_b = pm.Uniform(param_name + '_a_b', lower=0, upper=upper)
+        param_b_a = pm.Uniform(param_name + '_b_a', lower=0, upper=upper)
+        param_b_b = pm.Uniform(param_name + '_b_b', lower=0, upper=upper)
+        param_a = pm.Gamma(param_name + '_a', alpha=param_a_a, beta=param_a_b, shape=n_groups)
+        param_b = pm.Gamma(param_name + '_b', alpha=param_b_a, beta=param_b_b, shape=n_groups)
+
+        param_mu = pm.Deterministic(param_name + '_mu', param_a / param_b)
+        param_var = pm.Deterministic(param_name + '_var', param_a / np.square(param_b))
+
+        return pm.Gamma(param_name, alpha=param_a[group], param=param_b[group], shape=n_subj, testval=T.ones(n_subj))
 
 
 def create_model(choices, rewards, group, age,
@@ -122,183 +191,76 @@ def create_model(choices, rewards, group, age,
     with pm.Model() as model:
         if not fit_individuals:
 
-            # Population-level parameters
             # RL, Bayes, and WSLS
             if ('b' in model_name) or ('WSLS' in model_name):
-                beta_a_a = pm.Uniform('beta_a_a', lower=0, upper=upper)
-                beta_a_b = pm.Uniform('beta_a_b', lower=0, upper=upper)
-                beta_b_a = pm.Uniform('beta_b_a', lower=0, upper=upper)
-                beta_b_b = pm.Uniform('beta_b_b', lower=0, upper=upper)
-                beta_a = pm.Gamma('beta_a', alpha=beta_a_a, beta=beta_a_b, shape=n_groups)
-                beta_b = pm.Gamma('beta_b', alpha=beta_b_a, beta=beta_b_b, shape=n_groups)
-
-                beta_mu = pm.Deterministic('beta_mu', beta_a / beta_b)
-                beta_var = pm.Deterministic('beta_var', beta_a / np.square(beta_b))
-
-                beta = pm.Gamma('beta', alpha=beta_a[group], beta=beta_b[group], shape=n_subj, testval=T.ones(n_subj))
+                beta = create_0inf_parameter('beta', 'y' in model_name, n_groups, group, n_subj, upper, slope_variable)
                 print("Adding free parameter beta.")
-
             else:
                 beta = pm.Gamma('beta', alpha=1, beta=1, shape=n_subj)  # won't be used - necessary for sampling
                 print("This model does not have beta.")
 
             if 'p' in model_name:
-                persev_mu_mu = pm.Normal('persev_mu_mu', mu=0, sd=0.1)
-                persev_mu_sd = pm.HalfNormal('persev_mu_sd', sd=0.1)
-                persev_sd_sd = pm.HalfNormal('persev_sd_sd', sd=0.1)
-                persev_mu = pm.Bound(pm.Normal, lower=-1, upper=1)(
-                    'persev_mu', mu=persev_mu_mu, sd=persev_mu_sd, shape=n_groups)
-                persev_sd = pm.HalfNormal('persev_sd', sd=persev_sd_sd, shape=n_groups)
+                persev = create_infinf_parameter('persev', 't' in model_name, n_groups, group, n_subj, upper, slope_variable)
                 print("Adding free parameter persev.")
+            else:
+                persev = pm.Deterministic('persev', T.zeros(n_subj, dtype='float32'))
+                print("Setting persev = 0.")
 
             if 'RL' in model_name:
                 if 'a' in model_name:
-                    alpha_a_a = pm.Uniform('alpha_a_a', lower=0, upper=upper)
-                    alpha_a_b = pm.Uniform('alpha_a_b', lower=0, upper=upper)
-                    alpha_b_a = pm.Uniform('alpha_b_a', lower=0, upper=upper)
-                    alpha_b_b = pm.Uniform('alpha_b_b', lower=0, upper=upper)
-                    alpha_a = pm.Gamma('alpha_a', alpha=alpha_a_a, beta=alpha_a_b, shape=n_groups)
-                    alpha_b = pm.Gamma('alpha_b', alpha=alpha_b_a, beta=alpha_b_b, shape=n_groups)
+                    alpha = create_01_parameter('alpha', 'l' in model_name, n_groups, group, n_subj, upper, slope_variable)
                     print("Adding free parameter alpha.")
+                else:
+                    alpha = pm.Deterministic('alpha', T.ones(n_subj, dtype='float32'))
+                    print("Setting alpha = 1")
 
                 if 'n' in model_name:
-                    nalpha_a_a = pm.Uniform('nalpha_a_a', lower=0, upper=upper)
-                    nalpha_a_b = pm.Uniform('nalpha_a_b', lower=0, upper=upper)
-                    nalpha_b_a = pm.Uniform('nalpha_b_a', lower=0, upper=upper)
-                    nalpha_b_b = pm.Uniform('nalpha_b_b', lower=0, upper=upper)
-                    nalpha_a = pm.Gamma('nalpha_a', alpha=nalpha_a_a, beta=nalpha_a_b, shape=n_groups)
-                    nalpha_b = pm.Gamma('nalpha_b', alpha=nalpha_b_a, beta=nalpha_b_b, shape=n_groups)
+                    nalpha = create_01_parameter('nalpha', 'q' in model_name, n_groups, group, n_subj, upper, slope_variable)
                     print("Adding free parameter nalpha.")
+                else:
+                    nalpha = pm.Deterministic('nalpha', 1 * alpha)
+                    print("Setting nalpha = alpha.")
 
                 if 'c' in model_name:
-                    calpha_sc_a_a = pm.Uniform('calpha_sc_a_a', lower=0, upper=upper)
-                    calpha_sc_a_b = pm.Uniform('calpha_sc_a_b', lower=0, upper=upper)
-                    calpha_sc_b_a = pm.Uniform('calpha_sc_b_a', lower=0, upper=upper)
-                    calpha_sc_b_b = pm.Uniform('calpha_sc_b_b', lower=0, upper=upper)
-                    calpha_sc_a = pm.Gamma('calpha_sc_a', alpha=calpha_sc_a_a, beta=calpha_sc_a_b, shape=n_groups)
-                    calpha_sc_b = pm.Gamma('calpha_sc_b', alpha=calpha_sc_b_a, beta=calpha_sc_b_b, shape=n_groups)
-                    calpha_sc = pm.Beta('calpha_sc', alpha=calpha_sc_a[group], beta=calpha_sc_b[group], shape=n_subj, testval=0.25 * T.ones(n_subj))
+                    calpha_sc = create_01_parameter('calpha_sc', 'o' in model_name, n_groups, group, n_subj, upper, slope_variable)
                     print("Adding free parameter calpha_sc.")
                 else:
                     calpha_sc = pm.Deterministic('calpha_sc', T.as_tensor_variable(0))
                     print("Setting calpha_sc = 0.")
+                calpha = pm.Deterministic('calpha', alpha * calpha_sc)
 
                 if 'x' in model_name:
-                    cnalpha_sc_a_a = pm.Uniform('cnalpha_sc_a_a', lower=0, upper=upper)
-                    cnalpha_sc_a_b = pm.Uniform('cnalpha_sc_a_b', lower=0, upper=upper)
-                    cnalpha_sc_b_a = pm.Uniform('cnalpha_sc_b_a', lower=0, upper=upper)
-                    cnalpha_sc_b_b = pm.Uniform('cnalpha_sc_b_b', lower=0, upper=upper)
-                    cnalpha_sc_a = pm.Gamma('cnalpha_sc_a', alpha=cnalpha_sc_a_a, beta=cnalpha_sc_a_b, shape=n_groups)
-                    cnalpha_sc_b = pm.Gamma('cnalpha_sc_b', alpha=cnalpha_sc_b_a, beta=cnalpha_sc_b_b, shape=n_groups)
-                    cnalpha_sc = pm.Beta('cnalpha_sc', alpha=cnalpha_sc_a[group], beta=cnalpha_sc_b[group], shape=n_subj)
+                    cnalpha_sc = create_01_parameter('cnalpha_sc', 'u' in model_name, n_groups, group, n_subj, upper, slope_variable)
                     print("Adding free parameter cnalpha_sc.")
                 else:
                     cnalpha_sc = pm.Deterministic('cnalpha_sc', calpha_sc.copy())
                     print("Setting cnalpha_sc = calpha_sc.")
+                cnalpha = pm.Deterministic('cnalpha', nalpha * cnalpha_sc)
 
                 if 'm' in model_name:
-                    m_a_a = pm.Uniform('m_a_a', lower=0, upper=upper)
-                    m_a_b = pm.Uniform('m_a_b', lower=0, upper=upper)
-                    m_b_a = pm.Uniform('m_b_a', lower=0, upper=upper)
-                    m_b_b = pm.Uniform('m_b_b', lower=0, upper=upper)
-                    m_a = pm.Gamma('m_a', alpha=m_a_a, beta=m_a_b, shape=n_groups)
-                    m_b = pm.Gamma('m_b', alpha=m_b_a, beta=m_b_b, shape=n_groups)
-                    m = pm.Beta('m', alpha=m_a[group], beta=m_b[group], shape=n_subj)
+                    m = create_01_parameter('m', 'z' in model_name, n_groups, group, n_subj, upper, slope_variable)
                     print("Adding free parameter m.")
-
-                # Parameter means and variances
-                if 'a' in model_name:
-                    alpha_mu = pm.Deterministic('alpha_mu', 1 / (1 + alpha_b / alpha_a))
-                    alpha_var = pm.Deterministic('alpha_var', (alpha_a * alpha_b) / (np.square(alpha_a + alpha_b) * (alpha_a + alpha_b + 1)))
-                if 'n' in model_name:
-                    nalpha_mu = pm.Deterministic('nalpha_mu', 1 / (1 + nalpha_b / nalpha_a))
-                    nalpha_var = pm.Deterministic('nalpha_var', (nalpha_a * nalpha_b) / (np.square(nalpha_a + nalpha_b) * (nalpha_a + nalpha_b + 1)))
-                if 'c' in model_name:
-                    calpha_sc_mu = pm.Deterministic('calpha_sc_mu', 1 / (1 + calpha_sc_b / calpha_sc_a))
-                    calpha_sc_var = pm.Deterministic('calpha_sc_var', (calpha_sc_a * calpha_sc_b) / (np.square(calpha_sc_a + calpha_sc_b) * (calpha_sc_a + calpha_sc_b + 1)))
-                if 'x' in model_name:
-                    cnalpha_sc_mu = pm.Deterministic('cnalpha_sc_mu', 1 / (1 + cnalpha_sc_b / cnalpha_sc_a))
-                    cnalpha_sc_var = pm.Deterministic('cnalpha_sc_var', (cnalpha_sc_a * cnalpha_sc_b) / (np.square(cnalpha_sc_a + cnalpha_sc_b) * (cnalpha_sc_a + cnalpha_sc_b + 1)))
-                if 'm' in model_name:
-                    m_mu = pm.Deterministic('m_mu', 1 / (1 + m_b / m_a))
-                    m_var = pm.Deterministic('m_var', (m_a * m_b) / (np.square(m_a + m_b) * (m_a + m_b + 1)))
-
-                # Individual parameters (with group-level priors) (beta and persev are down below Bayes)
-                if 'a' in model_name:
-                    alpha = pm.Beta('alpha', alpha=alpha_a[group], beta=alpha_b[group], shape=n_subj, testval=0.5 * T.ones(n_subj))
-                else:
-                    alpha = pm.Deterministic('alpha', T.ones(n_subj, dtype='float32'))
-
-                if 'n' in model_name:
-                    nalpha = pm.Beta('nalpha', alpha=nalpha_a[group], beta=nalpha_b[group], shape=n_subj, testval=0.5 * T.ones(n_subj))
-                else:
-                    nalpha = pm.Deterministic('nalpha', 1 * alpha)
-                    if verbose:
-                        print("Setting nalpha = alpha.")
-
-                if 'm' in model_name:
-                    m = pm.Beta('m', alpha=m_a[group], beta=m_b[group], shape=n_subj, testval=0.5 * T.ones(n_subj))
                 else:
                     m = pm.Deterministic('m', T.ones(n_subj, dtype='float32'))
                     print("Setting m = 1.")
 
-                calpha = pm.Deterministic('calpha', alpha * calpha_sc)
-                cnalpha = pm.Deterministic('cnalpha', nalpha * cnalpha_sc)
-
             elif 'B' in model_name:
 
-                # Population-level parameters
                 p_noisy = 1e-5 * T.as_tensor_variable(1)
 
                 if 's' in model_name:
-                    p_switch_a_a = pm.Uniform('p_switch_a_a', lower=0, upper=upper)
-                    p_switch_a_b = pm.Uniform('p_switch_a_b', lower=0, upper=upper)
-                    p_switch_b_a = pm.Uniform('p_switch_b_a', lower=0, upper=upper)
-                    p_switch_b_b = pm.Uniform('p_switch_b_b', lower=0, upper=upper)
-                    p_switch_a = pm.Gamma('p_switch_a', alpha=p_switch_a_a, beta=p_switch_a_b, shape=n_groups)
-                    p_switch_b = pm.Gamma('p_switch_b', alpha=p_switch_b_a, beta=p_switch_b_b, shape=n_groups)
+                    p_switch = create_01_parameter('p_switch', 'w' in model_name, n_groups, group, n_subj, upper, slope_variable)
                     print("Adding free parameter p_switch.")
-
-                if 'r' in model_name:
-                    p_reward_a_a = pm.Uniform('p_reward_a_a', lower=0, upper=upper)
-                    p_reward_a_b = pm.Uniform('p_reward_a_b', lower=0, upper=upper)
-                    p_reward_b_a = pm.Uniform('p_reward_b_a', lower=0, upper=upper)
-                    p_reward_b_b = pm.Uniform('p_reward_b_b', lower=0, upper=upper)
-                    p_reward_a = pm.Gamma('p_reward_a', alpha=p_reward_a_a, beta=p_reward_a_b, shape=n_groups)
-                    p_reward_b = pm.Gamma('p_reward_b', alpha=p_reward_b_a, beta=p_reward_b_b, shape=n_groups)
-                    print("Adding free parameter p_reward.")
-
-                # Parameter mu and var and group differences
-                if 's' in model_name:
-                    p_switch_mu = pm.Deterministic('p_switch_mu', p_switch_a / (p_switch_a + p_switch_b))
-                    p_switch_var = pm.Deterministic('p_switch_var', p_switch_a * p_switch_b / (
-                                T.square(p_switch_a + p_switch_b) * (p_switch_a + p_switch_b + 1)))
-
-                if 'r' in model_name:
-                    p_reward_mu = pm.Deterministic('p_reward_mu', p_reward_a / (p_reward_a + p_reward_b))
-                    p_reward_var = pm.Deterministic('p_reward_var', p_reward_a * p_reward_b / (
-                                T.square(p_reward_a + p_reward_b) * (p_reward_a + p_reward_b + 1)))
-
-                # Individual parameters
-                if 's' in model_name:
-                    p_switch = pm.Beta('p_switch', alpha=p_switch_a[group], beta=p_switch_b[group], shape=n_subj)
                 else:
                     p_switch = pm.Deterministic('p_switch', 0.05081582 * T.ones(n_subj))
                     print("Setting p_switch to 0.0508...")
 
                 if 'r' in model_name:
-                    p_reward = pm.Beta('p_reward', alpha=p_reward_a[group], beta=p_reward_b[group], shape=n_subj)
+                    p_reward = create_01_parameter('p_reward', 'w' in model_name, n_groups, group, n_subj, upper, slope_variable)
+                    print("Adding free parameter p_reward.")
                 else:
                     p_reward = pm.Beta('p_reward', alpha=1, beta=1, shape=n_subj, testval=0.75 * T.ones(n_subj))
                     print("Setting p_reward to 0.75.")
-
-            # RL, Bayes, and WSLS
-            if 'p' in model_name:
-                persev = pm.Bound(pm.Normal, lower=-1, upper=1)(
-                    'persev', mu=persev_mu[group], sd=persev_sd[group], shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
-            else:
-                persev = pm.Deterministic('persev', T.zeros(n_subj, dtype='float32'))
-                print("Setting persev = 0.")
 
             if 'B' in model_name:
                 scaled_persev_bonus = persev_bonus * persev
@@ -343,7 +305,8 @@ def create_model(choices, rewards, group, age,
                             alpha_slope2 = pm.Uniform('alpha_slope2', lower=-1, upper=1, shape=n_groups, testval=0.1 * T.ones(n_groups, dtype='int32'))
                         else:
                             alpha_slope2= T.zeros(n_groups, dtype='int16')
-                        alpha = pm.Deterministic('alpha', alpha_intercept[group] + alpha_slope[group] * slope_variable + alpha_slope2[group] * slope_variable * slope_variable)
+                        alpha_unbound = pm.Deterministic('alpha_unbound', alpha_intercept[group] + alpha_slope[group] * slope_variable + alpha_slope2[group] * slope_variable * slope_variable)
+                        alpha = pm.Deterministic('alpha', T.nnet.sigmoid(alpha_unbound))  # element-wise sigmoid: sigmoid(x) = \frac{1}{1 + \exp(-x)}
                         print("Drawing slope, intercept, and noise for alpha.")
                     else:
                         alpha = pm.Beta('alpha', alpha=1, beta=1, shape=n_subj, testval=0.5 * T.ones(n_subj, dtype='float32'))
@@ -360,7 +323,8 @@ def create_model(choices, rewards, group, age,
                             nalpha_slope2 = pm.Uniform('nalpha_slope2', lower=-1, upper=1, shape=n_groups, testval=0.1 * T.ones(n_groups, dtype='int32'))
                         else:
                             nalpha_slope2= T.zeros(n_groups, dtype='int16')
-                        nalpha = pm.Deterministic('nalpha', nalpha_intercept[group] + nalpha_slope[group] * slope_variable + nalpha_slope2[group] * slope_variable * slope_variable )
+                        nalpha_unbound = pm.Deterministic('nalpha_unbound', nalpha_intercept[group] + nalpha_slope[group] * slope_variable + nalpha_slope2[group] * slope_variable * slope_variable)
+                        nalpha = pm.Deterministic('nalpha', T.nnet.sigmoid(nalpha_unbound))
                         print("Drawing slope, intercept, and noise for nalpha.")
                     else:
                         nalpha = pm.Beta('nalpha', alpha=1, beta=1, shape=n_subj, testval=0.25 * T.ones(n_subj, dtype='float32'))
@@ -377,7 +341,8 @@ def create_model(choices, rewards, group, age,
                             calpha_sc_slope2 = pm.Uniform('calpha_sc_slope2', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
                         else:
                             calpha_sc_slope2= T.zeros(n_groups, dtype='int16')
-                        calpha_sc = pm.Deterministic('calpha_sc', calpha_sc_intercept[group] + calpha_sc_slope[group] * slope_variable + calpha_sc_slope2[group] * slope_variable * slope_variable)
+                        calpha_sc_unbound = pm.Deterministic('calpha_sc_unbound', calpha_sc_intercept[group] + calpha_sc_slope[group] * slope_variable + calpha_sc_slope2[group] * slope_variable * slope_variable)
+                        calpha_sc = pm.Deterministic('calpha_sc', T.nnet.sigmoid(calpha_sc_unbound))
                         print("Drawing slope, intercept, and noise for calpha_sc.")
                     else:
                         calpha_sc = pm.Beta('calpha_sc', alpha=1, beta=1, shape=n_subj, testval=0.25 * T.ones(n_subj, dtype='float32'))
@@ -394,7 +359,8 @@ def create_model(choices, rewards, group, age,
                             cnalpha_sc_slope2 = pm.Uniform('cnalpha_sc_slope2', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
                         else:
                             cnalpha_sc_slope2= T.zeros(n_groups, dtype='int16')
-                        cnalpha_sc = pm.Deterministic('cnalpha_sc', cnalpha_sc_intercept[group] + cnalpha_sc_slope[group] * slope_variable + cnalpha_sc_slope2[group] * slope_variable * slope_variable)
+                        cnalpha_sc_unbound = pm.Deterministic('cnalpha_sc_unbound', cnalpha_sc_intercept[group] + cnalpha_sc_slope[group] * slope_variable + cnalpha_sc_slope2[group] * slope_variable * slope_variable)
+                        cnalpha_sc = pm.Deterministic('cnalpha_sc', T.nnet.sigmoid(cnalpha_sc_unbound))
                         print("Drawing slope, intercept, and noise for cnalpha_sc.")
                     else:
                         cnalpha_sc = pm.Beta('cnalpha_sc', alpha=1, beta=1, shape=n_subj, testval=0.25 * T.ones(n_subj, dtype='float32'))
@@ -432,7 +398,8 @@ def create_model(choices, rewards, group, age,
                     if 'w' in model_name:
                         p_switch_intercept = pm.Beta('p_switch_intercept', alpha=1, beta=1, shape=n_groups, testval=0.05 * T.ones(n_groups, dtype='int32'))
                         p_switch_slope = pm.Uniform('p_switch_slope', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
-                        p_switch = pm.Deterministic('p_switch', p_switch_intercept[group] + p_switch_slope[group] * slope_variable)
+                        p_switch_unbound = pm.Deterministic('p_switch_unbound', p_switch_intercept[group] + p_switch_slope[group] * slope_variable)
+                        p_switch = pm.Deterministic('p_switch', T.nnet.sigmoid(p_switch_unbound))
                         print("Drawing slope, intercept, and noise for p_switch.")
                     else:
                         p_switch = pm.Beta('p_switch', alpha=1, beta=1, shape=n_subj)
@@ -445,7 +412,8 @@ def create_model(choices, rewards, group, age,
                     if 'v' in model_name:
                         p_reward_intercept = pm.Beta('p_reward_intercept', alpha=1, beta=1, shape=n_groups, testval=0.75 * T.ones(n_groups, dtype='int32'))
                         p_reward_slope = pm.Uniform('p_reward_slope', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
-                        p_reward = pm.Deterministic('p_reward', p_reward_intercept[group] + p_reward_slope[group] * slope_variable)
+                        p_reward_unbound = pm.Deterministic('p_reward_unbound', p_reward_intercept[group] + p_reward_slope[group] * slope_variable)
+                        p_reward = pm.Deterministic('p_reward', T.nnet.sigmoid(p_reward_unbound))
                         print("Drawing slope, intercept, and noise for p_reward.")
                     else:
                         p_reward = pm.Beta('p_reward', alpha=1, beta=1, shape=n_subj)
@@ -630,7 +598,7 @@ def fit_model_and_save(model, n_params, n_subj, n_trials, sIDs, slope_variable,
     if fit_mcmc:
         print('Saving trace, model, summary, WAIC, and sIDs to {0}{1}\n'.format(save_dir, save_id))
         with open(save_dir + save_id + '_mcmc.pickle', 'wb') as handle:
-            pickle.dump({'trace': trace, 'model': model, 'summary': model_summary, 'WAIC': waic.WAIC, 'sIDs': list(sIDs)},
+            pickle.dump({'trace': trace, 'model': model, 'summary': model_summary, 'WAIC': waic.WAIC, 'slope_variable': slope_variable, 'sIDs': list(sIDs)},
                         handle, protocol=pickle.HIGHEST_PROTOCOL)
         pm.traceplot(trace)
         plt.savefig(save_dir + save_id + 'plot.png')
@@ -639,7 +607,7 @@ def fit_model_and_save(model, n_params, n_subj, n_trials, sIDs, slope_variable,
     if fit_map:
         print('Saving map estimate, nll, bic, aic, sIDs to {0}{1}\n'.format(save_dir, save_id))
         with open(save_dir + save_id + '_map.pickle', 'wb') as handle:
-            pickle.dump({'map': map, 'nll': nll, 'bic': bic, 'aic': aic, 'sIDs': list(sIDs), 'slope_variable': slope_variable},
+            pickle.dump({'map': map, 'nll': nll, 'bic': bic, 'aic': aic, 'slope_variable': slope_variable, 'sIDs': list(sIDs)},
                         handle, protocol=pickle.HIGHEST_PROTOCOL)
         return nll, bic, aic
 
@@ -647,11 +615,12 @@ def fit_model_and_save(model, n_params, n_subj, n_trials, sIDs, slope_variable,
 # Determine the basics
 contrast = 'linear'
 n_groups = 1
+kids_and_teens_only=True
 if not run_on_cluster:
-    fit_mcmc = False
-    fit_map = True
-    n_tune = 200
-    n_samples = 200
+    fit_mcmc = True
+    fit_map = False
+    n_tune = 100
+    n_samples = 100
     n_cores = 2
     n_chains = 1
 else:
@@ -669,11 +638,11 @@ else:
     fit_individuals = True
 
 # Load behavioral data on which to run the model(s)
-n_subj, rewards, choices, group, n_groups, age = load_data(run_on_cluster, n_groups=1, n_subj='all', kids_and_teens_only=True, n_trials=120)  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
+n_subj, rewards, choices, group, n_groups, age = load_data(run_on_cluster, n_groups=n_groups, n_subj='all', kids_and_teens_only=kids_and_teens_only, n_trials=120)  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
 
 # Run all models
 nll_bics = pd.DataFrame()
-for slope_variable in ['age_z']:  # TODO, 'PDS_z', 'T1_z']:
+for slope_variable in ['age_z', 'PDS_z', 'T1_z']:
     for model_name in model_names:
 
         # Create model
