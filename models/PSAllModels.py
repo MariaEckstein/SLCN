@@ -1,5 +1,5 @@
 run_on_cluster = False
-save_dir_appx = 'new_map_models5/'
+save_dir_appx = 'new_map_models_Bayes_mcmc/'
 import itertools
 
 # GET LIST OF MODELS TO RUN
@@ -20,7 +20,7 @@ import itertools
 #
 # # model_names = ['RLabcnplyoqt', 'RLabcxplyout']
 # # model_names = ['WSLS', 'WSLSy', 'WSLSS', 'WSLSy']
-# # model_names = ['Bbspr'] #  ['Bbsrywv']
+model_names = ['Bbsprywvt', 'RLabcnplyoqt'] #  ['Bbsrywv']
 # model_names = ['RLab', 'RLabc', 'RLabcn', 'RLabcnp']
 # model_names = ['RLabcnp']
 
@@ -33,27 +33,27 @@ import itertools
 #     # 'Bbpr', 'B'
 # ]
 
-# All possible models
-model_names = []
-
-# Add RL models
-for c in ['', 'c']:
-    for n in ['', 'n']:
-        for x in ['', 'x']:
-            for p in ['', 'p']:
-                for S in ['', 'S', 'SS']:  # , 'SSS'
-                    model_names.append('RLab' + c + n + x + p + S)
-                    if S == 'S' or S == 'SS':
-                        model_names.append('RLab' + c + n + x + p + S + 'i')
-
-# Add strategy models
-model_names.extend(['WSLS', 'WSLSS'])
-
-# Add Bayesian models
-for s in ['', 's']:
-    for p in ['', 'p']:
-        for r in ['', 'r']:
-            model_names.append('Bb' + s + p + r)
+# # All possible models
+# model_names = []
+#
+# # # Add RL models
+# # for c in ['', 'c']:
+# #     for n in ['', 'n']:
+# #         for x in ['', 'x']:
+# #             for p in ['', 'p']:
+# #                 for S in ['']:  # , 'S', 'SS']:  # , 'SSS'
+# #                     model_names.append('RLab' + c + n + x + p + S)
+# #                     if S == 'S' or S == 'SS':
+# #                         model_names.append('RLab' + c + n + x + p + S + 'i')
+# #
+# # # Add strategy models
+# # model_names.extend(['WSLS', 'WSLSS'])
+#
+# # Add Bayesian models
+# for s in ['', 's']:
+#     for p in ['', 'p']:
+#         for r in ['', 'r']:
+#             model_names.append('Bb' + s + p + r)
 
 print("Getting ready to run {0} models: {1}".format(len(model_names), model_names))
 
@@ -214,7 +214,7 @@ def create_model(choices, rewards, group, age,
     # Create choices_both (first trial is persev_bonus for second trial = where Qs starts)
     if 'B' in model_name:
         persev_bonus = 2 * choices - 1  # recode as -1 for choice==0 (left) and +1 for choice==1 (right)
-        persev_bonus = np.concatenate([np.zeros((1, n_subj)), persev_bonus])  # add 0 bonus for first trial
+        # persev_bonus = np.concatenate([np.zeros((1, n_subj)), persev_bonus])  # add 0 bonus for first trial
         persev_bonus = theano.shared(np.asarray(persev_bonus, dtype='int16'))
 
     # Transform everything into theano.shared variables
@@ -256,7 +256,7 @@ def create_model(choices, rewards, group, age,
                 print("This model does not have beta.")
 
             if 'p' in model_name:
-                persev = create_parameter('persev', 'Normal', 't' in model_name, n_groups, group, n_subj, upper, slope_variable)#,
+                persev = create_parameter('persev', 'Normal', 't' in model_name, n_groups, group, n_subj, upper, slope_variable, sd=1)#,
                                           # sd_testval=0.11, slope_testval=-0.03, int_testval=-0.01, param_testval=0.01, sd=1)  # RLabcnplyoqt persev mcmc results 2019-06-19
             else:
                 persev = pm.Deterministic('persev', T.zeros(n_subj, dtype='float32'))
@@ -512,10 +512,10 @@ def create_model(choices, rewards, group, age,
                         p_switch = pm.Deterministic('p_switch', T.nnet.sigmoid(p_switch_unbound))
                         print("Drawing slope, intercept, and noise for p_switch.")
                     else:
-                        p_switch = pm.Beta('p_switch', alpha=1, beta=1, shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                        p_switch = pm.Beta('p_switch', alpha=1, beta=1, shape=n_subj, testval=0.0508 * T.ones(n_subj, dtype='float32'))
                     print("Adding free parameter p_switch.")
                 else:
-                    p_switch = pm.Deterministic('p_switch', 0.05081582 * T.ones(n_subj))  # checked on 2019-06-03 in R: `mean(all_files$switch_trial)`
+                    p_switch = pm.Deterministic('p_switch', 0.0508 * T.ones(n_subj))  # checked on 2019-06-03 in R: `mean(all_files$switch_trial)`
                     print("Setting p_switch = 0.05081582.")
 
                 if 'r' in model_name:
@@ -526,7 +526,7 @@ def create_model(choices, rewards, group, age,
                         p_reward = pm.Deterministic('p_reward', T.nnet.sigmoid(p_reward_unbound))
                         print("Drawing slope, intercept, and noise for p_reward.")
                     else:
-                        p_reward = pm.Beta('p_reward', alpha=1, beta=1, shape=n_subj, testval=0.8 * T.ones(n_subj, dtype='float32'))
+                        p_reward = pm.Beta('p_reward', alpha=1, beta=1, shape=n_subj, testval=0.75 * T.ones(n_subj, dtype='float32'))
                     print("Adding free parmeter p_reward.")
                 else:
                     p_reward = pm.Deterministic('p_reward', 0.75 * T.ones(n_subj))  # 0.75 because p_reward is the prob. of getting reward if choice is correct
@@ -654,10 +654,11 @@ def create_model(choices, rewards, group, age,
 
             # Get posterior & calculate probability of subsequent trial
             p_r = 0.5 * T.ones(n_subj, dtype='float32')
-            [p_r, p_right], _ = theano.scan(fn=post_from_lik,  # shape (n_trials, n_subj); starts predicting at trial 1!
+            [p_r, p_right, p_right0], _ = theano.scan(fn=post_from_lik,  # shape (n_trials, n_subj); starts predicting at trial 1!
                                             sequences=[lik_cor, lik_inc, scaled_persev_bonus],
-                                            outputs_info=[p_r, None],
+                                            outputs_info=[p_r, None, None],
                                             non_sequences=[p_switch, beta])
+
             if 'b' in model_name:
                 p_right = p_right[2:]  # predict from trial 3 onward, not trial 1 (consistent with RL / strat models)
             else:
@@ -674,19 +675,21 @@ def create_model(choices, rewards, group, age,
         subjwise_LLs = pm.Deterministic('subjwise_LLs', T.sum(trialwise_LLs, axis=0))
         p = pm.Deterministic('trialwise_p_right', 1 * p_right)
 
-        # theano.printing.Print('alpha')(alpha)
         # theano.printing.Print('beta')(beta)
-        # theano.printing.Print('nalpha')(nalpha)
-        # theano.printing.Print('calpha')(calpha)
-        # theano.printing.Print('cnalpha')(cnalpha)
         # theano.printing.Print('persev')(persev)
-        # theano.printing.Print('Qs')(Qs)
-        # theano.printing.Print('p_right')(p_right)
+        # theano.printing.Print('p_switch')(p_switch)
+        # theano.printing.Print('p_reward')(p_reward)
+        # # theano.printing.Print('alpha')(alpha)
+        # # theano.printing.Print('nalpha')(nalpha)
+        # # theano.printing.Print('calpha')(calpha)
+        # # theano.printing.Print('cnalpha')(cnalpha)
+        # # theano.printing.Print('Qs')(Qs)
         # theano.printing.Print('choices')(choices)
         # theano.printing.Print('rewards')(rewards)
+        # theano.printing.Print('p_right')(p_right)
         # theano.printing.Print('trialwise_LLs')(trialwise_LLs)
         # theano.printing.Print('T.sum(trialwise_LLs, axis=0)')(T.sum(trialwise_LLs, axis=0))
-        theano.printing.Print('T.sum(trialwise_LLs)')(T.sum(trialwise_LLs))
+        # theano.printing.Print('T.sum(trialwise_LLs)')(T.sum(trialwise_LLs))
 
         # Check model logp and RV logps (will crash if they are nan or -inf)
         if verbose or print_logps:
@@ -747,8 +750,8 @@ contrast = 'linear'
 n_groups = 1  # 'gender'
 kids_and_teens_only = False
 if not run_on_cluster:
-    fit_mcmc = False
-    fit_map = True
+    fit_mcmc = True
+    fit_map = False
     n_tune = 20
     n_samples = 20
     n_cores = 2

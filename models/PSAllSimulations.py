@@ -7,7 +7,7 @@ import seaborn as sns
 sns.set(style='whitegrid')
 
 from PStask import Task
-from shared_modeling_simulation import get_paths, update_Q_sim, get_n_trials_back, p_from_Q_sim, get_WSLS_Qs, get_WSLSS_Qs, get_likelihoods, post_from_lik
+from shared_modeling_simulation import get_paths, update_Q_sim, get_n_trials_back, p_from_Q_sim, get_WSLS_Qs, get_WSLSS_Qs, get_likelihoods, post_from_lik_sim
 from modeling_helpers import load_data
 
 
@@ -31,13 +31,15 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
     """Simulate agents for the model specified in file_name, with the parameters indicated in the referenced file."""
 
     # # TODO remove after debugging!!!
-    # model_name = 'RLabcnp'
-    # parameters['beta'] = 3.63
-    # parameters['persev'] = -0.006
-    # parameters['alpha'] = 0.999
-    # parameters['nalpha'] = 0.304
-    # parameters['calpha'] = 0.999 * parameters['alpha']
-    # parameters['cnalpha'] = 0.999 * parameters['nalpha']
+    # model_name = 'Bb'
+    # parameters['beta'] = 2
+    # parameters['persev'] = 0.1
+    # parameters['p_switch'] = 0.0508
+    # parameters['p_reward'] = 0.75
+    # # parameters['alpha'] = 0.8
+    # # parameters['nalpha'] = 0.7
+    # # parameters['calpha'] = 0.5 * parameters['alpha']
+    # # parameters['cnalpha'] = 0.5 * parameters['nalpha']
 
     # GET MODEL PARAMETERS
     n_sim = n_sim_per_subj * n_subj
@@ -58,6 +60,11 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
     else:
         rewards, choices = loaded_data['rewards'], loaded_data['choices']
     ps_right = np.zeros((n_trials, n_sim))
+    lik_cors = []
+    lik_incs = []
+    p_rs = []
+    p_rights = []
+    p_rights0 = []
 
     # Get WSLS strategies
     if 'WSLSS' in model_name:
@@ -132,27 +139,32 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
         elif 'B' in model_name:
             if trial == 0:
                 scaled_persev_bonus = np.zeros(n_sim)
+                p_r = 0.5 * np.ones(n_sim)
                 p_right = 0.5 * np.ones(n_sim)
-                if model_name == 'B':
-                    p_right_ = 0.5 * np.ones(n_sim)
+
             else:
                 if not calculate_NLL_from_data:
                     persev_bonus = 2 * choice - 1  # recode as -1 for choice==0 (left) and +1 for choice==1 (right)
                 else:
                     persev_bonus = 2 * choices[trial-1] - 1
-                scaled_persev_bonus = persev_bonus * parameters['persev']  # TODO make sure it has the right shape
+                scaled_persev_bonus = persev_bonus * parameters['persev']
 
                 lik_cor, lik_inc = get_likelihoods(rewards[trial - 1], choices[trial - 1],
                                                    parameters['p_reward'], parameters['p_noisy'])
+                lik_cors.append(np.append([trial], lik_cor.values))
+                lik_incs.append(np.append([trial], lik_inc.values))
 
-                p_right_, p_right = post_from_lik(lik_cor, lik_inc,
-                                                  scaled_persev_bonus, p_right,
-                                                  parameters['p_switch'], parameters['beta'])
+                p_r, p_right, p_right0 = post_from_lik_sim(lik_cor, lik_inc,
+                                                 scaled_persev_bonus, p_r,
+                                                 parameters['p_switch'], parameters['beta'])
+                p_rs.append(np.append([trial], p_r.values))
+                p_rights.append(np.append([trial], p_right))
+                p_rights0.append(np.append([trial], p_right0))
 
         # Select an action based on probabilities
         if not calculate_NLL_from_data:
             if model_name == 'B':
-                choice = np.random.binomial(n=1, p=p_right_)  # don't use persev, don't use softmax
+                choice = np.random.binomial(n=1, p=p_r)  # don't use persev, don't use softmax
             else:
                 choice = np.random.binomial(n=1, p=p_right)  # produces "1" with p_right, and "0" with (1 - p_right)
 
@@ -171,15 +183,16 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
         if 'RL' in model_name:
             Qs_trials[trial] = Qs
         if model_name == 'B':
-            ps_right[trial] = p_right_
+            ps_right[trial] = p_r
         else:
             ps_right[trial] = p_right
         if not calculate_NLL_from_data:
             choices[trial] = choice
             rewards[trial] = reward
             correct_boxes[trial] = task.correct_box
-    trialwise_LLs = np.log(ps_right * choices + (1 - ps_right) * (1 - choices))[3:]  # remove 3 trials like in pymc3
-    subjwise_LLs = np.sum(trialwise_LLs, axis=0)
+    trialwise_LLs = np.array(np.log(ps_right * choices + (1 - ps_right) * (1 - choices))[3:])  # remove 3 trials like in pymc3
+    trialwise_LLs = pd.DataFrame(trialwise_LLs[:, :n_subj], columns=parameters['sID'][:n_subj])  # remove double subj
+    subjwise_LLs = pd.DataFrame(np.sum(trialwise_LLs, axis=0), columns=['NLL_sim'])
 
     print("Final LL: {0}".format(np.sum(subjwise_LLs)))
 
@@ -227,7 +240,7 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
             subj_data["p_right"] = ps_right[:, i]
             subj_data["sID"] = sID
             subj_data["simID"] = simID
-            subj_data["LL"] = subjwise_LLs[:, i]
+            subj_data["LL"] = subjwise_LLs.loc[sID].values[0]
             param_names = [col for col in parameters.columns if 'sID' not in col]
             for param_name in param_names:
                 subj_data[param_name] = np.array(parameters.loc[i, param_name])
@@ -242,56 +255,46 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
     else:
         print("Calculated {0} NLLs for {1} subjects and saved everything to {2}!".
               format(len(parameters['sID']), n_subj, data_dir))
-        trialwise_LLs = pd.DataFrame(trialwise_LLs[:, :n_subj], columns=parameters['sID'][:n_subj])  # remove double subjects
         trialwise_LLs.to_csv(data_dir + 'plots/trialwise_LLs_' + model_name + '_sim.csv', index=False)
-        subjwise_LLs = pd.DataFrame(subjwise_LLs[:n_subj], index=parameters['sID'][:n_subj], columns=['NLL_sim'])
         subjwise_LLs.to_csv(data_dir + 'plots/subjwise_LLs_' + model_name + '_sim.csv')
 
     return -np.sum(subjwise_LLs).values[0]  # total NLL of the model
 
 
 # Run simulations for all fitted models
-calculate_NLL_from_data = True
 n_sim_per_subj = 2
 verbose = False
-data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_map_models4/'
+data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_map_models_RL/'
 file_names = [f for f in os.listdir(data_dir) if ('.csv' in f) and ('params' in f) and not ('params_g' in f)]
 print("Found {0} models to simulate / calculate NLLs.".format(len(file_names)))
-nlls = pd.DataFrame()
+simulated_nlls = pd.DataFrame()
+fitted_nlls = pd.DataFrame()
 
-if calculate_NLL_from_data:
-    n_subj, rewards, choices, group, n_groups, age = load_data(False, n_groups=1, n_subj='all',
-                                                               kids_and_teens_only=False,
-                                                               n_trials=120,
-                                                               fit_slopes=False)
-    loaded_data = {'rewards': np.array(np.tile(rewards, 2), dtype=int),
-                   'choices': np.array(np.tile(choices, 2), dtype=int)}
-    indiv_nlls = pd.DataFrame()
-else:
-    loaded_data = None
+n_subj, rewards, choices, group, n_groups, age = load_data(False, n_groups=1, n_subj='all',
+                                                           kids_and_teens_only=False,
+                                                           n_trials=120,
+                                                           fit_slopes=False)
+loaded_data = {'rewards': np.array(np.tile(rewards, 2), dtype=int),
+               'choices': np.array(np.tile(choices, 2), dtype=int)}
 
 for file_name in file_names:
     model_name = [part for part in file_name.split('_') if ('RL' in part) or ('B' in part) or ('WSLS' in part)][0]
     n_subj, parameters = get_parameters(data_dir, file_name)
 
-    if calculate_NLL_from_data:
-        assert np.all(age['sID'].values[:n_subj] == parameters['sID'].values[
+    # Verify that the loaded age file fits with the loaded fitted parameter file
+    assert np.all(age['sID'].values[:n_subj] == parameters['sID'].values[
                                                 :n_subj]), "Parameters don't fit loaded data!! Results will be wrong!!"
 
-    # Simulate agents / calculate NLLs
-    nll = simulate_model_from_parameters(parameters, data_dir, n_subj, make_plots=False, calculate_NLL_from_data=calculate_NLL_from_data, verbose=verbose, loaded_data=loaded_data, n_sim_per_subj=n_sim_per_subj)
-    nlls = nlls.append([[model_name, nll]])
+    # Calculate NLLs for fitted parameters
+    fitted_nll = simulate_model_from_parameters(parameters, data_dir, n_subj, calculate_NLL_from_data=True, loaded_data=loaded_data, make_plots=False, verbose=verbose, n_sim_per_subj=n_sim_per_subj)
+    fitted_nlls = fitted_nlls.append([[model_name, fitted_nll]])
 
-if calculate_NLL_from_data:
-    nlls.columns = ['model_name', 'fitted_nll']
-else:
-    nlls.columns = ['model_name', 'simulated_nll']
+    # Simulate agents with fitted parameters
+    simulated_nll = simulate_model_from_parameters(parameters, data_dir, n_subj, calculate_NLL_from_data=False, loaded_data=None, make_plots=False, verbose=verbose, n_sim_per_subj=n_sim_per_subj)
+    simulated_nlls = simulated_nlls.append([[model_name, simulated_nll]])
 
 print("Saving nlls to {0}.".format(data_dir))
-nlls.to_csv(data_dir + 'plots/modelwise_LLs_sim.csv', index=False)
-
-# # Debug individual models
-# file_name = '2019_06_03/params_RLabcn_2019_6_3_3_7_humans_n_samples100.csv'
-# model_name = 'RLabcn'
-# n_subj, parameters = get_parameters(data_dir, file_name, n_subj=2)
-# simulate_model_from_parameters(parameters, data_dir, n_subj=n_subj, verbose=True)
+fitted_nlls.columns = ['model_name', 'fitted_nll']
+fitted_nlls.to_csv(data_dir + 'plots/modelwise_fitted_LLs_sim.csv', index=False)
+simulated_nlls.columns = ['model_name', 'simulated_nll']
+simulated_nlls.to_csv(data_dir + 'plots/modelwise_simulated_LLs_sim.csv', index=False)

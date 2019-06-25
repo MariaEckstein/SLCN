@@ -579,7 +579,7 @@ ages_file_dir = "C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv"
 ```{r plot all simulated agents}
 if (data_name == "simulated_human") {
   
-  dir_to_all_simulations = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/cluster_fits/simulations'
+  dir_to_all_simulations = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_map_models_RL/simulations'
   data_dirs = list.dirs(dir_to_all_simulations, recursive=F)
   # data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/simulate_without_replace_rewards/simulations/B'
   patt = ".*csv"

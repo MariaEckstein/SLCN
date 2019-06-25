@@ -570,32 +570,47 @@ def post_from_lik(lik_cor, lik_inc, scaled_persev_bonus,
 
     # Apply Bayes rule: Posterior prob. that right action is correct, based on likelihood (i.e., received feedback)
     p_r = lik_cor * p_r / (lik_cor * p_r + lik_inc * (1 - p_r))
-    # theano.printing.Print('p_r after integr prior')(p_r)
-    if verbose:
-        print('p_r after likelihood:\n{0}'.format(p_r.round(3)))
 
     # Take into account that a switch might occur
     p_r = (1 - p_switch) * p_r + p_switch * (1 - p_r)
-    # theano.printing.Print('p_r after taking switch')(p_r)
-    if verbose:
-        print('p_r after taking switch into account:\n{0}'.format(p_r.round(3)))
 
-    # Add perseverance bonus  # TODO not sure what happens when there is no softmax but persev; values > 1 or < 0?
-    p_r = p_r + scaled_persev_bonus
-    # theano.printing.Print('p_r after adding persevation bonus')(p_r)
-    if verbose:
-        print('p_r after adding perseveration bonus:\n{0}'.format(p_r.round(3)))
+    # Add perseverance bonus
+    p_right0 = p_r + scaled_persev_bonus
 
     # Log-transform probabilities
-    p_right = 1 / (1 + np.exp(list(-beta * (p_r - (1 - p_r)))))
+    # p_right = 1 / (1 + np.exp(list(-beta * (p_right0 - (1 - p_right0)))))
+    p_right = 1 / (1 + np.exp(-beta * (p_right0 - (1 - p_right0))))
     p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
-    # theano.printing.Print('p_r after softmax')(p_right)
-    if verbose:
-        print('p_right after sigmoid transform:\n{0}'.format(p_right.round(3)))
 
     # p_r is the actual probability of right, which is the prior for the next trial
     # p_right is p_r after adding perseveration and log-transform, used to select actions
-    return p_r, p_right
+    return p_r, p_right, p_right0
+
+
+def post_from_lik_sim(lik_cor, lik_inc, scaled_persev_bonus,
+                  p_r,
+                  p_switch, beta, verbose=False):
+
+    if verbose:
+        print('old p_r:\n{0}'.format(p_r.round(3)))
+
+    # Apply Bayes rule: Posterior prob. that right action is correct, based on likelihood (i.e., received feedback)
+    p_r = lik_cor * p_r / (lik_cor * p_r + lik_inc * (1 - p_r))
+
+    # Take into account that a switch might occur
+    p_r = (1 - p_switch) * p_r + p_switch * (1 - p_r)
+
+    # Add perseverance bonus
+    p_right0 = p_r + scaled_persev_bonus
+
+    # Log-transform probabilities
+    p_right = 1 / (1 + np.exp(list(-beta * (p_right0 - (1 - p_right0)))))
+    # p_right = 1 / (1 + np.exp(-beta * (p_right0 - (1 - p_right0))))
+    p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
+
+    # p_r is the actual probability of right, which is the prior for the next trial
+    # p_right is p_r after adding perseveration and log-transform, used to select actions
+    return p_r, p_right, p_right0
 
 
 def get_n_trials_back(model_name):

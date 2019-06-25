@@ -11,14 +11,12 @@ from shared_modeling_simulation import get_paths, get_n_params
 import scipy.stats as stats
 
 
-save_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_map_models5/'
+save_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_map_models_Bayes_mcmc/'
 SLCN_info_file_dir = 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv'
 n_subj = 234  # all: 234  # just kids & teens: 160
 n_trials = 120
-make_traceplot = False
-plot_nlls_bics_aics = True
-compare_pymc3_sim_results = True
-make_plots = False
+make_traceplot = True
+make_plots = True
 # ages = pd.read_csv(get_paths(False)['ages_cluster'])  # TODO model fitted on cluster or laptop??? Orders differ!!!
 ages = pd.read_csv(get_paths(False)['ages'])  # TODO model fitted on cluster or laptop??? Orders differ!!!
 SLCN_info = pd.read_csv(SLCN_info_file_dir)
@@ -74,7 +72,7 @@ def get_param_names_from_model_name(model_name, fit_mcmc, fit_map, summary=None)
         param_names = indiv_param_names + group_level_param_names
 
     elif fit_map:
-        param_names = [key for key in summary.keys() if ('__' not in key) or ('sd' in key) or ('int' in key) or ('slope' in key)]
+        param_names = [key for key in summary.keys() if ('__' not in key) or ('sd' in key) or ('slope' in key) or (('int' in key) and ('interval' not in key))]
         group_level_param_names = [name for name in param_names if ('int' in name) or ('slope' in name) or ('sd' in name)]
         NLL_param_names = [name for name in param_names if ('wise' in name)]
         indiv_param_names = [name for name in param_names if (name not in group_level_param_names) and (name not in NLL_param_names)]
@@ -269,31 +267,48 @@ for file_name in file_names:
         print("Saving pairplot to {0}.".format(save_dir))
         plt.savefig("{0}plots/param_pairplot_{1}_{2}.png".format(save_dir, model_name, slope_variable))
 
-    if compare_pymc3_sim_results:
-        subjwise_LLs_sim = pd.read_csv(save_dir + 'subjwise_LLs_' + model_name + '_sim.csv')
+    # Plot pymc3 NLLs (obtained when fitting) and my NLLs (using the simulation code)
+    try:
+        subjwise_LLs_sim = pd.read_csv(save_dir + 'plots/subjwise_LLs_' + model_name + '_sim.csv')
         subjwise_LLs = subjwise_LLs.merge(subjwise_LLs_sim, right_on='sID', left_index=True)
         plt.figure()
         sns.scatterplot(x='NLL_pymc3', y='NLL_sim', hue='sID', data=subjwise_LLs)  # , hue=subjwise_LLs['model_name'].str[0]
-        min, max = np.min(subjwise_LLs['NLL_sim']), np.max(subjwise_LLs['NLL_sim'])
-        plt.plot([min, max], [min, max], c='grey')
+        min_val, max_val = np.min(subjwise_LLs['NLL_sim']), np.max(subjwise_LLs['NLL_sim'])
+        plt.plot([min_val, max_val], [min_val, max_val], c='grey')
         plt.xlabel('pymc3')
         plt.ylabel('sim')
         plt.savefig(save_dir + "plots/plot_NLLs_" + model_name + ".png")
+    except FileNotFoundError:
+        pass
 
 # Save modelwise LLs
 modelwise_LLs = pd.DataFrame(modelwise_LLs, columns=['NLL', 'BIC', 'AIC', 'model_name'])
 modelwise_LLs.to_csv(save_dir + 'plots/modelwise_LLs_pymc3.csv', index=False)
-modelwise_LLs_sim = pd.read_csv(save_dir + 'plots/modelwise_LLs_sim.csv')
-modelwise_LLs = modelwise_LLs.merge(modelwise_LLs_sim)
-plt.figure(figsize=(10, 10))
-sns.scatterplot(x='NLL', y='fitted_nll', hue=modelwise_LLs['model_name'].str[0], data=modelwise_LLs)
-for i, type in enumerate(modelwise_LLs['model_name']):
-    plt.text(modelwise_LLs['NLL'][i], modelwise_LLs['fitted_nll'][i], modelwise_LLs['model_name'][i], fontsize=5)
-min, max = np.min(modelwise_LLs['fitted_nll']), np.max(modelwise_LLs['fitted_nll'])
-plt.plot([min, max], [min, max], c='grey')
-plt.xlabel('pymc3')
-plt.ylabel('sim')
-plt.savefig(save_dir + "plots/plot_NLLs.png")
+
+# Plot AIC scores
+modelwise_LLs = modelwise_LLs.sort_values(by=['AIC'])
+modelwise_LLs = modelwise_LLs[modelwise_LLs['AIC'] > 0]
+plt.figure(figsize=(50, 10))
+ax = sns.barplot(x='model_name', y='AIC', hue=modelwise_LLs['model_name'].str[0], data=modelwise_LLs, dodge=False)
+plt.xticks(rotation='vertical')
+plt.ylabel('AIC')
+plt.savefig("{0}plots/modelwise_AICs.png".format(save_dir))
+
+# Plot calculated (simulation code) and fitted (pymc3) NLLs against each other
+try:
+    modelwise_LLs_sim = pd.read_csv(save_dir + 'plots/modelwise_LLs_sim.csv')
+    modelwise_LLs = modelwise_LLs.merge(modelwise_LLs_sim)
+    plt.figure(figsize=(10, 10))
+    sns.scatterplot(x='NLL', y='fitted_nll', hue=modelwise_LLs['model_name'].str[0], data=modelwise_LLs)
+    for i, type in enumerate(modelwise_LLs['model_name']):
+        plt.text(modelwise_LLs['NLL'][i], modelwise_LLs['fitted_nll'][i], modelwise_LLs['model_name'][i], fontsize=7)
+    min_val, max_val = np.min(modelwise_LLs['fitted_nll']), np.max(modelwise_LLs['fitted_nll'])
+    plt.plot([min_val, max_val], [min_val, max_val], c='grey')
+    plt.xlabel('pymc3')
+    plt.ylabel('sim')
+    plt.savefig(save_dir + "plots/plot_NLLs.png")
+except FileNotFoundError:
+    pass
 
 # # Plot and save WAICS
 # waics.columns = ['model_name', 'slope_variable', 'waic', 'nll']
