@@ -85,7 +85,7 @@ def load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_su
     return [n_subj, n_trials, seasons, aliens, actions, rewards, true_params]
 
 
-def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids_and_teens_only=False, adults_only=False, n_subj='all', n_trials=120):
+def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids_and_teens_only=False, adults_only=False, n_subj='all', n_trials=120, fit_slopes=False):
 
     # Get data path and save path
     paths = get_paths(run_on_cluster)
@@ -165,27 +165,34 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids
     else:
         raise(ValueError('n_groups can only be 1, 3, 4, or "gender"!'))
 
-    # Find subjects that are missing age
+    # Find subjects that are missing data
     idxs_without_age = np.isnan(age['age'])
-    print("Subjects {} are missing age and are removed from analyses!".format(age.loc[idxs_without_age, 'sID'].values))
     idxs_without_gender = np.isnan(age['gender'])
-    print("Subjects {} are missing gender and are removed from analyses!".format(age.loc[idxs_without_gender, 'sID'].values))
     idxs_without_PDS = np.isnan(age['PDS'])
-    print("Subjects {} are missing PDS and are removed from analyses!".format(age.loc[idxs_without_PDS, 'sID'].values))
     idxs_without_T1 = np.isnan(age['T1'])
-    print("Subjects {} are missing T1 and are removed from analyses!".format(age.loc[idxs_without_T1, 'sID'].values))
 
     # Find subjects with outlier performance (checked in R on 2019-06-11)
     # "Participants with n_switches < 5: 45, 102, 1004"
     # "Participants with mean_ACC < 0.58: 24, 45, 101, 102, 124"
     idxs_with_bad_perf = [id in [24, 45, 101, 102, 124, 1004] for id in age['sID']]
+    print("Subjects {} are missing age and are removed from analyses!".format(
+        age.loc[idxs_without_age, 'sID'].values))
+    print("Subjects {} are missing gender and are removed from analyses!".format(
+        age.loc[idxs_without_gender, 'sID'].values))
     print("Subjects {} have bad performance (n_switches < 5 | mean_ACC < 0.58) and are removed from analyses!".format(age.loc[idxs_with_bad_perf, 'sID'].values))
 
     # Remove marked subjects
-    keep = np.invert(idxs_without_age | idxs_without_gender | idxs_with_bad_perf | idxs_without_T1 | idxs_without_PDS)
+    if fit_slopes:
+        keep = np.invert(idxs_without_age | idxs_without_gender | idxs_with_bad_perf | idxs_without_T1 | idxs_without_PDS)
+        print("Subjects {} are missing PDS and are removed from analyses!".format(
+            age.loc[idxs_without_PDS, 'sID'].values))
+        print(
+            "Subjects {} are missing T1 and are removed from analyses!".format(age.loc[idxs_without_T1, 'sID'].values))
+    else:
+        keep = np.invert(idxs_without_age | idxs_without_gender | idxs_with_bad_perf )
     n_subj = np.sum(keep)
     age = age[keep]
-    group = group[keep]
+    group = group[list(keep)]
     n_groups = len(np.unique(group))
     rewards = rewards[:, keep]
     choices = choices[:, keep]

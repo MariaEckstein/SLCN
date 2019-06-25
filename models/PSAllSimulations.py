@@ -8,6 +8,7 @@ sns.set(style='whitegrid')
 
 from PStask import Task
 from shared_modeling_simulation import get_paths, update_Q_sim, get_n_trials_back, p_from_Q_sim, get_WSLS_Qs, get_WSLSS_Qs, get_likelihoods, post_from_lik
+from modeling_helpers import load_data
 
 
 def get_parameters(data_dir, file_name, n_subj='all', n_sim_per_subj=2):
@@ -25,9 +26,18 @@ def get_parameters(data_dir, file_name, n_subj='all', n_sim_per_subj=2):
     return n_subj, parameters
 
 
-def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n_sim_per_subj=2, verbose=False, make_plots=False):
+def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n_sim_per_subj=2, verbose=False, make_plots=False, calculate_NLL_from_data=False, loaded_data=None):
 
     """Simulate agents for the model specified in file_name, with the parameters indicated in the referenced file."""
+
+    # # TODO remove after debugging!!!
+    # model_name = 'RLabcnp'
+    # parameters['beta'] = 3.63
+    # parameters['persev'] = -0.006
+    # parameters['alpha'] = 0.999
+    # parameters['nalpha'] = 0.304
+    # parameters['calpha'] = 0.999 * parameters['alpha']
+    # parameters['cnalpha'] = 0.999 * parameters['nalpha']
 
     # GET MODEL PARAMETERS
     n_sim = n_sim_per_subj * n_subj
@@ -36,23 +46,25 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
     # Get n_trials_back
     n_trials_back = get_n_trials_back(model_name)
 
+    # Get reward versions
+    reward_versions = pd.read_csv(get_paths(run_on_cluster=False)['PS reward versions'], index_col=0)
+    assert np.all((reward_versions["sID"] % 4) == (reward_versions["rewardversion"]))
+
+    # Prepare saving
+    if not calculate_NLL_from_data:
+        rewards = np.zeros((n_trials, n_sim), dtype=int)
+        choices = rewards.copy()  # human data: left choice==0; right choice==1 (verified in R script 18/11/17)
+        correct_boxes = rewards.copy()  # human data: left choice==0; right choice==1 (verified in R script 18/11/17)
+    else:
+        rewards, choices = loaded_data['rewards'], loaded_data['choices']
+    ps_right = np.zeros((n_trials, n_sim))
+
     # Get WSLS strategies
     if 'WSLSS' in model_name:
         Qs = get_WSLSS_Qs(2, n_sim)[0]  # only need one trial because I'm not iterating over Qs like in theano
     elif 'WSLS' in model_name:
         Qs = get_WSLS_Qs(2, n_sim)[0]
 
-    # Get reward versions
-    reward_versions = pd.read_csv(get_paths(run_on_cluster=False)['PS reward versions'], index_col=0)
-    assert np.all((reward_versions["sID"] % 4) == (reward_versions["rewardversion"]))
-
-    # Prepare saving
-    rewards = np.zeros((n_trials, n_sim), dtype=int)
-    choices = rewards.copy()  # human data: left choice==0; right choice==1 (verified in R script 18/11/17)
-    correct_boxes = rewards.copy()  # human data: left choice==0; right choice==1 (verified in R script 18/11/17)
-    ps_right = rewards.copy()
-    LLs = rewards.copy()
-    LL = np.zeros(n_sim)
     if n_trials_back == 0:
         Qs_trials = np.zeros((n_trials, n_sim, 2))
     elif n_trials_back == 1:
@@ -64,8 +76,13 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
     task_info_path = get_paths(run_on_cluster=False)['PS task info']
     task = Task(task_info_path, n_sim)
 
-    print('\nSimulating {0} {3} agents ({2} simulations each) on {1} trials (n_trials_back = {4}).\n'.format(
-        n_subj, n_trials, n_sim_per_subj, model_name, n_trials_back))
+    if not calculate_NLL_from_data:
+        print('\nSimulating {0} {3} agents ({2} simulations each) on {1} trials (n_trials_back = {4}).\n'.format(
+            n_subj, n_trials, n_sim_per_subj, model_name, n_trials_back))
+    else:
+        print('\nCalculating NLLs for {0} {2} agents on {1} trials (n_trials_back = {3}).'.format(
+            n_subj, n_trials, model_name, n_trials_back))
+
     for trial in range(n_trials):
 
         if verbose:
@@ -119,7 +136,10 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
                 if model_name == 'B':
                     p_right_ = 0.5 * np.ones(n_sim)
             else:
-                persev_bonus = 2 * choice - 1  # recode as -1 for choice==0 (left) and +1 for choice==1 (right)
+                if not calculate_NLL_from_data:
+                    persev_bonus = 2 * choice - 1  # recode as -1 for choice==0 (left) and +1 for choice==1 (right)
+                else:
+                    persev_bonus = 2 * choices[trial-1] - 1
                 scaled_persev_bonus = persev_bonus * parameters['persev']  # TODO make sure it has the right shape
 
                 lik_cor, lik_inc = get_likelihoods(rewards[trial - 1], choices[trial - 1],
@@ -130,35 +150,38 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
                                                   parameters['p_switch'], parameters['beta'])
 
         # Select an action based on probabilities
-        if model_name == 'B':
-            choice = np.random.binomial(n=1, p=p_right_)  # don't use persev, don't use softmax
-        else:
-            choice = np.random.binomial(n=1, p=p_right)  # produces "1" with p_right, and "0" with (1 - p_right)
+        if not calculate_NLL_from_data:
+            if model_name == 'B':
+                choice = np.random.binomial(n=1, p=p_right_)  # don't use persev, don't use softmax
+            else:
+                choice = np.random.binomial(n=1, p=p_right)  # produces "1" with p_right, and "0" with (1 - p_right)
 
-        # Obtain reward
-        reward = task.produce_reward(choice, replace_rewards=False)
-
-        # Update log-likelihood
-        LL += np.log(p_right * choice + (1 - p_right) * (1 - choice))
+            # Obtain reward
+            reward = task.produce_reward(choice, replace_rewards=False)
 
         if verbose:
             if 'RL' in model_name:
                 print("Qs:\n", np.round(Qs, 2))
             print("p_right:", np.round(p_right, 2))
-            print("Choice:", choice)
-            print("Reward:", reward)
-            print("LL:", LL)
+            if not calculate_NLL_from_data:
+                print("Choice:", choice)
+                print("Reward:", reward)
 
         # Store trial data
         if 'RL' in model_name:
             Qs_trials[trial] = Qs
-        ps_right[trial] = p_right
-        choices[trial] = choice
-        rewards[trial] = reward
-        correct_boxes[trial] = task.correct_box
-        LLs[trial] = LL
+        if model_name == 'B':
+            ps_right[trial] = p_right_
+        else:
+            ps_right[trial] = p_right
+        if not calculate_NLL_from_data:
+            choices[trial] = choice
+            rewards[trial] = reward
+            correct_boxes[trial] = task.correct_box
+    trialwise_LLs = np.log(ps_right * choices + (1 - ps_right) * (1 - choices))[3:]  # remove 3 trials like in pymc3
+    subjwise_LLs = np.sum(trialwise_LLs, axis=0)
 
-    print("Final LL: {0}".format(np.sum(LL)))
+    print("Final LL: {0}".format(np.sum(subjwise_LLs)))
 
     # Plot development of Q-values
     if 'RL' in model_name and make_plots:
@@ -186,147 +209,86 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
 
     # SAVE DATA
     # Get save_dir
-    save_dir = data_dir + 'simulations/' + model_name + '/'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    if not calculate_NLL_from_data:
+        save_dir = data_dir + 'simulations/' + model_name + '/'
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
 
-    # Save individual csv for each subject (same format as humans)
-    for i, sID in enumerate(parameters['sID']):
+        # Save individual csv for each subject (same format as humans)
+        for i, sID in enumerate(parameters['sID']):
 
-        simID = int(np.floor(i / n_subj))
+            simID = int(np.floor(i / n_subj))
 
-        # Create pandas DataFrame
-        subj_data = pd.DataFrame()
-        subj_data["selected_box"] = choices[:, i]
-        subj_data["reward"] = rewards[:, i]
-        subj_data["correct_box"] = correct_boxes[:, i]
-        subj_data["p_right"] = ps_right[:, i]
-        subj_data["sID"] = sID
-        subj_data["simID"] = simID
-        subj_data["LL"] = LLs[:, i]
-        param_names = [col for col in parameters.columns if 'sID' not in col]
-        for param_name in param_names:
-            subj_data[param_name] = np.array(parameters.loc[i, param_name])
+            # Create pandas DataFrame
+            subj_data = pd.DataFrame()
+            subj_data["selected_box"] = choices[:, i]
+            subj_data["reward"] = rewards[:, i]
+            subj_data["correct_box"] = correct_boxes[:, i]
+            subj_data["p_right"] = ps_right[:, i]
+            subj_data["sID"] = sID
+            subj_data["simID"] = simID
+            subj_data["LL"] = subjwise_LLs[:, i]
+            param_names = [col for col in parameters.columns if 'sID' not in col]
+            for param_name in param_names:
+                subj_data[param_name] = np.array(parameters.loc[i, param_name])
 
-        # Save to disc
-        file_name = save_dir + "PS_{2}_sim_{0}_{1}.csv".format(int(sID), simID, model_name)
-        subj_data.to_csv(file_name)
+            # Save to disc
+            file_name = save_dir + "PS_{2}_sim_{0}_{1}.csv".format(int(sID), simID, model_name)
+            subj_data.to_csv(file_name)
 
-    print("Ran and saved {0} simulations ({1} * {2}) to {3}!".
-          format(len(parameters['sID']), n_subj, n_sim_per_subj, file_name))
+        print("Ran and saved {0} simulations ({1} * {2}) to {3}!".
+              format(len(parameters['sID']), n_subj, n_sim_per_subj, file_name))
 
-    return -np.sum(LL)
+    else:
+        print("Calculated {0} NLLs for {1} subjects and saved everything to {2}!".
+              format(len(parameters['sID']), n_subj, data_dir))
+        trialwise_LLs = pd.DataFrame(trialwise_LLs[:, :n_subj], columns=parameters['sID'][:n_subj])  # remove double subjects
+        trialwise_LLs.to_csv(data_dir + 'plots/trialwise_LLs_' + model_name + '_sim.csv', index=False)
+        subjwise_LLs = pd.DataFrame(subjwise_LLs[:n_subj], index=parameters['sID'][:n_subj], columns=['NLL_sim'])
+        subjwise_LLs.to_csv(data_dir + 'plots/subjwise_LLs_' + model_name + '_sim.csv')
 
-
-def get_quantile_groups(params_ages, col):
-
-    qcol = col + '_quant'
-    params_ages[qcol] = np.nan
-
-    # Set adult quantile to 2
-    params_ages.loc[params_ages['PreciseYrs'] > 20, qcol] = 2
-
-    # Determine quantiles, separately for both genders
-    for gender in ['Male', 'Female']:
-
-        # Get 3 quantiles
-        cut_off_values = np.nanquantile(
-            params_ages.loc[(params_ages.PreciseYrs < 20) & (params_ages.Gender == gender), col],
-            [0, 1 / 3, 2 / 3])
-        for cut_off_value, quantile in zip(cut_off_values, np.round([1 / 3, 2 / 3, 1], 2)):
-            params_ages.loc[
-                (params_ages.PreciseYrs < 20) & (params_ages[col] >= cut_off_value) & (params_ages.Gender == gender),
-                qcol] = quantile
-
-    return params_ages
-
-
-def plot_parameters_against_age_calculate_corr(parameters, SLCN_info_file_dir='C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv'):
-
-    # Load SLCN_info dataframe
-    SLCN_info = pd.read_csv(SLCN_info_file_dir)
-    SLCN_info = SLCN_info.rename(columns={'ID': 'sID'})
-
-    # Add age etc. to parameters
-    params_SLCN_info = parameters.merge(SLCN_info)
-    params_SLCN_info.loc[params_SLCN_info['Gender'] == 1, 'Gender'] = 'Female'
-    params_SLCN_info.loc[params_SLCN_info['Gender'] == 2, 'Gender'] = 'Male'
-
-    # # Plot raw parameters against raw age etc.
-    # sns.pairplot(params_SLCN_info, hue='Gender',
-    #              x_vars=['PDS', 'BMI', 'PreciseYrs', 'T1'], y_vars=list(parameters.columns),
-    #              plot_kws=dict(size=1))
-    # print("Saving plot_params_SLCN_info_{1} to {0}".format(data_dir, model_name))
-    # plt.savefig("{0}plot_params_SLCN_info_{1}.png".format(data_dir, model_name))
-
-    # Same, but with quantile groups for age etc.
-    cols = ['PDS', 'BMI', 'PreciseYrs', 'T1']
-    param_names = parameters.columns
-    plt.figure(figsize=(4 * len(cols), 3 * len(param_names)))
-    # fig, axes = plt.subplots(len(cols), len(param_names),
-    #                          figsize=(4 * len(cols), 4 * len(param_names)),
-    #                          sharex="col", sharey="row",
-    #                          squeeze=False)
-
-    i = 0
-    for param_name in param_names:
-        for col in cols:
-            params_SLCN_info = get_quantile_groups(params_SLCN_info, col)
-
-            # plt.figure()
-            # plt.scatter(params_SLCN_info[col], params_SLCN_info[col + '_quant'], c=params_SLCN_info['Gender'])  # check that it worked
-            # plt.show()
-
-            plt.subplot(len(param_names), len(cols), i + 1)
-            # sns.barplot(x=col + '_quant', y=param_name, hue='Gender', data=params_SLCN_info)  # , ax=axes[i])
-            sns.lineplot(x=col + '_quant', y=param_name, hue='Gender', data=params_SLCN_info, legend=False)  # , ax=axes[i])
-            plt.xlabel(col)
-            i += 1
-
-    plt.tight_layout()
-    plt.savefig("{0}plot_params_SLCN_info_quant_lines_{1}.png".format(data_dir, model_name))
-
-    # Get correlations between parameters and age etc.
-    corrs = pd.DataFrame()
-    for param_name in param_names:
-        for col in cols:
-            for gen in np.unique(params_SLCN_info['Gender']):
-
-                # clean_idx = ~np.logical_or(np.isnan(params_SLCN_info[col]), np.isnan(params_SLCN_info[param_name]))
-                clean_idx = 1 - np.isnan(params_SLCN_info[col]) | np.isnan(params_SLCN_info[param_name])
-                gen_idx = params_SLCN_info['Gender'] == gen
-
-                corr, p = stats.pearsonr(
-                    params_SLCN_info.loc[clean_idx & gen_idx, param_name], params_SLCN_info.loc[clean_idx & gen_idx, col])
-
-                clean_idx_young = clean_idx & (params_SLCN_info['PreciseYrs'] < 20) & gen_idx
-                corr_young, p_young = stats.pearsonr(
-                    params_SLCN_info.loc[clean_idx_young, param_name], params_SLCN_info.loc[clean_idx_young, col])
-
-                corrs = corrs.append([[param_name, col, gen, corr, p, corr_young, p_young]])
-
-    corrs.columns = ['param_name', 'charact', 'gender', 'r', 'p', 'r_young', 'p_young']
-    corrs.to_csv("{0}corrs_{1}.csv".format(data_dir, model_name), index=False)
+    return -np.sum(subjwise_LLs).values[0]  # total NLL of the model
 
 
 # Run simulations for all fitted models
-data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/cluster_fits/'
-file_names = [f for f in os.listdir(data_dir) if '.csv' in f if 'params' in f]
+calculate_NLL_from_data = True
+n_sim_per_subj = 2
+verbose = False
+data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_map_models4/'
+file_names = [f for f in os.listdir(data_dir) if ('.csv' in f) and ('params' in f) and not ('params_g' in f)]
+print("Found {0} models to simulate / calculate NLLs.".format(len(file_names)))
 nlls = pd.DataFrame()
+
+if calculate_NLL_from_data:
+    n_subj, rewards, choices, group, n_groups, age = load_data(False, n_groups=1, n_subj='all',
+                                                               kids_and_teens_only=False,
+                                                               n_trials=120,
+                                                               fit_slopes=False)
+    loaded_data = {'rewards': np.array(np.tile(rewards, 2), dtype=int),
+                   'choices': np.array(np.tile(choices, 2), dtype=int)}
+    indiv_nlls = pd.DataFrame()
+else:
+    loaded_data = None
 
 for file_name in file_names:
     model_name = [part for part in file_name.split('_') if ('RL' in part) or ('B' in part) or ('WSLS' in part)][0]
     n_subj, parameters = get_parameters(data_dir, file_name)
 
-    # Simulate agents
-    nll = simulate_model_from_parameters(parameters, data_dir, n_subj, make_plots=False)
+    if calculate_NLL_from_data:
+        assert np.all(age['sID'].values[:n_subj] == parameters['sID'].values[
+                                                :n_subj]), "Parameters don't fit loaded data!! Results will be wrong!!"
+
+    # Simulate agents / calculate NLLs
+    nll = simulate_model_from_parameters(parameters, data_dir, n_subj, make_plots=False, calculate_NLL_from_data=calculate_NLL_from_data, verbose=verbose, loaded_data=loaded_data, n_sim_per_subj=n_sim_per_subj)
     nlls = nlls.append([[model_name, nll]])
 
-    # # Plot parameters against age etc., calculate correlations between parameters and age etc.
-    # plot_parameters_against_age_calculate_corr(parameters)
+if calculate_NLL_from_data:
+    nlls.columns = ['model_name', 'fitted_nll']
+else:
+    nlls.columns = ['model_name', 'simulated_nll']
 
-nlls.columns = ['model_name', 'simulated_nll']
-nlls.to_csv(data_dir + 'nlls.csv', index=False)
+print("Saving nlls to {0}.".format(data_dir))
+nlls.to_csv(data_dir + 'plots/modelwise_LLs_sim.csv', index=False)
 
 # # Debug individual models
 # file_name = '2019_06_03/params_RLabcn_2019_6_3_3_7_humans_n_samples100.csv'

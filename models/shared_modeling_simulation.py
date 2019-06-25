@@ -459,13 +459,13 @@ def update_Q_sim(
         mindex = np.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice  # mirror action (e.g., right & reward -> right)
         cmindex = np.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice  # counterf. mir. ac. (e.g, right & reward -> left)
 
-    # Get reward prediction errors (RPEs) for positive (reward == 1) and negative outcomes (reward == 0)
-    RPE = (1 - Qs[index]) * reward
-    nRPE = (0 - Qs[index]) * (1 - reward)
+    # Get reward prediction errors (RPEs)
+    RPE = (1 - Qs[index]) * reward  # RPEs for positive outcomes (reward == 1)
+    nRPE = (0 - Qs[index]) * (1 - reward)  # RPEs for negative outcomes (reward == 0)
 
     # Get counterfactual prediction errors (cRPEs)
-    cRPE = (1 - Qs[cindex]) * (1 - reward)
-    cnRPE = (0 - Qs[cindex]) * reward
+    cRPE = (0 - Qs[cindex]) * reward  # actual reward was 1; I think I would have gotten 0 for the other action
+    cnRPE = (1 - Qs[cindex]) * (1 - reward)  # actual reward 0; would have gotten 1 for the other action
 
     # Update action taken
     Qs[index] += alpha * RPE + nalpha * nRPE  # add RPE at all pos. outcomes, and nRPE at all neg. outcomes
@@ -587,7 +587,7 @@ def post_from_lik(lik_cor, lik_inc, scaled_persev_bonus,
         print('p_r after adding perseveration bonus:\n{0}'.format(p_r.round(3)))
 
     # Log-transform probabilities
-    p_right = 1 / (1 + np.exp(-beta * (p_r - (1 - p_r))))
+    p_right = 1 / (1 + np.exp(list(-beta * (p_r - (1 - p_r)))))
     p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
     # theano.printing.Print('p_r after softmax')(p_right)
     if verbose:
