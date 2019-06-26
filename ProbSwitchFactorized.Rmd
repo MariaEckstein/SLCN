@@ -540,11 +540,56 @@ plot_wsls = function(wsls, gg_save) {
   }
 }
 ```
+```{r correlate params and behavior}
+correlate_params_behavior(param_file_dir, human_data_dir, gg_save) {
+  
+  # Load model parameters
+  params = read.csv(paste0(param_file_dir, "/params_Bbpr_pymc3.csv"))
+  
+  # Load human data
+  ages = get_ages(ages_file_dir)
+  hum_files = get_data(human_data_dir, "human", ".*mat")
+  hum_files = finish_all_files(hum_files, ages)
+  
+  # Exclude subjects
+  excl_subj = plot_indivduals_for_exclusion(hum_files, gg_save)
+  hum_files = subset(hum_files, !sID %in% excl_subj)
+  
+  # Create summary data
+  ACC_subj = get_ACC_reward_subj(hum_files)[[1]]
+  reward_subj = get_ACC_reward_subj(hum_files)[[2]]
+  
+  # Get 1-number behavioral summaries
+  switch_speed2 = subset(reward_subj, outcome_21_back=="reward, no reward", select=c("sID", "stay"))
+  switch_speed3 = subset(reward_subj, outcome_21_back=="both no reward", select=c("sID", "stay"))
+  mean_ACC = ddply(hum_files, .(sID), ACC=mean(ACC, na.rm=T), summarize)
+  median_RT = ddply(subset(hum_files, ACC=T), .(sID), RT=median(RT, na.rm=T), summarize)
+  
+  # Put everything into a single dataframe
+  l = list(switch_speed2, switch_speed3, mean_ACC, median_RT)
+  cor_dat = subset(params, PreciseYrs < 20, select=c("sID", "beta", "persev", "p_reward", "PDS", "BMI", "T1", "PreciseYrs"))
+  for(i in 1:length(l)) {
+    cor_dat = merge(cor_dat, l[[i]], by="sID", all.x=T, all.y=F)
+  }
+  cor_dat$sID = NULL
+  
+  # Calculate the correlation matrix (rcorr in Hmisc also calculates p-values)
+  cor_matrix = cor(cor_dat, use="complete.obs")
+  
+  # Plot correlation heatmap
+  library("corrplot")  # only loading corrplot so late because it seems to interfere with ddply
+  if (gg_save) {
+    png(file.path(plot_dir, "/gg_corrplot.png"), width=800, height=800)
+    corrplot(cor_matrix, type="upper", tl.col="black", tl.srt=45)
+    dev.off()
+  }
+}
+```
 
 # Main script
 
 ```{r Load packages, set parameters}
-library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo"); library(lmerTest)
+library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo"); library(lmerTest)#; library("corrplot")#; library("Hmisc")
 
 gg_save = T
 run_regression = F
@@ -579,6 +624,7 @@ ages_file_dir = "C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv"
 ```{r plot all simulated agents}
 if (data_name == "simulated_human") {
   
+  param_file_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_mcmc_models_cluster"
   dir_to_all_simulations = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_map_models_RL/simulations'
   data_dirs = list.dirs(dir_to_all_simulations, recursive=F)
   # data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/simulate_without_replace_rewards/simulations/B'
@@ -613,6 +659,9 @@ if (data_name == "simulated_human") {
     # Behavioral analyses
     plot_RTs_ACC_choice_rewards_stay(all_files, ACC_subj, reward_subj, all_files_sum, gg_save)
     plot_wsls(wsls, gg_save)
+    
+    # Parameter analyses
+    correlate_params_behavior(param_file_dir, human_data_dir, gg_save)
   }
   
 } else if (data_name == "human") {
