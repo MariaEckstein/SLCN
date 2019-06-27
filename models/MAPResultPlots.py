@@ -11,40 +11,42 @@ from shared_modeling_simulation import get_paths, get_n_params
 import scipy.stats as stats
 
 
-save_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_map_models_Bayes_mcmc/'
+save_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_mcmc_models_cluster/'
+# save_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_map_models_mcmc/'
+if not os.path.exists(save_dir + 'plots/'):
+    os.makedirs(save_dir + 'plots/')
 SLCN_info_file_dir = 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv'
-n_subj = 234  # all: 234  # just kids & teens: 160
 n_trials = 120
 make_traceplot = True
 make_plots = True
-# ages = pd.read_csv(get_paths(False)['ages_cluster'])  # TODO model fitted on cluster or laptop??? Orders differ!!!
-ages = pd.read_csv(get_paths(False)['ages'])  # TODO model fitted on cluster or laptop??? Orders differ!!!
+ages = pd.read_csv(get_paths(False)['ages_cluster'])  # TODO model fitted on cluster or laptop??? Orders differ!!!
+# ages = pd.read_csv(get_paths(False)['ages'])  # TODO model fitted on cluster or laptop??? Orders differ!!!
 SLCN_info = pd.read_csv(SLCN_info_file_dir)
 SLCN_info = SLCN_info.rename(columns={'ID': 'sID'})
 waic_criterion_for_analysis = 1e6
 
 
-def get_quantile_groups(params_ages, col):
+def get_quantile_groups(fitted_params, col):
 
     qcol = col + '_quant'
-    params_ages[qcol] = np.nan
+    fitted_params[qcol] = np.nan
 
     # Set adult quantile to 2
-    params_ages.loc[params_ages['PreciseYrs'] > 20, qcol] = 2
+    fitted_params.loc[fitted_params['PreciseYrs'] > 20, qcol] = 2
 
     # Determine quantiles, separately for both genders
-    for gender in np.unique(params_ages['Gender']):
+    for gender in np.unique(fitted_params['Gender']):
 
         # Get 3 quantiles
         cut_off_values = np.nanquantile(
-            params_ages.loc[(params_ages.PreciseYrs < 20) & (params_ages.Gender == gender), col],
+            fitted_params.loc[(fitted_params.PreciseYrs < 20) & (fitted_params.Gender == gender), col],
             [0, 1 / 3, 2 / 3])
         for cut_off_value, quantile in zip(cut_off_values, np.round([1 / 3, 2 / 3, 1], 2)):
-            params_ages.loc[
-                (params_ages.PreciseYrs < 20) & (params_ages[col] >= cut_off_value) & (params_ages.Gender == gender),
+            fitted_params.loc[
+                (fitted_params.PreciseYrs < 20) & (fitted_params[col] >= cut_off_value) & (fitted_params.Gender == gender),
                 qcol] = quantile
 
-    return params_ages
+    return fitted_params
 
 
 def get_param_names_from_model_name(model_name, fit_mcmc, fit_map, summary=None):
@@ -88,16 +90,23 @@ def fill_in_missing_params(fitted_params, model_name):
         fitted_params['persev'] = 0
 
     if 'RL' in model_name:
+        if 'a' not in model_name:
+            fitted_params['alpha'] = 1
         if 'n' not in model_name:
             fitted_params['nalpha'] = fitted_params['alpha']
         if 'c' not in model_name:
             fitted_params['calpha_sc'] = 0
             fitted_params['calpha'] = 0
+        else:
+            fitted_params['calpha_sc'] = fitted_params['calpha'] / fitted_params['alpha']
         if 'x' not in model_name:
             fitted_params['cnalpha_sc'] = fitted_params['calpha_sc']
             fitted_params['cnalpha'] = fitted_params['cnalpha_sc'] * fitted_params['nalpha']
+        else:
+            fitted_params['cnalpha_sc'] = fitted_params['cnalpha'] / fitted_params['nalpha']
 
     if 'B' in model_name:
+        fitted_params['p_noisy'] = 1e-5
         if 's' not in model_name:
             fitted_params['p_switch'] = 0.05081582
         if 'r' not in model_name:
@@ -174,6 +183,7 @@ for file_name in file_names:
 
     # Unpack it
     sID = data['sIDs']
+    n_subj = len(sID)
     slope_variable = data['slope_variable']
     if fit_mcmc:
         summary = data['summary'].T
@@ -188,7 +198,7 @@ for file_name in file_names:
     # Make traceplot
     if fit_mcmc and make_traceplot:
         pm.traceplot(trace)
-        plt.savefig(save_dir + "plots/traceplot" + model_name + ".png")
+        plt.savefig(save_dir + "plots/traceplot" + file_name + ".png")
 
     # Get model_name and param_names
     model_name = [part for part in file_name.split('_') if ('RL' in part) or ('B' in part) or ('WSLS' in part)][0]
@@ -196,7 +206,9 @@ for file_name in file_names:
         model_name, fit_mcmc, fit_map, summary)
 
     # Add model WAIC score
-    # waics = waics.append([[model_name, slope_variable, waic, nll]])
+    if fit_mcmc:
+        modelwise_LLs.append([model_name, slope_variable, waic, nll])
+        pd.DataFrame(modelwise_LLs).to_csv(save_dir + 'plots/modelwise_LLs_temp.csv', index=False)
 
     # Create csv file for individuals' fitted parameters
     fitted_params = []
@@ -216,14 +228,15 @@ for file_name in file_names:
     fitted_params.loc[fitted_params['Gender'] == 2, 'Gender'] = 'Female'
 
     # Add '_quant' columns for age, PDS, T1
-    fitted_params = get_quantile_groups(fitted_params, 'PreciseYrs')
-    fitted_params = get_quantile_groups(fitted_params, 'PDS')
-    fitted_params = get_quantile_groups(fitted_params, 'T1')
+    if np.any(fitted_params['PreciseYrs'] < 20):
+        fitted_params = get_quantile_groups(fitted_params, 'PreciseYrs')
+        fitted_params = get_quantile_groups(fitted_params, 'PDS')
+        fitted_params = get_quantile_groups(fitted_params, 'T1')
 
     # Add missing (non-fitted) parameters and save
     fitted_params = fill_in_missing_params(fitted_params, model_name)
     print("Saving csv of fitted parameters for model {0} to {1}.".format(file_name, save_dir))
-    fitted_params.to_csv(save_dir + 'params_' + model_name + '_pymc3.csv', index=False)
+    fitted_params.to_csv(save_dir + 'params_' + model_name + '_' + slope_variable + '_pymc3.csv', index=False)
 
     # Create csv for group-level fitted parameters
     if group_level_param_names:
@@ -236,27 +249,16 @@ for file_name in file_names:
         fitted_params_g = np.array(fitted_params_g).T
         fitted_params_g = pd.DataFrame(fitted_params_g, columns=group_level_param_names)  # TODO , index=['Male', 'Female'])
         fitted_params_g['slope_variable'] = slope_variable
-        fitted_params_g.to_csv(save_dir + 'params_g_' + model_name + '_pymc3.csv')
-
-    if NLL_param_names:
-        pd.DataFrame(summary['trialwise_LLs'], columns=sID).to_csv(save_dir + 'plots/trialwise_LLs_' + model_name + '_pymc3.csv', index=False)
-        pd.DataFrame(summary['trialwise_p_right'], columns=sID).to_csv(save_dir + 'plots/trialwise_p_' + model_name + '_pymc3.csv', index=False)
-        subjwise_LLs = pd.DataFrame(summary['subjwise_LLs'], index=sID, columns=['NLL_pymc3'])
-        subjwise_LLs.to_csv(save_dir + 'plots/subjwise_LLs_' + model_name + '_pymc3.csv')
-
-        n_params = get_n_params(model_name, n_subj, 1)
-        nll = -np.sum(subjwise_LLs).values[0]
-        bic = np.log(n_trials * n_subj) * n_params + 2 * nll
-        aic = 2 * n_params + 2 * nll
-        modelwise_LLs.append([nll, bic, aic, model_name])
+        fitted_params_g.to_csv(save_dir + 'params_g_' + model_name + '_' + slope_variable + '_pymc3.csv')
 
     # Plot correlations between parameters and age/PDS/T1
     if make_plots:
         cols = ['PreciseYrs', 'PDS', 'T1']
         corrs = plot_fitted_params_against_cols(fitted_params, indiv_param_names, cols=cols, type='scatter')
         plt.savefig("{0}plots/fitted_param_distr_{1}_{2}.png".format(save_dir, model_name, slope_variable))
-        plot_fitted_params_against_cols(fitted_params, indiv_param_names, cols=[col + '_quant' for col in cols], type='line')
-        plt.savefig("{0}plots/fitted_param_quant_{1}_{2}.png".format(save_dir, model_name, slope_variable))
+        if np.any(fitted_params['PreciseYrs'] < 20):
+            plot_fitted_params_against_cols(fitted_params, indiv_param_names, cols=[col + '_quant' for col in cols], type='line')
+            plt.savefig("{0}plots/fitted_param_quant_{1}_{2}.png".format(save_dir, model_name, slope_variable))
 
         # Save correlations
         print("Saving correlations between fitted parameters and age, PDS, T for model {0} to {1}.".format(file_name, save_dir))
@@ -266,6 +268,19 @@ for file_name in file_names:
         sns.pairplot(fitted_params, hue='Gender', vars=indiv_param_names, plot_kws={'s': 10})
         print("Saving pairplot to {0}.".format(save_dir))
         plt.savefig("{0}plots/param_pairplot_{1}_{2}.png".format(save_dir, model_name, slope_variable))
+
+    # Plot trialwise LLs etc.
+    if NLL_param_names:
+        pd.DataFrame(summary['trialwise_LLs'], columns=sID).to_csv(save_dir + 'plots/trialwise_LLs_' + model_name + '_' + slope_variable + '_pymc3.csv', index=False)
+        pd.DataFrame(summary['trialwise_p_right'], columns=sID).to_csv(save_dir + 'plots/trialwise_p_' + model_name + '_' + slope_variable + '_pymc3.csv', index=False)
+        subjwise_LLs = pd.DataFrame(summary['subjwise_LLs'], index=sID, columns=['NLL_pymc3'])
+        subjwise_LLs.to_csv(save_dir + 'plots/subjwise_LLs_' + model_name + '_' + slope_variable + '_pymc3.csv')
+
+        n_params = get_n_params(model_name, n_subj, 1)
+        nll = -np.sum(subjwise_LLs).values[0]
+        bic = np.log(n_trials * n_subj) * n_params + 2 * nll
+        aic = 2 * n_params + 2 * nll
+        modelwise_LLs.append([nll, bic, aic, model_name])
 
     # Plot pymc3 NLLs (obtained when fitting) and my NLLs (using the simulation code)
     try:
@@ -278,12 +293,17 @@ for file_name in file_names:
         plt.xlabel('pymc3')
         plt.ylabel('sim')
         plt.savefig(save_dir + "plots/plot_NLLs_" + model_name + ".png")
-    except FileNotFoundError:
+    except (FileNotFoundError, NameError):
         pass
 
 # Save modelwise LLs
-modelwise_LLs = pd.DataFrame(modelwise_LLs, columns=['NLL', 'BIC', 'AIC', 'model_name'])
-modelwise_LLs.to_csv(save_dir + 'plots/modelwise_LLs_pymc3.csv', index=False)
+if fit_mcmc:
+    modelwise_LLs = pd.DataFrame(modelwise_LLs, columns=['model_name', 'slope_variable', 'WAIC', 'NLL'])
+    modelwise_LLs['AIC'] = modelwise_LLs['WAIC']
+    modelwise_LLs.to_csv(save_dir + 'plots/modelwise_LLs_' + slope_variable + '.csv', index=False)
+else:
+    modelwise_LLs = pd.DataFrame(modelwise_LLs, columns=['NLL', 'BIC', 'AIC', 'model_name'])
+    modelwise_LLs.to_csv(save_dir + 'plots/modelwise_LLs_pymc3.csv', index=False)
 
 # Plot AIC scores
 modelwise_LLs = modelwise_LLs.sort_values(by=['AIC'])

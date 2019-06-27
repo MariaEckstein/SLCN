@@ -11,17 +11,26 @@ from shared_modeling_simulation import get_paths, update_Q_sim, get_n_trials_bac
 from modeling_helpers import load_data
 
 
-def get_parameters(data_dir, file_name, n_subj='all', n_sim_per_subj=2):
+def get_parameters(data_dir, file_name, model_name, sID_order, n_subj='all', n_sim_per_subj=2):
 
     orig_parameters = pd.read_csv(data_dir + file_name)
     print("Loaded parameters for model {2} from {0}\nParameters.head():\n{1}".format(data_dir, orig_parameters.head(), model_name))
 
+    # sort parameters according to order in age!
+    if sID_order:
+        sID_order.index = range(len(sID_order))
+        parameters = pd.DataFrame(sID_order).merge(orig_parameters)
+        columns = ['sID'] + [col for col in orig_parameters.columns if col != 'sID']
+    else:
+        parameters = orig_parameters
+        columns = orig_parameters.columns
+
     # Adjust n_subj
     if n_subj == 'all':
-        n_subj = len(orig_parameters['sID'])
-    parameters = np.tile(orig_parameters[:n_subj], (n_sim_per_subj, 1))  # Same parameters for each simulation of a subject
+        n_subj = len(parameters['sID'])
+    parameters = np.tile(parameters[:n_subj], (n_sim_per_subj, 1))  # Same parameters for each simulation of a subject
     parameters = pd.DataFrame(parameters)
-    parameters.columns = orig_parameters.columns
+    parameters.columns = columns
 
     return n_subj, parameters
 
@@ -223,7 +232,7 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
     # SAVE DATA
     # Get save_dir
     if not calculate_NLL_from_data:
-        save_dir = data_dir + 'simulations/' + model_name + '/'
+        save_dir = data_dir + 'simulations/' + model_name  + '_nsubj' + str(len(np.unique(parameters['sID']))) + '_' + parameters['slope_variable'][0] + '/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
@@ -262,39 +271,51 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
 
 
 # Run simulations for all fitted models
+kids_and_teens_only = True
 n_sim_per_subj = 2
 verbose = False
-data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_map_models_RL/'
+calculate_NLLs = False
+simulate_agents = True
+data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_mcmc_models_cluster/ready_params/'
 file_names = [f for f in os.listdir(data_dir) if ('.csv' in f) and ('params' in f) and not ('params_g' in f)]
 print("Found {0} models to simulate / calculate NLLs.".format(len(file_names)))
 simulated_nlls = pd.DataFrame()
 fitted_nlls = pd.DataFrame()
 
-n_subj, rewards, choices, group, n_groups, age = load_data(False, n_groups=1, n_subj='all',
-                                                           kids_and_teens_only=False,
-                                                           n_trials=120,
-                                                           fit_slopes=False)
-loaded_data = {'rewards': np.array(np.tile(rewards, 2), dtype=int),
-               'choices': np.array(np.tile(choices, 2), dtype=int)}
+if calculate_NLLs:
+    n_subj, rewards, choices, group, n_groups, age = load_data(False, n_groups=1, n_subj='all',
+                                                               kids_and_teens_only=kids_and_teens_only,
+                                                               n_trials=120,
+                                                               fit_slopes=False)
+    loaded_data = {'rewards': np.array(np.tile(rewards, 2), dtype=int),
+                   'choices': np.array(np.tile(choices, 2), dtype=int)}
+    sID_order = age['sID']
+else:
+    sID_order = []
 
 for file_name in file_names:
     model_name = [part for part in file_name.split('_') if ('RL' in part) or ('B' in part) or ('WSLS' in part)][0]
-    n_subj, parameters = get_parameters(data_dir, file_name)
+    n_subj, parameters = get_parameters(data_dir, file_name, model_name, sID_order)
 
     # Verify that the loaded age file fits with the loaded fitted parameter file
-    assert np.all(age['sID'].values[:n_subj] == parameters['sID'].values[
+    if calculate_NLLs:
+        assert np.all(age['sID'].values[:n_subj] == parameters['sID'].values[
                                                 :n_subj]), "Parameters don't fit loaded data!! Results will be wrong!!"
 
     # Calculate NLLs for fitted parameters
-    fitted_nll = simulate_model_from_parameters(parameters, data_dir, n_subj, calculate_NLL_from_data=True, loaded_data=loaded_data, make_plots=False, verbose=verbose, n_sim_per_subj=n_sim_per_subj)
-    fitted_nlls = fitted_nlls.append([[model_name, fitted_nll]])
+    if calculate_NLLs:
+        fitted_nll = simulate_model_from_parameters(parameters, data_dir, n_subj, calculate_NLL_from_data=True, loaded_data=loaded_data, make_plots=False, verbose=verbose, n_sim_per_subj=n_sim_per_subj)
+        fitted_nlls = fitted_nlls.append([[model_name, fitted_nll]])
 
     # Simulate agents with fitted parameters
-    simulated_nll = simulate_model_from_parameters(parameters, data_dir, n_subj, calculate_NLL_from_data=False, loaded_data=None, make_plots=False, verbose=verbose, n_sim_per_subj=n_sim_per_subj)
-    simulated_nlls = simulated_nlls.append([[model_name, simulated_nll]])
+    if simulate_agents:
+        simulated_nll = simulate_model_from_parameters(parameters, data_dir, n_subj, calculate_NLL_from_data=False, loaded_data=None, make_plots=False, verbose=verbose, n_sim_per_subj=n_sim_per_subj)
+        simulated_nlls = simulated_nlls.append([[model_name, simulated_nll]])
 
 print("Saving nlls to {0}.".format(data_dir))
-fitted_nlls.columns = ['model_name', 'fitted_nll']
-fitted_nlls.to_csv(data_dir + 'plots/modelwise_fitted_LLs_sim.csv', index=False)
-simulated_nlls.columns = ['model_name', 'simulated_nll']
-simulated_nlls.to_csv(data_dir + 'plots/modelwise_simulated_LLs_sim.csv', index=False)
+if calculate_NLLs:
+    fitted_nlls.columns = ['model_name', 'fitted_nll']
+    fitted_nlls.to_csv(data_dir + 'plots/modelwise_fitted_LLs_sim.csv', index=False)
+if simulate_agents:
+    simulated_nlls.columns = ['model_name', 'simulated_nll']
+    simulated_nlls.to_csv(data_dir + 'plots/modelwise_simulated_LLs_sim.csv', index=False)

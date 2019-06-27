@@ -1,5 +1,5 @@
 run_on_cluster = False
-save_dir_appx = 'new_map_models_Bayes_mcmc/'
+save_dir_appx = 'new_map_models_mcmc/'
 import itertools
 
 # GET LIST OF MODELS TO RUN
@@ -17,12 +17,20 @@ import itertools
 # model_names = ['RLabcnp' + appx for appx in slope_appxs_abcnp]
 # model_names.extend(['Bbspr' + appx for appx in slope_appxs_bspr])
 # model_names.extend(['RLabcxp' + appx for appx in slope_appxs_abcxp])
-#
+
 # # model_names = ['RLabcnplyoqt', 'RLabcxplyout']
 # # model_names = ['WSLS', 'WSLSy', 'WSLSS', 'WSLSy']
-model_names = ['Bbsprywvt', 'RLabcnplyoqt'] #  ['Bbsrywv']
+# model_names = ['Bbsprywvt', 'RLabcnplyoqt'] #  ['Bbsrywv']
 # model_names = ['RLab', 'RLabc', 'RLabcn', 'RLabcnp']
 # model_names = ['RLabcnp']
+model_names = [
+    # 'RLabcp', 'RLabcpn', 'RLabxp', 'RLabcpx', 'RLab', 'RLabc',
+    # 'Bbpr', 'Bbspr', 'Bbsp', 'Bb', 'Bbs',
+    # 'Bbsprywtv', 'Bbspry', 'Bbspryw', 'Bbsprt', 'Bbsprv',
+    # 'Bbspr', 'Bbsprywtv',
+    'RLabcpnlyoqt', 'RLabcpnl', 'RLabcpny', 'RLabcpno', 'RLabcpnq', 'RLabcpnt',
+    # 'WSLS', 'WSLSS'
+]
 
 # model_names = [
 #     'RLabcnp',
@@ -671,9 +679,8 @@ def create_model(choices, rewards, group, age,
             model_choices = pm.Bernoulli('model_choices', p=p_right[:-1], observed=choices[4:])  # predict from trial 4 on; discard last p_right because there is no trial to predict after the last value update
 
         # Calculate NLL
-        trialwise_LLs = pm.Deterministic('trialwise_LLs', T.log(p_right[:-1] * choices[3:] + (1 - p_right[:-1]) * (1 - choices[3:])))
-        subjwise_LLs = pm.Deterministic('subjwise_LLs', T.sum(trialwise_LLs, axis=0))
-        p = pm.Deterministic('trialwise_p_right', 1 * p_right)
+        trialwise_LLs = 'trialwise_LLs', T.log(p_right[:-1] * choices[3:] + (1 - p_right[:-1]) * (1 - choices[3:]))
+        # subjwise_LLs = pm.Deterministic('subjwise_LLs', T.sum(trialwise_LLs, axis=0))
 
         # theano.printing.Print('beta')(beta)
         # theano.printing.Print('persev')(persev)
@@ -749,18 +756,19 @@ def fit_model_and_save(model, n_params, n_subj, n_trials, sIDs, slope_variable,
 contrast = 'linear'
 n_groups = 1  # 'gender'
 kids_and_teens_only = False
+adults_only = True
 if not run_on_cluster:
     fit_mcmc = True
     fit_map = False
-    n_tune = 20
-    n_samples = 20
+    n_tune = 5
+    n_samples = 5
     n_cores = 2
     n_chains = 1
 else:
     fit_mcmc = True
     fit_map = False
     n_tune = 1000
-    n_samples = 1000
+    n_samples = 2000
     n_cores = 1
     n_chains = 1
 target_accept = 0.8
@@ -771,17 +779,22 @@ else:
     fit_individuals = True
 
 # Load behavioral data on which to run the model(s)
-fit_slopes = any([i in model_name for i in 'lyouqtwv' for model_name in model_names])
-if fit_slopes:
-    slope_variables = ['age_z', 'PDS_z', 'T1_z']
-else:
-    slope_variables = ['age_z']  # dummy; won't be used
-n_subj, rewards, choices, group, n_groups, age = load_data(run_on_cluster, n_groups=n_groups, n_subj='all', kids_and_teens_only=kids_and_teens_only, n_trials=120, fit_slopes=fit_slopes)  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
-
 # Run all models
 nll_bics = pd.DataFrame()
-for slope_variable in slope_variables:
-    for model_name in model_names:
+for model_name in model_names:
+    fit_slopes = any([i in model_name for i in 'lyouqtwv'])
+    if fit_slopes and kids_and_teens_only:
+        slope_variables = ['age_z', 'PDS_z', 'T1_log_z']
+        adults_only = False  # just to make sure
+    elif fit_slopes and adults_only:
+        slope_variables = ['T1_log_z']
+    elif fit_slopes:
+        raise ValueError("Fit slopes separately for children and adults! Set kids_and_teens_only=True or adults_only=True.")
+    else:
+        slope_variables = ['age_z']  # dummy; won't be used
+    n_subj, rewards, choices, group, n_groups, age = load_data(run_on_cluster, n_groups=n_groups, n_subj='all', kids_and_teens_only=kids_and_teens_only, adults_only=adults_only, n_trials=120, fit_slopes=fit_slopes)  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
+
+    for slope_variable in slope_variables:
 
         # Create model
         model, n_params, n_trials, save_dir, save_id = create_model(

@@ -541,10 +541,22 @@ plot_wsls = function(wsls, gg_save) {
 }
 ```
 ```{r correlate params and behavior}
-correlate_params_behavior(param_file_dir, human_data_dir, gg_save) {
+correlate_params_behavior = function(all_files, human_data_dir, model_name, gg_save) {
   
-  # Load model parameters
-  params = read.csv(paste0(param_file_dir, "/params_Bbpr_pymc3.csv"))
+  # Get model parameters
+  if (grepl("B", model_name)) {
+    params = ddply(all_files, .(sID),
+                   PreciseYrs=PreciseYrs[1], PDS=PDS[1], BMI=BMI[1], T1=T1[1],
+                   beta=beta[1], persev=persev[1], p_switch=p_switch[1], p_reward=p_reward[1], summarize)
+  } else if (grepl("RL", model_name)) {
+    params = ddply(all_files, .(sID),
+                   PreciseYrs=PreciseYrs[1], PDS=PDS[1], BMI=BMI[1], T1=T1[1],
+                   beta=beta[1], persev=persev[1], alpha=alpha[1], nalpha=nalpha[1], calpha=calpha[1], cnalpha=cnalpha[1], summarize)  # calpha_sc=calpha_sc[1], cnalpha_sc=cnalpha_sc[1],
+  } else if (grepl("WSLS", model_name)) {
+    params = ddply(all_files, .(sID),
+                   PreciseYrs=PreciseYrs[1], PDS=PDS[1], BMI=BMI[1], T1=T1[1],
+                   beta=beta[1], summarize)
+  }
   
   # Load human data
   ages = get_ages(ages_file_dir)
@@ -567,7 +579,7 @@ correlate_params_behavior(param_file_dir, human_data_dir, gg_save) {
   
   # Put everything into a single dataframe
   l = list(switch_speed2, switch_speed3, mean_ACC, median_RT)
-  cor_dat = subset(params, PreciseYrs < 20, select=c("sID", "beta", "persev", "p_reward", "PDS", "BMI", "T1", "PreciseYrs"))
+  cor_dat = params
   for(i in 1:length(l)) {
     cor_dat = merge(cor_dat, l[[i]], by="sID", all.x=T, all.y=F)
   }
@@ -597,7 +609,12 @@ data_name = "simulated_human"  # Can be "human", "fitted_human", or "simulated_h
 colors_3and1 = c("#00D000", "#00C0CC", "#00B0FF", "darkgrey")
 parameter_names = c('alpha', 'beta', 'nalpha', 'calpha', 'cnalpha', 'p_switch', 'p_reward', 'persev')
 desired_columns = c("sID", "version", "selected_box", "p_right", "reward", "RT", "correct", "correct_box", "learning_style", "model_name", "NLL", parameter_names, paste0(parameter_names, "_rec"))
+
+# Directories of all the stuff
 ages_file_dir = "C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv"
+human_data_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch"
+param_file_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_mcmc_models_cluster"
+dir_to_all_simulations = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_mcmc_models_cluster/ready_params/simulations'
 ```
 ```{r do_it_all}
 # do_it_all = function() {
@@ -624,13 +641,13 @@ ages_file_dir = "C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv"
 ```{r plot all simulated agents}
 if (data_name == "simulated_human") {
   
-  param_file_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_mcmc_models_cluster"
-  dir_to_all_simulations = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_map_models_RL/simulations'
   data_dirs = list.dirs(dir_to_all_simulations, recursive=F)
-  # data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/simulate_without_replace_rewards/simulations/B'
   patt = ".*csv"
   
   for (data_dir in data_dirs) {
+    data_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_mcmc_models_cluster/ready_params/simulations/RLabcpn_nsubj179_age_z/"
+    folder_name = strsplit(data_dir, "/")[[1]][length(strsplit(data_dir, "/")[[1]])]
+    model_name = strsplit(folder_name, "_")[[1]][1]
     
     # Create plot_dir
     plot_dir = file.path(data_dir, "Plots")
@@ -661,23 +678,22 @@ if (data_name == "simulated_human") {
     plot_wsls(wsls, gg_save)
     
     # Parameter analyses
-    correlate_params_behavior(param_file_dir, human_data_dir, gg_save)
+    correlate_params_behavior(all_files, human_data_dir, model_name, gg_save)
   }
   
 } else if (data_name == "human") {
   
-  data_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch"
   patt = ".*mat"
   
   # Create plot_dir
-  plot_dir = file.path(data_dir, "Plots")
+  plot_dir = file.path(human_data_dir, "Plots")
   if (!dir.exists(plot_dir)) {
     dir.create(plot_dir)
   }
   
   # Get data
   ages = get_ages(ages_file_dir)
-  all_files = get_data(data_dir, data_name, patt)
+  all_files = get_data(human_data_dir, data_name, patt)
   all_files = finish_all_files(all_files, ages)
   
   # Exclude subjects

@@ -182,14 +182,18 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids
     print("Subjects {} have bad performance (n_switches < 5 | mean_ACC < 0.58) and are removed from analyses!".format(age.loc[idxs_with_bad_perf, 'sID'].values))
 
     # Remove marked subjects
-    if fit_slopes:
+    if fit_slopes and kids_and_teens_only:
         keep = np.invert(idxs_without_age | idxs_without_gender | idxs_with_bad_perf | idxs_without_T1 | idxs_without_PDS)
         print("Subjects {} are missing PDS and are removed from analyses!".format(
             age.loc[idxs_without_PDS, 'sID'].values))
         print(
             "Subjects {} are missing T1 and are removed from analyses!".format(age.loc[idxs_without_T1, 'sID'].values))
+    elif fit_slopes and adults_only:
+        keep = np.invert(idxs_without_age | idxs_without_gender | idxs_with_bad_perf | idxs_without_T1)
+        print(
+            "Subjects {} are missing T1 and are removed from analyses!".format(age.loc[idxs_without_T1, 'sID'].values))
     else:
-        keep = np.invert(idxs_without_age | idxs_without_gender | idxs_with_bad_perf )
+        keep = np.invert(idxs_without_age | idxs_without_gender | idxs_with_bad_perf)
     n_subj = np.sum(keep)
     age = age[keep]
     group = group[list(keep)]
