@@ -38,7 +38,8 @@ def se(dat):
 def update_Qs_sim(season, alien,
                   Q_low, Q_high,
                   beta, beta_high, alpha, alpha_high, forget, forget_high,
-                  n_subj, n_actions, n_TS, task, verbose=False):
+                  n_subj, n_actions, n_TS, task,
+                  action=[], verbose=False):
 
     # Select TS
     Q_high_sub = Q_high[np.arange(n_subj), season]  # Q_high_sub.shape -> (n_subj, n_TS)
@@ -51,7 +52,8 @@ def update_Qs_sim(season, alien,
     # Calculate action probabilities based on TS and select action
     Q_low_sub = Q_low[np.arange(n_subj), TS, alien]  # Q_low_sub.shape -> [n_subj, n_actions]
     p_low = softmax(beta * Q_low_sub, axis=1)
-    action = np.array([np.random.choice(a=n_actions, p=p_low_subj) for p_low_subj in p_low])
+    if len(action) == 0:  # action can be provided as participant-chosen actions when calculating human values
+        action = np.array([np.random.choice(a=n_actions, p=p_low_subj) for p_low_subj in p_low])
     reward, correct = task.produce_reward(action)
 
     # Forget Q-values a little bit

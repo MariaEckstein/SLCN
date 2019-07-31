@@ -57,16 +57,21 @@ class Task(object):
                 aliens = np.hstack([aliens, agent_data["sad_alien"]])
                 phase = np.hstack([phase, agent_data["phase"]])
                 correct = np.hstack([correct, agent_data["correct"]])
+                reward = np.hstack([reward, agent_data["reward"]])
                 actions = np.hstack([actions, agent_data["item_chosen"]])
+                sID = np.hstack([sID, agent_data["subjID"]])
             except NameError:
                 seasons = agent_data["TS"]
                 aliens = agent_data["sad_alien"]
                 phase = agent_data["phase"]
                 correct = agent_data["correct"]
+                reward = agent_data["reward"]
                 actions = agent_data["item_chosen"]
+                sID = agent_data["subjID"]
             n_trials = np.min([n_trials, agent_data.shape[0]])
 
         # Bring into right shape
+        actions[np.isnan(actions)] = np.random.choice(range(3), )  # replace missing actions with random actions
         seasons = np.tile(seasons, n_sim_per_subj)
         aliens = np.tile(aliens, n_sim_per_subj)
         self.seasons = seasons.reshape([int(len(seasons) / n_trials), n_trials]).astype(int).T
@@ -83,7 +88,9 @@ class Task(object):
 
         return (n_trials,
                 correct.reshape([int(len(correct) / n_trials), n_trials]).astype(int).T,
-                actions.reshape([int(len(correct) / n_trials), n_trials]).astype(int).T)
+                reward.reshape([int(len(reward) / n_trials), n_trials]).T,
+                actions.reshape([int(len(correct) / n_trials), n_trials]).astype(int).T,
+                sID.reshape([int(len(sID) / n_trials), n_trials]).T)
 
     def present_stimulus(self, trial):
 

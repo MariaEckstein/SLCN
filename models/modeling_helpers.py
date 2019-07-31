@@ -85,7 +85,8 @@ def load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_su
     return [n_subj, n_trials, seasons, aliens, actions, rewards, true_params]
 
 
-def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids_and_teens_only=False, adults_only=False, n_subj='all', n_trials=120, fit_slopes=False):
+def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids_and_teens_only=False, adults_only=False,
+              n_subj='all', n_trials=120, fit_slopes=False):
 
     # Get data path and save path
     paths = get_paths(run_on_cluster)
@@ -166,7 +167,7 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids
         raise(ValueError('n_groups can only be 1, 3, 4, or "gender"!'))
 
     # Find subjects that are missing data
-    idxs_without_age = np.isnan(age['age'])
+    idxs_without_age = (np.isnan(age['age'])) | (age['age'] > 30)
     idxs_without_gender = np.isnan(age['gender'])
     idxs_without_PDS = np.isnan(age['PDS'])
     idxs_without_T1 = np.isnan(age['T1'])

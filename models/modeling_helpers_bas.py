@@ -1,6 +1,7 @@
 import numpy as np
 from shared_aliens_bas import alien_initial_Q, softmax
 
+
 def get_Qhigh_series(TS_series, season_series, reward_series, alpha_high, forget_high, n_TS):
     Q_high_series = []
     Q_high = alien_initial_Q * np.ones((n_TS, n_TS))  # first trial Q_high
@@ -9,6 +10,7 @@ def get_Qhigh_series(TS_series, season_series, reward_series, alpha_high, forget
         Q_high[season, TS] += alpha_high * (reward - Q_high[season, TS])
         Q_high_series = Q_high_series + [Q_high]
     return Q_high_series
+
 
 def get_Qlow_series(TS_series, alien_series, action_series, reward_series, alpha, forget, n_TS, n_aliens, n_actions):
     Q_low_series = []
@@ -19,17 +21,21 @@ def get_Qlow_series(TS_series, alien_series, action_series, reward_series, alpha
         Q_low_series = Q_low_series + [Q_low]
     return Q_low_series
 
+
 def get_phigh_series(Q_high_series, season_series, beta_high):
     return np.array([softmax(beta_high * Q_high[season]) for Q_high, season in zip(Q_high_series, season_series)])
 
+
 def get_plow_series(Q_low_series, TS_series, alien_series, beta):
     return np.array([softmax(beta * Q_low[TS, alien]) for Q_low, TS, alien in zip(Q_low_series, TS_series, alien_series)])
+
 
 def get_initial_TS_series(season_series):
     # return np.mod(np.arange(0,len(season_series)),3)
     # return np.random.randint(0,3,len(season_series))
     # return np.zeros_like(season_series)
     return season_series  # Initializing with a flat RL agent
+
 
 def generate_TS_series(TS_series, n_TS):
     # this replaces a random entry in TS_series by a random alternative TS
@@ -42,10 +48,11 @@ def generate_TS_series(TS_series, n_TS):
     # random number, but one that isn't the same as in TS_series
     return TS_series_new
 
+
 def compute_logprob(TS_series, season_series, alien_series, action_series, reward_series,
                     alpha, beta, forget, alpha_high, beta_high, forget_high,
                     n_TS, n_aliens, n_actions):
-    Q_high_series =  get_Qhigh_series(TS_series, season_series, reward_series, alpha_high, forget_high, n_TS)
+    Q_high_series = get_Qhigh_series(TS_series, season_series, reward_series, alpha_high, forget_high, n_TS)
     Q_low_series = get_Qlow_series(TS_series, alien_series, action_series, reward_series, alpha, forget, n_TS, n_aliens, n_actions)
     phigh_series = get_phigh_series(Q_high_series, season_series, beta_high)
     plow_series = get_plow_series(Q_low_series, TS_series, alien_series, beta)
@@ -57,7 +64,7 @@ def accept(beta_MCMC, delta_L):
     # Metropolis-Hastings acceptance rule:
     # - always accept the new logprob when it is better than the old one
     # - also accept the new logprob with higher probabilities the smaller the (negative) difference to the old one
-    return delta_L > 0 or np.random.uniform() < np.exp(beta_MCMC*delta_L)
+    return delta_L > 0 or np.random.uniform() < np.exp(beta_MCMC * delta_L)
 
 
 def sample_TS_series(season_series, alien_series, action_series, reward_series,

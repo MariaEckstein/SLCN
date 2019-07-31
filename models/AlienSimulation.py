@@ -10,11 +10,14 @@ from competition_phase import CompetitionPhase
 from shared_aliens import alien_initial_Q, update_Qs_sim, softmax, get_alien_paths,\
     simulate_competition_phase, simulate_rainbow_phase, get_summary_rainbow, read_in_human_data
 
-plot_dir = get_alien_paths(False)['fitting results'] + '/SummariesInsteadOfFitting/'
+# plot_dir = get_alien_paths(False)['fitting results'] + '/SummariesInsteadOfFitting/'
+main_dir = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/simulated_values_as_regressors/'
+plot_dir = main_dir + '/plots/'
 
 
 # Switches for this script
-def do_simulate(make_plots=False):
+def do_simulate(make_plots=False, best_hierarchical_param_index=0, calculate_human_values=False):
+
     model_name = "hier"  # "hier"
     verbose = False
     n_subj = 31
@@ -24,11 +27,11 @@ def do_simulate(make_plots=False):
     param_names = np.array(['alpha', 'beta', 'forget', 'alpha_high', 'beta_high', 'forget_high'])
     fake_data = False
     human_data_path = get_alien_paths()["human data prepr"]  # "C:/Users/maria/MEGAsync/Berkeley/TaskSets/Data/version3.1/",  # note: human data prepr works for analyzing human behavior, the direct path works just for simulating agents
-    model_to_be_simulated = "specify"  # "MSE" "MCMC" "specify" "best_hierarchical
+    model_to_be_simulated = "best_hierarchical"  # "MSE" "MCMC" "specify" "best_hierarchical
     # model_name = "/AliensMSEFitting/18-10-14/f_['alpha' 'beta' 'forget']_[[ 1 10  1]]_2018_10_14_9_47"  # 'Aliens/max_abf_2018_10_10_18_7_humans_n_samples10'  #
 
     # Get save path
-    save_dir = get_alien_paths(False)['simulations']
+    save_dir = main_dir  # get_alien_paths(False)['simulations']
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -52,10 +55,10 @@ def do_simulate(make_plots=False):
     # Load fitted parameters
     elif model_to_be_simulated == 'best_hierarchical':
         read_dir = parameter_dir + '/SummariesInsteadOfFitting/selected_agents4_good.csv'
-        print('Using parameters in {} for simulation!'.format(read_dir))
+        print('Using parameters in {} (column {}) for simulation!'.format(read_dir, best_hierarchical_param_index))
         all_parameters = pd.read_csv(read_dir, usecols=param_names)  # pd.read_csv(plot_dir + 'ag_summary_for_paper.csv', index_col=0).loc[param_names]
         # Same parameters for all subj
-        parameters = all_parameters.loc[0].values.reshape((1, len(param_names))) * np.ones((n_subj, len(param_names)))
+        parameters = all_parameters.loc[best_hierarchical_param_index].values.reshape((1, len(param_names))) * np.ones((n_subj, len(param_names)))
         parameters = pd.DataFrame(parameters, columns=all_parameters.columns.values)
         # # Different parameters for each subj
         # parameters = all_parameters.loc[:(n_subj-1)]
@@ -111,7 +114,7 @@ def do_simulate(make_plots=False):
 
     # Initialize task
     task = Task(n_subj)
-    n_trials, _, _ = task.get_trial_sequence(human_data_path,
+    n_trials, corrects, rewards, actions, sIDs = task.get_trial_sequence(human_data_path,
                                              n_subj, n_sim_per_subj, range(n_subj), fake_data,
                                              phases=['1InitialLearning', '2CloudySeason'])  #
     print("n_trials", n_trials)
@@ -124,12 +127,13 @@ def do_simulate(make_plots=False):
               '4RainbowSeason': range(n_trials_['2CloudySeason'], n_trials_['2CloudySeason'] + n_trials_['4RainbowSeason'])}
 
     # For saving data
-    seasons = np.zeros([n_trials, n_sim], dtype=int)
     TSs = np.zeros([n_trials, n_sim], dtype=int)
     aliens = np.zeros([n_trials, n_sim], dtype=int)
-    actions = np.zeros([n_trials, n_sim], dtype=int)
-    rewards = np.zeros([n_trials, n_sim])
-    corrects = np.zeros([n_trials, n_sim])
+    seasons = np.zeros([n_trials, n_sim], dtype=int)
+    if not calculate_human_values:
+        actions = np.zeros([n_trials, n_sim], dtype=int)
+        rewards = np.zeros([n_trials, n_sim])
+        corrects = np.zeros([n_trials, n_sim])
     p_lows = np.zeros([n_trials, n_sim, n_actions])
     Q_lows = np.zeros([n_trials, n_sim, n_TS, n_aliens, n_actions])
     Q_highs = np.zeros([n_trials, n_sim, n_seasons, n_TS])
@@ -157,11 +161,16 @@ def do_simulate(make_plots=False):
         season, alien = task.present_stimulus(trial)
 
         # Respond and update Q-values
+        if calculate_human_values:
+            action = actions[trial]  # provide participants' actions
+        else:
+            action = []  # chose actions within the model
         [Q_low, Q_high, TS, action, correct, reward, p_low] =\
             update_Qs_sim(season, alien,
                           Q_low, Q_high,
                           beta, beta_high, alpha, alpha_high, forget, forget_high,
-                          n_sim, n_actions, n_TS, task, verbose=verbose)
+                          n_sim, n_actions, n_TS, task,
+                          action=action, verbose=verbose)
 
         # Store trial data
         seasons[trial] = season
@@ -356,40 +365,44 @@ def do_simulate(make_plots=False):
     #     plt.show()
 
     # Save simulation data
-    for sID in range(n_sim):
+    for agentID in range(n_sim):
 
-        agent_ID = sID + start_id
+        # agentID = agentID + start_id
         # Create pandas DataFrame
         subj_data = pd.DataFrame()
-        subj_data["context"] = seasons[:, sID]
-        # subj_data["phase"] = phase[:, sID]
-        subj_data["TS_chosen"] = TSs[:, sID]
-        subj_data["sad_alien"] = aliens[:, sID]
-        subj_data["item_chosen"] = actions[:, sID]
-        subj_data["reward"] = rewards[:, sID]
-        subj_data["correct"] = corrects[:, sID]
+        subj_data["context"] = seasons[:, agentID]
+        # subj_data["phase"] = phase[:, agentID]
+        subj_data["TS_chosen"] = TSs[:, agentID]
+        subj_data["sad_alien"] = aliens[:, agentID]
+        subj_data["item_chosen"] = actions[:, agentID]
+        subj_data["reward"] = rewards[:, agentID]
+        subj_data["correct"] = corrects[:, agentID]
         subj_data["trial_type"] = "feed-aliens"
         subj_data["trial_index"] = np.arange(n_trials)
-        # subj_data["p_low"] = p_norms[:, sID]
-        subj_data["sID"] = agent_ID
+        # subj_data["p_low"] = p_norms[:, agentID]
+        subj_data["agentID"] = agentID
+        sID = sIDs[:, agentID][0]
+        subj_data["sID"] = sID
         subj_data["block.type"] = "normal"
         subj_data["model_name"] = model_name
         for param_name in param_names:
-            subj_data[param_name] = np.array(parameters.loc[sID, param_name])
+            subj_data[param_name] = np.array(parameters.loc[agentID, param_name])
         for season in range(n_seasons):
             for TS in range(n_TS):
-                subj_data["Q_high_c{0}TS{1}".format(season, TS)] = Q_highs[:, sID, season, TS]
+                subj_data["Q_high_c{0}TS{1}".format(season, TS)] = Q_highs[:, agentID, season, TS]
         for TS in range(n_TS):
             for item in range(n_actions):
                 for alien in range(n_aliens):
-                    subj_data["Q_low_TS{0}s{1}a{2}".format(TS, alien, item)] = Q_lows[:, sID, TS, alien, item]
+                    subj_data["Q_low_TS{0}s{1}a{2}".format(TS, alien, item)] = Q_lows[:, agentID, TS, alien, item]
 
         # Save to disc
-        file_name = save_dir + "aliens_" + model_name + '_' + str(agent_ID) + ".csv"
+        file_name = "{}aliens_{}_sID{}_ag{}_sim{}.csv".format(save_dir, model_name, sID, agentID, best_hierarchical_param_index)
         print('Saving file {0}'.format(file_name))
         subj_data.to_csv(file_name)
 
     return (alpha, beta, forget, alpha_high, beta_high, forget_high), (seasons, TSs, aliens, actions, rewards)
 
 
-do_simulate(make_plots=False)
+for bhpi in range(7):
+    plt.close('all')
+    do_simulate(make_plots=False, best_hierarchical_param_index=bhpi, calculate_human_values=False)

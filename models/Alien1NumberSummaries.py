@@ -474,12 +474,14 @@ if do_read_in_and_visualize_summaries:
                    plot_name='0TS_react_hist_log.png',
                    xlabels=['Slope (trials 1-4)'] + CL_cols[9:], vline=1e-10, yscale_log=True)
     get_means_sds(all_summaries, hum_summary_cloudy, 'CL_slope')
+
     # Intrusion errors (init. learn.)
     make_histogram(all_summaries, hum_summary_initial_learn, IL_cols[3:5],
                    plot_name='1intrusion_errors_hist.png',
                    xlim=(0.2, 0.6), xlabels=['Accuracy', 'Intrusion errors'], vline=1/3)
     get_means_sds(all_summaries, hum_summary_initial_learn, IL_cols[3], 1/3)
     get_means_sds(all_summaries, hum_summary_initial_learn, IL_cols[4], 1/3)
+
     # TS values affect performance (init. learn.)
     make_histogram(all_summaries, hum_summary_initial_learn, ['IL_perf_TS2minus1'],
                    plot_name='2TS_values_perf_hist.png',
@@ -489,6 +491,7 @@ if do_read_in_and_visualize_summaries:
                    plot_name='2TS_values_perf_hist2.png',
                    xlabels=['Correlation'], vline=1e-10, scale_data=-1)
     make_histogram(all_summaries, hum_summary_initial_learn, IL_cols[9:12][::-1], plot_name='2TS_values_perf_hist3.png')  # TS perf (init. learn.)
+
     # TS values affect preference (competition)
     make_histogram(all_summaries, hum_summary_competition, CO_cols[:2],
                    plot_name='3TS_values_preference_hist.png',
@@ -497,9 +500,15 @@ if do_read_in_and_visualize_summaries:
                    plot_name='3TS_values_preference_hist2.png',
                    xlim=(-0.1, 0.1), xlabels=['Context minus stimulus'], vline=1e-10)
     get_means_sds(all_summaries, hum_summary_competition, 'CO_season_minus_alien')
+
     # TS values affect generalization (rainbow)
+    summary_rainbow['TS2minusTS0'] = summary_rainbow['TS2'] - summary_rainbow['TS0']
     make_histogram(summary_rainbow, hum_dat=False, columns=['corr_with_humans'],
                    plot_name='4TS_values_generalization_hist.png')
+    make_histogram(summary_rainbow, hum_dat=hum_summary_rainbow, columns=['TS2minusTS0'],
+                   plot_name='4TS_values_generalization_hist_.png')
+    get_means_sds(summary_rainbow, hum_summary_rainbow, 'TS2minusTS0')
+
     # Savings (init. learn.)
     make_histogram(all_summaries, hum_summary_initial_learn, IL_cols[:3] + ['IL_saving_last_minus_first'], plot_name='5Savings_hist.png')  # Savings (init. learn.)
 

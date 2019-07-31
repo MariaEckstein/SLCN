@@ -40,9 +40,9 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
     """Simulate agents for the model specified in file_name, with the parameters indicated in the referenced file."""
 
     # # TODO remove after debugging!!!
-    # model_name = 'Bb'
+    # model_name = 'B'
     # parameters['beta'] = 2
-    # parameters['persev'] = 0.1
+    # parameters['persev'] = 0
     # parameters['p_switch'] = 0.0508
     # parameters['p_reward'] = 0.75
     # # parameters['alpha'] = 0.8
@@ -232,7 +232,7 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
     # SAVE DATA
     # Get save_dir
     if not calculate_NLL_from_data:
-        save_dir = data_dir + 'simulations/' + model_name  + '_nsubj' + str(len(np.unique(parameters['sID']))) + '_' + parameters['slope_variable'][0] + '/'
+        save_dir = '{0}simulations/{1}_{2}_{3}/'.format(data_dir, model_name, parameters['slope_variable'][0], len(np.unique(parameters['sID'])))
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
@@ -271,18 +271,18 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
 
 
 # Run simulations for all fitted models
-kids_and_teens_only = True
 n_sim_per_subj = 2
 verbose = False
 calculate_NLLs = False
 simulate_agents = True
-data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_mcmc_models_cluster/ready_params/'
+data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/simulate/'
 file_names = [f for f in os.listdir(data_dir) if ('.csv' in f) and ('params' in f) and not ('params_g' in f)]
 print("Found {0} models to simulate / calculate NLLs.".format(len(file_names)))
 simulated_nlls = pd.DataFrame()
 fitted_nlls = pd.DataFrame()
 
 if calculate_NLLs:
+    kids_and_teens_only = True
     n_subj, rewards, choices, group, n_groups, age = load_data(False, n_groups=1, n_subj='all',
                                                                kids_and_teens_only=kids_and_teens_only,
                                                                n_trials=120,
