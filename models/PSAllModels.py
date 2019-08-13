@@ -1,5 +1,5 @@
 run_on_cluster = False
-save_dir_appx = 'new_ML_models/MCMC/'
+save_dir_appx = 'new_ML_models/'
 import itertools
 
 # GET LIST OF MODELS TO RUN
@@ -34,15 +34,16 @@ import itertools
 
 model_names = [
     # 'RLabcnplyoqt',
-    'RLabnp2',
+    # 'RLabnp2',
     # 'RLab', 'RLabc', 'RLabcp', 'RLabcpn', 'RLabcnpx',
-    # 'RLabcxnplyoqtu',
+    'RLabcxnplyoqtu',
     # 'RLabcxnp',
     # 'Bbspry',
     # 'Bbsprywtv',
     # 'RLab', 'RLabcxpS', 'RLabcxpSi', 'RLabcxpSS', 'RLabcxpSSi', 'RLabcxpSm',
     # 'WSLS', 'WSLSS',
-    # 'Bbpr', 'B'
+    # 'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
+    # 'RLabcnpx', 'Bbpr',
 ]
 
 # # All possible models
@@ -763,7 +764,8 @@ def fit_model_and_save(model, n_params, n_subj, n_trials, sIDs, slope_variable,
         print("MCMC estimates: {0}\nWAIC: {1}".format(model_summary, waic.WAIC))
 
     if fit_map:
-        nll = opt_result['fun']
+        # nll = opt_result['fun']  # this is approximately right, but does not agree with hand-calculated trialwise LLs
+        nll = -np.sum(map['trialwise_LLs'])
         bic = np.log(n_trials * n_subj) * n_params + 2 * nll  # n_params incorporates all subj
         aic = 2 * n_params + 2 * nll
         print("NLL: {0}\nBIC: {1}\nAIC: {2}".format(nll, bic, aic))
@@ -780,7 +782,8 @@ def fit_model_and_save(model, n_params, n_subj, n_trials, sIDs, slope_variable,
 
     if fit_map:
         print('Saving map estimate, nll, bic, aic, sIDs to {0}{1}\n'.format(save_dir, save_id))
-        with open(save_dir + save_id + '_map.pickle', 'wb') as handle:
+        # with open(save_dir + save_id + '_map.pickle', 'wb') as handle:  # TODO comment back in!
+        with open(save_dir + 'gen_rec/' + save_id + '_map.pickle', 'wb') as handle:
             pickle.dump({'map': map, 'nll': nll, 'bic': bic, 'aic': aic, 'slope_variable': slope_variable, 'sIDs': list(sIDs)},
                         handle, protocol=pickle.HIGHEST_PROTOCOL)
         return nll, bic, aic
@@ -803,14 +806,14 @@ def get_slope_variables(model_name, kids_and_teens_only, adults_only):
 
 # Determine the basics
 contrast = 'quadratic'
-n_groups = 1  # 'gender'  # 1  # 'gender'
+n_groups = 1  # 'gender'  # 1
 kids_and_teens_only = False
 adults_only = False
 if not run_on_cluster:
-    fit_mcmc = True
-    fit_map = False
-    n_tune = 5
-    n_samples = 45
+    fit_mcmc = False
+    fit_map = True
+    n_tune = 20
+    n_samples = 20
     n_cores = 2
     n_chains = 1
 else:
@@ -827,6 +830,15 @@ if fit_mcmc:
 else:
     fit_individuals = True
 
+
+def replace_nans(data, n_trials):
+
+    data = data[:n_trials]
+    data[np.isnan(data)] = np.random.binomial(1, 0.5, np.sum(np.isnan(data)))
+
+    return data
+
+
 # Load behavioral data on which to run the model(s)
 # Run all models
 nll_bics = pd.DataFrame()
@@ -836,6 +848,39 @@ for model_name in model_names:
         run_on_cluster, n_groups=n_groups, n_subj='all', kids_and_teens_only=kids_and_teens_only,  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
         adults_only=adults_only, n_trials=120,
         fit_slopes=any([i in model_name for i in 'lyouqtwv' for model_name in model_names]))  # make sure I load the same data for every model...
+
+    # n_subj, rewards, choices, group, n_groups, age = load_data(
+    #     run_on_cluster, fitted_data_name='RL_simulations', n_groups=n_groups, n_subj='all', kids_and_teens_only=kids_and_teens_only,  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
+    #     adults_only=adults_only, n_trials=120,
+    #     fit_slopes=any([i in model_name for i in 'lyouqtwv' for model_name in model_names]))  # make sure I load the same data for every model...
+
+    # # Load mouse data
+    # rewards_j = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PSMouseData/Juvi_Reward.csv').T.values  # row: sessions; cols: trials
+    # choices_j = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PSMouseData/Juvi_Choice.csv').T.values
+    # rewards_a = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PSMouseData/Adult_Reward.csv').T.values
+    # choices_a = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PSMouseData/Adult_Choice.csv').T.values
+    #
+    # # Clean mouse data
+    # n_trials_per_animal = np.sum(np.invert(np.isnan(rewards_j)), axis=0)
+    # sns.distplot(n_trials_per_animal)
+    # n_trials = np.round(np.percentile(n_trials_per_animal, 0.8)).astype('int')
+    # rewards_j = replace_nans(rewards_j, n_trials).astype('int')
+    # choices_j = replace_nans(choices_j, n_trials).astype('int')
+    # rewards_a = replace_nans(rewards_a, n_trials).astype('int')
+    # choices_a = replace_nans(choices_a, n_trials).astype('int')
+    #
+    # # Combine juvenile and adult data
+    # rewards = np.hstack([rewards_j, rewards_a])
+    # choices = np.hstack([choices_j, choices_a])
+    #
+    # n_subj = np.shape(rewards)[1]
+    # assert np.shape(rewards) == np.shape(choices)
+    # group = np.zeros(n_subj)
+    # n_groups = len(np.unique(group))
+    # age = pd.DataFrame({'age_z': np.zeros(n_subj), 'PDS_z': np.zeros(n_subj), 'T_z': np.zeros(n_subj)})
+    # sID_j = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PSMouseData/Juvi_AnimalID.csv').T.values.flatten()
+    # sID_a = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PSMouseData/Adult_AnimalID.csv').T.values.flatten()
+    # age['sID'] = np.concatenate([sID_j, sID_a])
 
     # slope_variables = get_slope_variables(model_name, kids_and_teens_only, adults_only)
     slope_variables = ['age_z']  # ['PDS_z', 'T1_log_z']

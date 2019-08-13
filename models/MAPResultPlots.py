@@ -28,6 +28,7 @@ class AnalyzePSModels:
         self.make_plots = data['make_plots']
         self.waic_criterion_for_analysis = data['waic_criterion_for_analysis']
         self.fit_mcmc = data['fit_mcmc']
+        self.run_on_humans = data['run_on_humans']
 
         # Stuff I make myself in the later methods
         self.modelwise_LLs = []
@@ -121,15 +122,19 @@ class AnalyzePSModels:
             self.fitted_params['slope_variable'] = self.slope_variable
 
             # Add remaining info (PDS, T1, PreciseYrs, etc.)
-            self.fitted_params = self.fitted_params.merge(self.SLCN_info, on='sID')  # columns only added for rows that already exist
-            self.fitted_params.loc[self.fitted_params['Gender'] == 1, 'Gender'] = 'Male'
-            self.fitted_params.loc[self.fitted_params['Gender'] == 2, 'Gender'] = 'Female'
+            if self.run_on_humans:
+                self.fitted_params = self.fitted_params.merge(self.SLCN_info, on='sID')  # columns only added for rows that already exist
+                self.fitted_params.loc[self.fitted_params['Gender'] == 1, 'Gender'] = 'Male'
+                self.fitted_params.loc[self.fitted_params['Gender'] == 2, 'Gender'] = 'Female'
 
-            # Add '_quant' columns for age, PDS, T1
-            if np.any(self.fitted_params['PreciseYrs'] < 20):
-                self.get_quantile_groups('PreciseYrs')
-                self.get_quantile_groups('PDS')
-                self.get_quantile_groups('T1')
+                # Add '_quant' columns for age, PDS, T1
+                if np.any(self.fitted_params['PreciseYrs'] < 20):
+                    self.get_quantile_groups('PreciseYrs')
+                    self.get_quantile_groups('PDS')
+                    self.get_quantile_groups('T1')
+            else:
+                for col in ['Gender', 'PreciseYrs', 'PDS', 'T1', 'age_quant', 'PDS_quant', 'T1_quant']:
+                    self.fitted_params[col] = 0
 
             # Add missing (non-fitted) parameters and save
             self.fill_in_missing_params()
@@ -158,6 +163,7 @@ class AnalyzePSModels:
         self.subjwise_LLs.to_csv(self.get_file_name('subjwise_LLs'), index=False)
 
     def get_file_name(self, file_name, file_name_apx=''):
+
         if file_name == 'fitted_params_g':
             return '{0}params_g_{1}_{2}_{3}_pymc3.csv'.format(self.save_dir, self.model_name, self.slope_variable, self.n_subj)
         elif file_name == 'fitted_params':
@@ -202,6 +208,7 @@ class AnalyzePSModels:
                                    value_name='NLL', var_name='sID')
             subjwise_LLs['BIC'] = np.log(self.n_trials) * subjwise_LLs['n_params'] - 2 * subjwise_LLs['NLL']
             subjwise_LLs['AIC'] = 2 * subjwise_LLs['n_params'] - 2 * subjwise_LLs['NLL']
+            subjwise_LLs = subjwise_LLs.sort_values(by=['AIC'])
             plt.figure(figsize=(5, 5))
             sns.barplot(x='model_name', y='AIC', data=subjwise_LLs)
             plt.xticks(rotation='vertical')
@@ -249,27 +256,25 @@ class AnalyzePSModels:
             self.model_name, self.n_subj = self.get_info_from_filename(file_name)
 
             try:
-                self.fitted_params_g = pd.read_csv(self.get_file_name('fitted_params_g'), index_col=0)
+                self.fitted_params_g = pd.read_csv(self.get_file_name('fitted_params_g'), index_col=0)  # TODO comment back in!
+                # self.fitted_params_g = pd.read_csv(self.save_dir + '/g/params_g_RLabcxnplyoqtu_age_z_271_pymc3.csv', index_col=0)
+                # self.fitted_params_g = pd.read_csv(self.save_dir + '/g/params_g_Bbprytv_age_z_271_pymc3.csv', index_col=0)
             except FileNotFoundError:
                 self.fitted_params_g = pd.DataFrame()
 
             if self.fit_mcmc:
-                self.summary = pd.read_csv(self.get_file_name('summary'), index_col=0)
+                self.summary = pd.read_csv(self.get_file_name('summary'), index_col=0)  # TODO comment back in!
+                # self.summary = pd.read_csv(self.save_dir + '/g/summary_RLabcxnplyoqtu_age_z_271_pymc3.csv', index_col=0)
+                # self.summary = pd.read_csv(self.save_dir + '/g/summary_Bbprytv_age_z_271_pymc3.csv', index_col=0)
                 self.get_param_names_from_summary()
-            else:
-                if 'RL' in self.file_name:
-                    self.indiv_param_names = ['alpha', 'beta', 'nalpha', 'calpha', 'cnalpha', 'persev']
-                elif 'B' in self.file_name:
-                    self.indiv_param_names = ['p_switch', 'p_reward', 'beta', 'persev']
-
-            # if 'calpha' in self.indiv_param_names:
-            #     self.fitted_params['calpha_sc'] = self.fitted_params['calpha'] / self.fitted_params['alpha']
-            #     self.indiv_param_names.remove('calpha')
-            #     self.indiv_param_names.append('calpha_sc')
-            # if 'cnalpha' in self.indiv_param_names:
-            #     self.fitted_params['cnalpha_sc'] = self.fitted_params['cnalpha'] / self.fitted_params['nalpha']
-            #     self.indiv_param_names.remove('cnalpha')
-            #     self.indiv_param_names.append('cnalpha_sc')
+            if 'RL' in self.file_name:
+                self.fitted_params['alpha_minus_calpha'] = self.fitted_params['alpha'] - self.fitted_params['calpha']
+                self.fitted_params['alpha_minus_nalpha'] = self.fitted_params['alpha'] - self.fitted_params['nalpha']
+                self.fitted_params['nalpha_minus_cnalpha'] = self.fitted_params['nalpha'] - self.fitted_params['cnalpha']
+                self.indiv_param_names = ['beta', 'persev', 'alpha', 'nalpha', 'calpha', 'cnalpha',
+                                          'alpha_minus_calpha', 'alpha_minus_nalpha', 'nalpha_minus_cnalpha']
+            elif 'B' in self.file_name:
+                self.indiv_param_names = ['p_reward', 'beta', 'persev']
 
             # Close all figures
             plt.close('all')
@@ -335,11 +340,11 @@ class AnalyzePSModels:
         # Determine quantiles, separately for both genders
         for gender in np.unique(self.fitted_params['Gender']):
 
-            # Get 3 quantiles
+            # Get 4 quantiles
             cut_off_values = np.nanquantile(
                 self.fitted_params.loc[(self.fitted_params.PreciseYrs < 20) & (self.fitted_params.Gender == gender), col],
-                [0, 1 / 3, 2 / 3])
-            for cut_off_value, quantile in zip(cut_off_values, np.round([1 / 3, 2 / 3, 1], 2)):
+                [0, 1/4, 2/4, 3/4])
+            for cut_off_value, quantile in zip(cut_off_values, np.round([1/4, 2/4, 3/4, 1], 2)):
                 self.fitted_params.loc[
                     (self.fitted_params.PreciseYrs < 20) & (self.fitted_params[col] >= cut_off_value) & (self.fitted_params.Gender == gender),
                     qcol] = quantile
@@ -385,16 +390,9 @@ class AnalyzePSModels:
             if 'n' not in self.model_name:
                 self.fitted_params['nalpha'] = self.fitted_params['alpha']
             if 'c' not in self.model_name:
-                # self.fitted_params['calpha_sc'] = 0
                 self.fitted_params['calpha'] = 0
-            # else:
-            #     self.fitted_params['calpha_sc'] = self.fitted_params['calpha'] / self.fitted_params['alpha']
             if 'x' not in self.model_name:
-                # self.fitted_params['cnalpha_sc'] = self.fitted_params['calpha_sc']
-                # self.fitted_params['cnalpha'] = self.fitted_params['cnalpha_sc'] * self.fitted_params['nalpha']
                 self.fitted_params['cnalpha'] = 0
-            # else:
-            #     self.fitted_params['cnalpha_sc'] = self.fitted_params['cnalpha'] / self.fitted_params['nalpha']
 
         if 'B' in self.model_name:
             self.fitted_params['p_noisy'] = 1e-5
@@ -423,7 +421,7 @@ class AnalyzePSModels:
         elif param_name == 'persev':
             return 't'
         else:
-            raise ValueError("{0} is not a valid param_name.".format(param_name))
+            return 'dddddddd'
 
     def plot_fitted_params_against_cols(self, cols=('age_z', 'PDS_z', 'T1_log_z'), file_name_apx='', type='scatter'):
 
@@ -431,21 +429,20 @@ class AnalyzePSModels:
 
         n_rows = max(len(self.indiv_param_names), 2)  # need at least 2 rows for indexing to work
         n_cols = max(len(cols), 2)
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(2 * n_cols, 2 * n_rows), sharex='col', sharey='row')
-        kids_dat = self.fitted_params[self.fitted_params['age'] < 18]
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(2.1 * n_cols, 2 * n_rows), sharex='col', sharey='row')
 
         for row, param_name in enumerate(self.indiv_param_names):
             for col, pred in enumerate(cols):
 
                 # Plot correlations
                 if type == 'scatter':
+
                     axes[row, col].scatter(self.fitted_params[pred], self.fitted_params[param_name], s=1,
-                                           c=['r' if g == 'Female' else 'b' for g in self.fitted_params['Gender']])
+                                           c=['tomato' if g == 'Female' else 'lightseagreen' for g in self.fitted_params['Gender']])
 
                     # If this model has a fitted slope, add it to the plot
                     right_param = self.get_slope_letter_for_param_name(param_name) in self.model_name
                     if right_param and (pred in self.file_name):
-                        # intercept, slope, sd = self.get_intercept_slope_sd_from_summary(param_name, pred)
                         slope = self.summary.filter(regex=param_name + '_slope').loc['mean'][0]
                         try:
                             slope2 = self.summary.filter(regex=param_name + '_2_slope').loc['mean'][0]
@@ -453,7 +450,6 @@ class AnalyzePSModels:
                             slope2 = 0
                         sd = self.summary.filter(regex=param_name + '_sd').loc['mean'][0]
                         intercept = self.summary.filter(regex=param_name + '_int.*').loc['mean'][0]
-                        # x_vals = np.linspace(np.min(kids_dat[pred]), np.max(kids_dat[pred]), 100)
                         x_vals = np.linspace(np.min(self.fitted_params[pred]), np.max(self.fitted_params[pred]), 100)
                         y_vals = intercept + slope * x_vals + slope2 * x_vals * x_vals
                         axes[row, col].plot(x_vals, y_vals, '--', c='black')
@@ -461,17 +457,20 @@ class AnalyzePSModels:
                         axes[row, col].plot(x_vals, y_vals - sd, '--', c='grey')
 
                 elif type == 'line':
-                    sns.lineplot(pred, param_name, hue='Gender', data=self.fitted_params, legend=False, ax=axes[row, col])
+                    sns.lineplot(pred, param_name, hue='Gender', data=self.fitted_params, legend=False, ax=axes[row, col], palette={'Female': 'tomato', 'Male': 'lightseagreen'})
+
+                # Make y-axis [0, 1] for all alphas
+                if ('alpha' in param_name) and ('minus' not in param_name):
+                    axes[row, col].set_ylim([0, 1])
+                if 'beta' == param_name:
+                    axes[row, col].set_ylim([1, 11])
+                if 'persev' == param_name:
+                    axes[row, col].set_ylim([-0.25, 0.75])
 
                 # Add axis labels
-                if row == n_rows - 1:
+                if row == n_rows - 1:  # bottom row
                     axes[row, col].set_xlabel(pred)
-                    # z_scored_labels = [item.get_text() for item in axes[row, col].get_xticklabels()]
-                    # z_scored_labels_int = [int(item[-1]) if (len(item) == 1) else -int(item[-1]) for item in
-                    #                        z_scored_labels]
-                    # labels = np.array(z_scored_labels_int) * np.std(kids_dat[pred[:-2]]) + np.mean(kids_dat[pred[:-2]])
-                    # axes[row, col].set_xticklabels(np.round(labels))
-                if col == 0:
+                if col == 0:  # left-most column
                     axes[row, col].set_ylabel(param_name)
 
                 # Calculate correlations
@@ -499,7 +498,8 @@ class AnalyzePSModels:
 
 # Main script
 data = {
-    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/',
+    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/genrec/simRLabcnpx/',
+    # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/mice/',
     'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv',
     'n_trials': 120,
     'make_csvs_from_pickle': True,
@@ -508,6 +508,7 @@ data = {
     'make_plots': True,
     'waic_criterion_for_analysis': 1e6,
     'fit_mcmc': True,
+    'run_on_humans': True,
 }
 
 apm = AnalyzePSModels(data)
@@ -520,68 +521,3 @@ if apm.make_csvs_from_pickle:
 # Create files, save files, make plots, save plots
 if apm.make_analyses:
     apm.analyze()
-
-
-
-
-# OLD STUFF
-
-# # Plot trialwise LLs etc.
-# if self.NLL_param_names:
-#     pd.DataFrame(self.summary['trialwise_LLs'], columns=self.sID).to_csv(
-#         self.save_dir + 'plots/trialwise_LLs_' + self.model_name + '_' + self.slope_variable + '_pymc3.csv',
-#         index=False)
-#     pd.DataFrame(self.summary['trialwise_p_right'], columns=self.sID).to_csv(
-#         self.save_dir + 'plots/trialwise_p_' + self.model_name + '_' + self.slope_variable + '_pymc3.csv',
-#         index=False)
-#     subjwise_LLs = pd.DataFrame(self.summary['subjwise_LLs'], index=self.sID, columns=['NLL_pymc3'])
-#     subjwise_LLs.to_csv(
-#         self.save_dir + 'plots/subjwise_LLs_{0}_{1}_{2}_pymc3.csv'.format(self.model_name, self.slope_variable,
-#                                                                           self.n_subj))
-#
-#     n_params = get_n_params(self.model_name, self.n_subj, 1)
-#     nll = -np.sum(subjwise_LLs).values[0]
-#     bic = np.log(self.n_trials * self.n_subj) * n_params + 2 * nll
-#     aic = 2 * n_params + 2 * nll
-#     self.modelwise_LLs.append([nll, bic, aic, self.model_name])
-#
-# # Plot pymc3 NLLs (obtained when fitting) and my NLLs (using the simulation code)
-# try:
-#     subjwise_LLs_sim = pd.read_csv(self.save_dir + 'plots/subjwise_LLs_' + self.model_name + '_sim.csv')
-#     subjwise_LLs = subjwise_LLs.merge(subjwise_LLs_sim, right_on='sID', left_index=True)
-#     plt.figure()
-#     sns.scatterplot(x='NLL_pymc3', y='NLL_sim', hue='sID',
-#                     data=subjwise_LLs)  # , hue=subjwise_LLs['model_name'].str[0]
-#     min_val, max_val = np.min(subjwise_LLs['NLL_sim']), np.max(subjwise_LLs['NLL_sim'])
-#     plt.plot([min_val, max_val], [min_val, max_val], c='grey')
-#     plt.xlabel('pymc3')
-#     plt.ylabel('sim')
-#     plt.savefig(
-#         self.save_dir + "plots/plot_NLLs_{0}_{1}_{2}.png".format(self.model_name, self.slope_variable, self.n_subj))
-# except (FileNotFoundError, NameError):
-#     pass
-
-    # def get_intercept_slope_sd_from_summary(self, param_name, pred):
-    #
-    #     z_scored_slope = self.summary.filter(regex=param_name + '_slope').loc['mean'][0]
-    #     slope = z_scored_slope / np.std(self.fitted_params[pred])
-    #
-    #     z_scored_sd = self.summary.filter(regex=param_name + '_sd').loc['mean'][0]
-    #     sd = z_scored_sd / np.std(self.fitted_params[pred])
-    #
-    #     z_scored_intercept = self.summary.filter(regex=param_name + '_int.*').loc['mean'][0]
-    #     intercept = z_scored_intercept - np.mean(self.fitted_params[pred]) * slope
-    #
-    #     return intercept, slope, sd
-
-# # Plot fitted against simulated nll (run after PSAllSimulations)
-# nll = pd.read_csv(self.save_dir + 'nlls.csv')
-# nll_all = nll.merge(nll_bic)
-# ax = sns.scatterplot('nll', 'simulated_nll', hue='color', data=nll_all)
-# for row in range(nll_all.shape[0]):
-#     ax.text(nll_all.nll[row]+0.2, nll_all.simulated_nll[row], nll_all.model_name[row],
-#             horizontalalignment='left', size='small', color='black')
-# ax.get_legend().remove()
-# plt.xlabel('Fitted NLL')
-# plt.ylabel('Simulated NLL')
-# plt.savefig("{0}plot_nll_sim_rec.png".format(self.save_dir))

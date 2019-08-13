@@ -275,7 +275,7 @@ n_sim_per_subj = 2
 verbose = False
 calculate_NLLs = False
 simulate_agents = True
-data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/simulate/'
+data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/simulate/'
 file_names = [f for f in os.listdir(data_dir) if ('.csv' in f) and ('params' in f) and not ('params_g' in f)]
 print("Found {0} models to simulate / calculate NLLs.".format(len(file_names)))
 simulated_nlls = pd.DataFrame()
