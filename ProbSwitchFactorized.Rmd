@@ -341,7 +341,7 @@ plot_performance_over_age = function(ACCs, gg_save) {
 plot_indivduals_for_exclusion = function(all_files, gg_save, exclude_UCB) {
   
   # Overall behavior for each participant
-  ACCs = ddply(all_files, .(sID, PreciseYrs, Gender, PDS, age_group), summarize,
+  ACCs = ddply(all_files, .(sID, PreciseYrs, Gender, PDS, T1, age_group), summarize,
                mean_ACC = mean(ACC, na.rm=T),
                n_switches=sum(switch_trial, na.rm=T),
                n_fast_RTs=sum(RT<100, na.rm=T),
@@ -374,20 +374,27 @@ plot_indivduals_for_exclusion = function(all_files, gg_save, exclude_UCB) {
     geom_point()
   
   # Tell us who'll be excluded
+  special_excl = 1004
   gender_excl = sort(subset(ACCs, is.na(Gender))$sID)
-  PDS_excl = sort(subset(ACCs, is.na(PDS))$sID)
+  PDS_excl = sort(subset(ACCs, is.na(PDS) & sID < 400)$sID)
+  T_excl = sort(subset(ACCs, is.na(T1) & sID < 400)$sID)
+  age_excl = sort(subset(ACCs, is.na(age))$sID)
   n_trials_excl = sort(subset(ACCs, n_trials < 120)$sID)
   switch_excl = sort(subset(ACCs, n_switches < 5)$sID)
   ACC_excl = sort(subset(ACCs, mean_ACC < 0.58)$sID)
-  age_excl = sort(subset(ACCs, PreciseYrs > 30)$sID)
+  above30_excl = sort(subset(ACCs, PreciseYrs > 30)$sID)
   if (exclude_UCB) {
-    age_excl = c(age_excl, subset(ACCs, sID > 400)$sID)
+    above30_excl = c(above30_excl, subset(ACCs, sID > 400)$sID)
   }
+  print("Excluding subjetct 1004.")
   print(paste("Participants missing gender:", paste(gender_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% gender_excl)$PreciseYrs, collapse=', ')))
-  print(paste("Participants missing PDS:", paste(PDS_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% PDS_excl)$PreciseYrs, collapse=', ')))
+  # print(paste("Participants missing PDS:", paste(PDS_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% PDS_excl)$PreciseYrs, collapse=', ')))
+  # print(paste("Participants missing T:", paste(T_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% T_excl)$PreciseYrs, collapse=', ')))
   print(paste("Participants with < 120 trials:", paste(n_trials_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% n_trials_excl)$PreciseYrs, collapse=', ')))
   print(paste("Participants with n_switches < 5:", paste(switch_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% switch_excl)$PreciseYrs, collapse=', ')))
   print(paste("Participants with mean_ACC < 0.58:", paste(ACC_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% ACC_excl)$PreciseYrs, collapse=', ')))
+  print(paste("Participants > 30:", paste(above30_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% above30_excl)$PreciseYrs, collapse=', ')))
+  all_excluded = unique(c(gender_excl, n_trials_excl, switch_excl, ACC_excl, above30_excl, special_excl))  # , PDS_excl, T_excl
   
   # Save plots
   if (gg_save) {
@@ -400,7 +407,7 @@ plot_indivduals_for_exclusion = function(all_files, gg_save, exclude_UCB) {
     ggsave(file.path(plot_dir, "/gg_0excl_fast.svg"), gg_0excl_fast)
   }
   
-  return(unique(c(gender_excl, PDS_excl, n_trials_excl, switch_excl, ACC_excl, age_excl)))
+  return(all_excluded)
 }
 ```
 ```{r Basic behavioral analyses}
@@ -863,7 +870,7 @@ library("ggplot2"); theme_set(theme_bw()); library("plyr"); library("reshape2");
 gg_save = T
 run_regression = F
 data_name = "human"  # Can be "human", "fitted_human", or "simulated_human"
-exclude_UCB = T
+exclude_UCB = F
 colors_3and1 = c("#00D000", "#00C055", "#00B0AA", "#00A0FF", "gray60", "grey50")
 parameter_names = c('alpha', 'beta', 'nalpha', 'calpha', 'cnalpha', 'p_switch', 'p_reward', 'persev')
 desired_columns = c("sID", "version", "selected_box", "p_right", "reward", "RT", "correct", "correct_box", "learning_style", "model_name", "NLL", parameter_names, paste0(parameter_names, "_rec"))
@@ -872,7 +879,7 @@ desired_columns = c("sID", "version", "selected_box", "p_right", "reward", "RT",
 ages_file_dir = "C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv"
 human_data_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch"
 param_file_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_mcmc_models_cluster"
-dir_to_all_simulations = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/BF/simulate/simulations'
+dir_to_all_simulations = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/simulate/simulations'
 
 # Notes
 # ggsave(..., useDingbats=FALSE) is supposed to help with illustrator problems
@@ -884,8 +891,8 @@ if (data_name == "simulated_human") {
   data_dirs = list.dirs(dir_to_all_simulations, recursive=F)
   patt = ".*csv"
   
-  for (data_dir in data_dirs) {  # [8:length(data_dirs)]
-    data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/BF/simulate/simulations/Bbpr_age_z_271'
+  for (data_dir in data_dirs) {
+    # data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/simulate/simulations/Bbpr_age_z_271'
     folder_name = strsplit(data_dir, "/")[[1]][length(strsplit(data_dir, "/")[[1]])]
     model_name = strsplit(folder_name, "_")[[1]][1]
     print(model_name)
@@ -914,6 +921,7 @@ if (data_name == "simulated_human") {
     all_files_sum = get_all_files_sum(all_files)
     
     # Sample overview
+    plot_sample_composition(all_files, gg_save, run_regression)
     plot_switch_age_T_PDS(ACC_subj, reward_subj, run_regression, gg_save)
       
     # Behavioral analyses
@@ -958,6 +966,7 @@ if (data_name == "simulated_human") {
   all_files_sum = get_all_files_sum(all_files)
   
   # Sample overview
+  plot_sample_composition(all_files, gg_save, run_regression)
   plot_switch_age_T_PDS(ACC_subj, reward_subj, run_regression, gg_save)
     
   # Behavioral analyses
@@ -1054,66 +1063,41 @@ for (backi in 1:5) {
 ```
 
 ```{r Analyze and plot fitted parameters}
-plot_parameters = function(fitted_param_dir, plot_appx) {  # , fitted_slopes_dir
+plot_parameters = function(fitted_param_dir, model, plot_appx) {
   
   # Read in and clean fitted parameter data
   fitted_params = read.csv(fitted_param_dir)
-  # fitted_slopes = read.csv(fitted_slopes_dir)
   
-  fitted_params$alpha_minus_calpha = with(fitted_params, alpha - calpha)
-  fitted_params$alpha_minus_nalpha = with(fitted_params, alpha - nalpha)
-  fitted_params$nalpha_minus_cnalpha = with(fitted_params, nalpha - cnalpha)
+  if (model == "RL") {
+    fitted_params$alpha_minus_calpha = with(fitted_params, alpha - calpha)
+    fitted_params$alpha_minus_nalpha = with(fitted_params, alpha - nalpha)
+    fitted_params$nalpha_minus_cnalpha = with(fitted_params, nalpha - cnalpha)
+    
+    param_cols = c("sID", "beta", "persev", "alpha", "nalpha", "calpha", "cnalpha", "alpha_minus_calpha", "alpha_minus_nalpha", "nalpha_minus_cnalpha")
+  } else {
+    param_cols = c("sID", "beta", "persev", "p_switch", "p_reward")
+  }
   
-  param_cols = c("sID", "beta", "persev", "alpha", "nalpha", "calpha", "cnalpha", "alpha_minus_calpha", "alpha_minus_nalpha", "nalpha_minus_cnalpha")
   fitted_params = merge(subset(fitted_params, select=param_cols), ages, by='sID', all.x=T)
   fp_long = melt(fitted_params, id.vars=c("sID", "Gender", "age_group", "PDS_group", "T_group", "PreciseYrs"), measure.vars=param_cols[2:length(param_cols)], variable.name="parameter")
   fp_llong = melt(fp_long, measure.vars=c("age_group", "PDS_group", "T_group"), variable.name="group", value.name="percent")
   fp_llong$percent = factor(fp_llong$percent, levels=c("25%", "50%", "75%", "100%", "Adult", NA))
-  
-  # # Plot parmaeters over age
-  # int = 1
-  # slope = 1
-  # slope2 = -1
-  # sd = 0.5
-  # # gg_params_ages_dist =
-  #   ggplot(fp_long, aes(PreciseYrs, value, color=Gender, group=Gender)) +
-  #     geom_point() +
-  #     stat_function(fun=function(x) int + slope * x + slope2 * x^2, color="black") +
-  #     # stat_function(fun=function(x) int + slope * x + slope2 * x^2 + sd, color="grey") +
-  #     # stat_function(fun=function(x) int + slope * x + slope2 * x^2 - sd, color="grey") +
-  #     facet_grid(parameter ~ ., scales="free")
-    
-    # ggplot() +
-    #   geom_point(data=fp_long, aes(PreciseYrs, value, color=Gender, group=Gender)) +
-    #   stat_function(fun=function(x) int + slope * x + slope2 * x^2, color="black",
-    #                 data=slopes,
-    #                 aes(fp_long$PreciseYrs))
     
   # Plot parameters over age groups
-  gg_params_ages_quant =
-    ggplot(subset(fp_llong, !is.na(percent) & parameter %in% c("alpha_minus_calpha", "alpha_minus_nalpha", "nalpha_minus_cnalpha")), aes(percent, value, color=Gender, group=Gender)) +
+  gg_params_ages_free =
+    ggplot(subset(fp_llong, !is.na(percent) & parameter %in% c("alpha_minus_calpha", "alpha_minus_nalpha", "nalpha_minus_cnalpha", "beta")), aes(percent, value, color=Gender, group=Gender)) +
     stat_summary(fun.data=mean_se, geom="pointrange") +
     stat_summary(fun.data=mean_se, geom="line") +
     facet_grid(parameter ~ group, scales="free")
   
-  gg_params_ages_quant_a = gg_params_ages_quant + coord_cartesian(ylim=c(0, 1))
-  gg_params_ages_quant_a$data = subset(fp_llong, !is.na(percent) & parameter %in% c("alpha", "nalpha", "calpha", "cnalpha"))
-  # , aes(percent, value, color=Gender, group=Gender)
-    # ggplot(subset(fp_llong, !is.na(percent) & parameter %in% c("alpha", "nalpha", "calpha", "cnalpha")), aes(percent, value, color=Gender, group=Gender)) +
-    # stat_summary(fun.data=mean_se, geom="pointrange") +
-    # stat_summary(fun.data=mean_se, geom="line") +
-    # coord_cartesian(ylim=c(0, 1)) +
-    # facet_grid(parameter ~ group, scales="free")
+  gg_params_ages_01 = gg_params_ages_free + coord_cartesian(ylim=c(0, 1))
+  gg_params_ages_01$data = subset(fp_llong, !is.na(percent) & parameter %in% c("alpha", "nalpha", "calpha", "cnalpha", "p_switch", "p_reward"))
   
-  gg_params_ages_quant_b = gg_params_ages_quant + coord_cartesian(ylim=c(1, 11))
-  gg_params_ages_quant_b$data = subset(fp_llong, !is.na(percent) & parameter %in% c("beta"))
-    # ggplot(subset(fp_llong, !is.na(percent) & parameter %in% c("beta", "persev", "alpha_minus_calpha", "alpha_minus_nalpha", "nalpha_minus_cnalpha")), aes(percent, value, color=Gender, group=Gender)) +
-    # stat_summary(fun.data=mean_se, geom="pointrange") +
-    # stat_summary(fun.data=mean_se, geom="line") +
-    # facet_grid(parameter ~ group, scales="free")
+  gg_params_ages_beta = gg_params_ages_free + coord_cartesian(ylim=c(1, 11))
+  gg_params_ages_beta$data = subset(fp_llong, !is.na(percent) & parameter %in% c("beta"))
   
-  gg_params_ages_quant_p = gg_params_ages_quant + coord_cartesian(ylim=c(-0.25, 0.75))
-  gg_params_ages_quant_p$data = subset(fp_llong, !is.na(percent) & parameter %in% c("persev"))
+  gg_params_ages_p = gg_params_ages_free + coord_cartesian(ylim=c(-0.25, 0.75))
+  gg_params_ages_p$data = subset(fp_llong, !is.na(percent) & parameter %in% c("persev"))
   
   # Calculate ANOVAs and t-tests to see age group differences
   for (predictor in c("age_group", "PDS_group", "T_group")) {#
@@ -1121,28 +1105,106 @@ plot_parameters = function(fitted_param_dir, plot_appx) {  # , fitted_slopes_dir
       print(paste(predictor, param))
       
       formula = as.formula(paste(param, "~", predictor, " + Gender"))
-      # print(summary(aov(formula, subset(fitted_params, !age_group %in% c("UCB", "Adult")))))#
+      # print(summary(aov(formula, subset(fitted_params, !age_group %in% c("UCB")))))#
       
       # print(pairwise.t.test(fitted_params[,param], fitted_params[,predictor], p.adjust.method="none"))
     }
   }
   
   if (gg_save) {
-    ggsave(file.path(plot_dir, paste0("gg_params_ages_dist", plot_appx, ".png")), gg_params_ages_dist, width=4, height=12)
-    ggsave(file.path(plot_dir, paste0("gg_params_ages_quant_a", plot_appx, ".png")), gg_params_ages_quant_a, width=8, height=8)
-    ggsave(file.path(plot_dir, paste0("gg_params_ages_quant_b", plot_appx, ".png")), gg_params_ages_quant_b, width=8, height=2.5)
-    ggsave(file.path(plot_dir, paste0("gg_params_ages_quant_p", plot_appx, ".png")), gg_params_ages_quant_p, width=8, height=2.5)
+    ggsave(file.path(plot_dir, paste0("gg_params_ages_free_", model, plot_appx, ".png")), gg_params_ages_free, width=8, height=8)
+    ggsave(file.path(plot_dir, paste0("gg_params_ages_01_", model, plot_appx, ".png")), gg_params_ages_01, width=8, height=4.5)
+    ggsave(file.path(plot_dir, paste0("gg_params_ages_beta_", model, plot_appx, ".png")), gg_params_ages_beta, width=8, height=2.5)
+    ggsave(file.path(plot_dir, paste0("gg_params_ages_p_", model, plot_appx, ".png")), gg_params_ages_p, width=8, height=2.5)
   }
 }
 
-# fitted_slopes_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_g_RLabcxnplyoqtu_age_z_271_pymc3.csv"
-plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/params_RLabcnpx_age_z_271_pymc3.csv", plot_appx="_ML")
-# plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabcxnplyoqtu_age_z_271_pymc3.csv", "_MCMC")
-# plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabcnpx_age_z_271_pymc3.csv", "_MCMC_sep")
+plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/params_RLabcnpx_age_z_271_pymc3.csv", model="RL", plot_appx="_ML")
+# plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabcxnplyoqtu_age_z_271_pymc3.csv", model="RL", "_MCMC")
+# plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabcnpx_age_z_271_pymc3.csv", model="RL", "_MCMC_sep")
 
-plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/params_Bbpr_age_z_271_pymc3.csv", plot_appx="_ML")
-# plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabcxnplyoqtu_age_z_271_pymc3.csv", "_MCMC")
-# plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabcnpx_age_z_271_pymc3.csv", "_MCMC_sep")
+plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/params_Bbpr_age_z_271_pymc3.csv", model="BF", plot_appx="_ML")
+plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_Bbprytv_age_z_271_pymc3.csv", "BF", "_MCMC")
+plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_Bbpr_age_z_271_pymc3.csv", "BF", "_MCMC_sep")
+```
+```{r Compare RL and BF parameters}
+# ML fitting
+RL_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/params_RLabcnpx_age_z_271_pymc3.csv"
+BF_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/params_Bbpr_age_z_271_pymc3.csv"
+
+# Bayesian fitting
+RL_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabcnpx_age_z_271_pymc3.csv"
+BF_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_Bbpr_age_z_271_pymc3.csv"
+
+params_RL = subset(read.csv(RL_ML_dir), select=c("beta", "persev", "alpha", "nalpha", "calpha", "cnalpha", "sID"))
+params_BF = subset(read.csv(BF_ML_dir), select=c("beta", "persev", "p_switch", "p_reward", "sID"))
+
+params = merge(params_RL, params_BF, by="sID", suffixes=c("_RL", "_BF"))
+
+ggplot(params, aes(beta_RL, beta_BF)) +
+  geom_point()
+ggplot(params, aes(persev_RL, persev_BF)) +
+  geom_point()
+
+cor.test(params$beta_BF, params$beta_RL, method="pearson")
+cor.test(params$persev_BF, params$persev_RL, method="pearson")
+cor.test(params$cnalpha, params$p_reward, method="pearson")
+
+library("corrplot")
+cor_matrix = cor(params, use="complete.obs")
+p_values = cor.mtest(params, conf.level = .95)
+
+png(file.path(plot_dir, "/gg_RL_BF_params.png"), pointsize=15, width=600, height=600)
+corrplot(cor_matrix)
+corrplot(cor_matrix, method="color", #col=col(200),
+     number.cex = 0.8, #type = "upper", 
+     addCoef.col="black", # Add coefficient of correlation
+     tl.col="black", tl.srt=30, cl.pos="b", # Text label, color, and rotation
+     # Combine with significance
+     p.mat = p_values$p, sig.level=0.05, insig="blank",
+     # hide correlation coefficient on the principal diagonal
+     # diag = FALSE
+     )
+# corrplot(cor_matrix, p.mat=p_values$p, method="color", order="hclust", insig="label_sig", pch="p" addrect=4)
+# corrplot(cor_matrix, type="upper", tl.col="black", tl.srt=45)
+dev.off()
+```
+```{r GenRec}
+# ML fitting
+simBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/simulate/params_Bbpr_age_z_271_pymc3.csv")
+recBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/gen_rec/params_simBbprrecBbpr_age_z_271_pymc3.csv")
+simRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/simulate/params_RLabcnpx_age_z_271_pymc3.csv")
+recRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/gen_rec/params_simRLabcnpxrecRLabcnpx_age_z_271_pymc3.csv")
+
+# Bayesian fitting
+simBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_Bbpr_age_z_271_pymc3.csv")
+recBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/genrec/simBbpr/params_Bbpr_age_z_271_pymc3.csv")
+simRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabcnpx_age_z_271_pymc3.csv")
+recRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/genrec/simRLabcnpx/params_RLabcnpx_age_z_271_pymc3.csv")
+
+# Plots
+BF_params =
+  merge(melt(subset(simBF_params, select=c("beta", "persev", "p_switch", "p_reward", "sID")), id.var="sID", variable.name="param"),
+        melt(subset(recBF_params, select=c("beta", "persev", "p_switch", "p_reward", "sID")), id.var="sID", variable.name="param"),
+        by=c("sID", "param"), suffixes=c("_sim", "_rec"))
+gg_genrec_BF =
+  ggplot(BF_params, aes(value_sim, value_rec)) +
+    geom_point() +
+    facet_wrap(~ param, scales="free")
+
+RL_params =
+  merge(melt(subset(simRL_params, select=c("beta", "persev", "alpha", "nalpha", "calpha", "cnalpha", "sID")), id.var="sID", variable.name="param"),
+        melt(subset(recRL_params, select=c("beta", "persev", "alpha", "nalpha", "calpha", "cnalpha", "sID")), id.var="sID", variable.name="param"),
+        by=c("sID", "param"), suffixes=c("_sim", "_rec"))
+gg_genrec_RL =
+  ggplot(RL_params, aes(value_sim, value_rec)) +
+    geom_point() +
+    facet_wrap(~ param, scales="free")
+
+if (gg_save) {
+  ggsave(file.path(plot_dir, "gg_genrec_BF.png"), gg_genrec_BF, width=8, height=8)
+  ggsave(file.path(plot_dir, "gg_genrec_RL.png"), gg_genrec_RL, width=12, height=8)
+}
 ```
 
 ```{r regression ACC / RT ~ age * testosterone}
