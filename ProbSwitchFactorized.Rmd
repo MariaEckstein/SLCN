@@ -318,12 +318,14 @@ plot_performance_over_age = function(ACCs, gg_save) {
   
   # Prepare data
   ACCs$stay_fit = -0.25 -0.586402 + 0.171191 * ACCs$PreciseYrs -0.004136 * ACCs$PreciseYrs ^ 2  # results from summary(glmer(same_choice_01_back ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), all_files, binomial)); 10/08/2019; run on all subjects, IDs 12-448, ages 7.77-30
+  ACCs$stay_fit[ACCs$Gender == "Female"] = NA  # hack to get rid of double lines
   # ACCs$stay_fit_low = -0.25 -0.586402 + (0.171191 + 1.96 * 0.040369 / n_subj) * ACCs$PreciseYrs -(0.004136 + 1.96 * 0.001079 / n_subj) * ACCs$PreciseYrs ^ 2
   # ACCs$stay_fit_hig = -0.25 -0.586402 + (0.171191 - 1.96 * 0.040369 / n_subj) * ACCs$PreciseYrs -(0.004136 - 1.96 * 0.001079 / n_subj) * ACCs$PreciseYrs ^ 2
   ACCs$stay_fit_low = -0.25 -0.586402 + (0.171191 - 0.040369) * ACCs$PreciseYrs -(0.004136 - 0.001079) * ACCs$PreciseYrs ^ 2
   ACCs$stay_fit_hig = -0.25 -0.586402 + (0.171191 + 0.040369) * ACCs$PreciseYrs -(0.004136 + 0.001079) * ACCs$PreciseYrs ^ 2
   
   ACCs$reward_fit = 35 + 120 * (-0.1233495 + 0.0490270 * ACCs$PreciseYrs -0.0013627 * ACCs$PreciseYrs ^ 2)  # summary(glmer(reward ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), all_files, binomial))
+  ACCs$reward_fit[ACCs$Gender == "Female"] = NA  # hack to get rid of double lines
   ACCs$reward_fit_low = 35 + 120 * (-0.1233495 + (0.0490270 - 0.0130263) * ACCs$PreciseYrs -(0.0013627 - 0.0003473) * ACCs$PreciseYrs ^ 2)
   ACCs$reward_fit_hig = 35 + 120 * (-0.1233495 + (0.0490270 + 0.0130263) * ACCs$PreciseYrs -(0.0013627 + 0.0003473) * ACCs$PreciseYrs ^ 2)
 
@@ -344,23 +346,23 @@ plot_performance_over_age = function(ACCs, gg_save) {
   # Stay over age
   gg_stay_age =
     gg_ACC_age + aes(y=mean_stay) +
-      geom_line(aes(y=stay_fit), color='black') +
       # stat_function(fun = function(x) -0.586402 + 0.171191 * x -0.004136 * x ^ 2, color='black') +  # same as line above
       geom_ribbon(aes(ymin=stay_fit_low, ymax=stay_fit_hig), linetype=0, fill='black', alpha=0.05) +
+      geom_line(aes(y=stay_fit), color='black') +
       coord_cartesian(ylim=c(0.35, 0.93))
 
   # Coins won across age
   gg_reward_age =
-    gg_ACC_age + aes(y=mean_reward * 120) +  # 120 is number of trials
+    gg_ACC_age + aes(y=mean_reward * 120) +
+      geom_ribbon(aes(ymin=reward_fit_low, ymax=reward_fit_hig), linetype=0, fill='black', alpha=0.05) +  # 120 is number of trials
       geom_line(aes(y=reward_fit), color='black') +
-      geom_ribbon(aes(ymin=reward_fit_low, ymax=reward_fit_hig), linetype=0, fill='black', alpha=0.05) +
       coord_cartesian(ylim=c(52, 80))
   
   # RTs across age
   gg_RT_age =
     gg_ACC_age + aes(y=median_cor_RT) +
-      geom_line(aes(y=RT_fit)) +
       geom_ribbon(aes(ymin=RT_fit_low, ymax=RT_fit_hig), linetype=0, alpha=0.1) +
+      geom_line(aes(y=RT_fit)) +
       coord_cartesian(ylim=c(0, 800))
   
   # Number of switches across age
@@ -1168,58 +1170,75 @@ plot_parameters(fitted_param_dir="C:/Users/maria/MEGAsync/SLCN/PShumanData/fitti
 ```
 ```{r Compare RL and BF parameters}
 # ML fitting
-RL_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/params_RLabcnpx_age_z_271_pymc3.csv"
-BF_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/params_Bbpr_age_z_271_pymc3.csv"
+# RL_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/params_RLabcnpx_age_z_271_pymc3.csv"
+# BF_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/params_Bbpr_age_z_271_pymc3.csv"
+RL_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/params_RLabnp2_age_z_271_pymc3.csv"
+BF_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/params_Bbspr_age_z_271_pymc3.csv"
 
 # Bayesian fitting
-RL_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabcnpx_age_z_271_pymc3.csv"
-BF_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_Bbpr_age_z_271_pymc3.csv"
+# RL_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabcnpx_age_z_271_pymc3.csv"
+# BF_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_Bbpr_age_z_271_pymc3.csv"
+RL_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabnp2_age_z_271_pymc3.csv"
+BF_ML_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_Bbspr_age_z_271_pymc3.csv"
 
-params_RL = subset(read.csv(RL_ML_dir), select=c("beta", "persev", "alpha", "nalpha", "calpha", "cnalpha", "sID"))
+params_RL = subset(read.csv(RL_ML_dir), select=c("beta", "persev", "alpha", "nalpha", "sID"))
 params_BF = subset(read.csv(BF_ML_dir), select=c("beta", "persev", "p_switch", "p_reward", "sID"))
 
 params = merge(params_RL, params_BF, by="sID", suffixes=c("_RL", "_BF"))
 
-ggplot(params, aes(beta_RL, beta_BF)) +
-  geom_point()
-ggplot(params, aes(persev_RL, persev_BF)) +
-  geom_point()
+gg_beta_RL_BF =
+  ggplot(params, aes(beta_RL, beta_BF)) +
+    geom_point() +
+    geom_smooth(method="lm", color="black", linetype="dotted") +
+    coord_cartesian(xlim=c(0, 15), ylim=c(0, 15))
+gg_persev_RL_BF =
+  ggplot(params, aes(persev_RL, persev_BF)) +
+    geom_point() +
+    geom_smooth(method="lm", color="black", linetype="dotted") +
+    coord_cartesian(xlim=c(-1, 1), ylim=c(-1, 1))
 
-cor.test(params$beta_BF, params$beta_RL, method="pearson")
-cor.test(params$persev_BF, params$persev_RL, method="pearson")
-cor.test(params$cnalpha, params$p_reward, method="pearson")
+if (gg_save) {
+  ggsave(file.path(plot_dir, "gg_beta_RL_BF.png"), gg_beta_RL_BF, width=4, height=4)
+  ggsave(file.path(plot_dir, "gg_persev_RL_BF.png"), gg_persev_RL_BF, width=4, height=4)
+}
 
 library("corrplot")
 cor_matrix = cor(params, use="complete.obs")
 p_values = cor.mtest(params, conf.level = .95)
 
-png(file.path(plot_dir, "/gg_RL_BF_params.png"), pointsize=15, width=600, height=600)
-corrplot(cor_matrix)
 corrplot(cor_matrix, method="color", #col=col(200),
      number.cex = 0.8, #type = "upper", 
      addCoef.col="black", # Add coefficient of correlation
      tl.col="black", tl.srt=30, cl.pos="b", # Text label, color, and rotation
      # Combine with significance
      p.mat = p_values$p, sig.level=0.05, insig="blank",
-     # hide correlation coefficient on the principal diagonal
-     # diag = FALSE
      )
-# corrplot(cor_matrix, p.mat=p_values$p, method="color", order="hclust", insig="label_sig", pch="p" addrect=4)
-# corrplot(cor_matrix, type="upper", tl.col="black", tl.srt=45)
-dev.off()
+
+cor.test(params$beta_BF, params$beta_RL, method="pearson")
+cor.test(params$persev_BF, params$persev_RL, method="pearson")
+cor.test(params$nalpha, params$p_reward, method="pearson")
+cor.test(params$beta_RL, params$p_switch, method="pearson")
 ```
 ```{r GenRec}
 # ML fitting
-simBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/simulate/params_Bbpr_age_z_271_pymc3.csv")
-recBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/gen_rec/params_simBbprrecBbpr_age_z_271_pymc3.csv")
-simRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/simulate/params_RLabcnpx_age_z_271_pymc3.csv")
-recRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/gen_rec/params_simRLabcnpxrecRLabcnpx_age_z_271_pymc3.csv")
+simBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/simulate/params_Bbspr_age_z_271_pymc3.csv")
+recBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/gen_rec/params_simBbsprrecBsbpr_age_z_271_pymc3.csv")
+simRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/simulate/params_RLabnp2_age_z_271_pymc3.csv")
+recRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/gen_rec/params_simRLabnp2recRLabnp2_age_z_271_pymc3.csv")
+# simBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/simulate/params_Bbpr_age_z_271_pymc3.csv")
+# recBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/gen_rec/params_simBbprrecBbpr_age_z_271_pymc3.csv")
+# simRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/simulate/params_RLabcnpx_age_z_271_pymc3.csv")
+# recRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/gen_rec/params_simRLabcnpxrecRLabcnpx_age_z_271_pymc3.csv")
 
 # Bayesian fitting
-simBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_Bbpr_age_z_271_pymc3.csv")
-recBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/genrec/simBbpr/params_Bbpr_age_z_271_pymc3.csv")
-simRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabcnpx_age_z_271_pymc3.csv")
-recRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/genrec/simRLabcnpx/params_RLabcnpx_age_z_271_pymc3.csv")
+simBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_Bbspr_age_z_271_pymc3.csv")
+recBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/genrec/simBbspr/params_Bbspr_age_z_271_pymc3.csv")
+simRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabnp2_age_z_271_pymc3.csv")
+recRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/genrec/simRLabnp2/params_RLabnp2_age_z_271_pymc3.csv")
+# simBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_Bbpr_age_z_271_pymc3.csv")
+# recBF_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/genrec/simBbpr/params_Bbpr_age_z_271_pymc3.csv")
+# simRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_RLabcnpx_age_z_271_pymc3.csv")
+# recRL_params = read.csv("C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/genrec/simRLabcnpx/params_RLabcnpx_age_z_271_pymc3.csv")
 
 # Plots
 BF_params =
@@ -1229,20 +1248,22 @@ BF_params =
 gg_genrec_BF =
   ggplot(BF_params, aes(value_sim, value_rec)) +
     geom_point() +
+    geom_smooth(method="lm", color="black", linetype="dotted") +
     facet_wrap(~ param, scales="free")
 
 RL_params =
-  merge(melt(subset(simRL_params, select=c("beta", "persev", "alpha", "nalpha", "calpha", "cnalpha", "sID")), id.var="sID", variable.name="param"),
-        melt(subset(recRL_params, select=c("beta", "persev", "alpha", "nalpha", "calpha", "cnalpha", "sID")), id.var="sID", variable.name="param"),
+  merge(melt(subset(simRL_params, select=c("beta", "persev", "alpha", "nalpha", "sID")), id.var="sID", variable.name="param"),
+        melt(subset(recRL_params, select=c("beta", "persev", "alpha", "nalpha", "sID")), id.var="sID", variable.name="param"),
         by=c("sID", "param"), suffixes=c("_sim", "_rec"))
 gg_genrec_RL =
   ggplot(RL_params, aes(value_sim, value_rec)) +
     geom_point() +
+    geom_smooth(method="lm", color="black", linetype="dotted") +
     facet_wrap(~ param, scales="free")
 
 if (gg_save) {
   ggsave(file.path(plot_dir, "gg_genrec_BF.png"), gg_genrec_BF, width=8, height=8)
-  ggsave(file.path(plot_dir, "gg_genrec_RL.png"), gg_genrec_RL, width=12, height=8)
+  ggsave(file.path(plot_dir, "gg_genrec_RL.png"), gg_genrec_RL, width=8, height=8)
 }
 ```
 
