@@ -258,14 +258,16 @@ class AnalyzePSModels:
             try:
                 self.fitted_params_g = pd.read_csv(self.get_file_name('fitted_params_g'), index_col=0)  # TODO comment back in!
                 # self.fitted_params_g = pd.read_csv(self.save_dir + '/g/params_g_RLabcxnplyoqtu_age_z_271_pymc3.csv', index_col=0)
-                # self.fitted_params_g = pd.read_csv(self.save_dir + '/g/params_g_Bbprytv_age_z_271_pymc3.csv', index_col=0)
+                # self.fitted_params_g = pd.read_csv(self.save_dir + '/params_g_Bbsprywtv_age_z_271_pymc3.csv', index_col=0)
+                # self.fitted_params_g = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_g_Bbsprywtv_age_z_271_pymc3.csv', index_col=0)
             except FileNotFoundError:
                 self.fitted_params_g = pd.DataFrame()
 
             if self.fit_mcmc:
                 self.summary = pd.read_csv(self.get_file_name('summary'), index_col=0)  # TODO comment back in!
                 # self.summary = pd.read_csv(self.save_dir + '/g/summary_RLabcxnplyoqtu_age_z_271_pymc3.csv', index_col=0)
-                # self.summary = pd.read_csv(self.save_dir + '/g/summary_Bbprytv_age_z_271_pymc3.csv', index_col=0)
+                # self.summary = pd.read_csv(self.save_dir + '/g/summary_Bbsprytv_age_z_271_pymc3.csv', index_col=0)
+                # self.summary = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/plots/summary_Bbsprywtv_age_z_271_pymc3.csv', index_col=0)
                 self.get_param_names_from_summary()
             if 'RL' in self.file_name:
                 self.fitted_params['alpha_minus_calpha'] = self.fitted_params['alpha'] - self.fitted_params['calpha']
@@ -274,7 +276,7 @@ class AnalyzePSModels:
                 self.indiv_param_names = ['beta', 'persev', 'alpha', 'nalpha', 'calpha', 'cnalpha',
                                           'alpha_minus_calpha', 'alpha_minus_nalpha', 'nalpha_minus_cnalpha']
             elif 'B' in self.file_name:
-                self.indiv_param_names = ['p_reward', 'beta', 'persev']
+                self.indiv_param_names = ['p_reward', 'p_switch', 'beta', 'persev']
 
             # Close all figures
             plt.close('all')
@@ -390,9 +392,15 @@ class AnalyzePSModels:
             if 'n' not in self.model_name:
                 self.fitted_params['nalpha'] = self.fitted_params['alpha']
             if 'c' not in self.model_name:
-                self.fitted_params['calpha'] = 0
+                if '2' in self.model_name:  # RLabcnp2 model (alpha == calpha; nalpha == cnalpha)
+                    self.fitted_params['calpha'] = self.fitted_params['alpha']
+                else:  # RLabcnp model
+                    self.fitted_params['calpha'] = 0
             if 'x' not in self.model_name:
-                self.fitted_params['cnalpha'] = 0
+                if '2' in self.model_name:
+                    self.fitted_params['cnalpha'] = self.fitted_params['nalpha']
+                else:
+                    self.fitted_params['cnalpha'] = 0
 
         if 'B' in self.model_name:
             self.fitted_params['p_noisy'] = 1e-5
@@ -498,7 +506,7 @@ class AnalyzePSModels:
 
 # Main script
 data = {
-    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/genrec/simRLabcnpx/',
+    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/',
     # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/mice/',
     'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv',
     'n_trials': 120,
