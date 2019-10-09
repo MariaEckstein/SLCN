@@ -250,20 +250,25 @@ get_ACC_reward_subj = function(all_files) {
 plot_sample_composition = function(all_files, gg_save, run_regression) {
   
   # Sample composition
-  gg_PDS_composition =
-    ggplot(ddply(all_files, .(sID, PDS, Gender, T134, PreciseYrs), summarize, z=NA), aes(x=factor(1), fill=factor(round(PDS*4)/4))) +
+  dat = ddply(all_files, .(sID, PDS, Gender, log_T, PreciseYrs), summarize, z=NA)
+  gg_age_composition =
+    ggplot(dat, aes(x=factor(1), fill=factor(round(PreciseYrs)))) +
     geom_bar(width=1) + coord_polar("y") +
-    labs(fill="PDS") +
+    labs(fill="Age") +
+    theme(axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          panel.grid  = element_blank()) +
     facet_grid(~ Gender)
   
-  gg_age_composition = gg_PDS_composition + aes(fill=factor(round(PreciseYrs))) + labs(fill="Age")
-  gg_T_composition = gg_PDS_composition + aes(fill=factor(round(log(T134)*3)/3)) + labs(fill="log. Testost.")
+  gg_PDS_composition = gg_age_composition + aes(fill=factor(round(PDS*4)/4)) + labs(fill="PDS")
+  gg_PDS_composition$data = subset(dat, PreciseYrs < 20)
+  gg_T_composition = gg_PDS_composition + aes(fill=factor(round(log_T*3)/3)) + labs(fill="log. Testost.")
   
   # Relationship between predictors
   dat = subset(ages, sID < 300)
   gg_age_PDS = ggplot(dat, aes(PreciseYrs, PDS, color=Gender)) +
     geom_point(size=0.4) +
-    scale_color_manual(values=c("red", "orange")) +
+    # scale_color_manual(values=c("blue", "red")) +
     labs(x="Age", y="PDS", color="Sex")
   gg_age_T = gg_age_PDS + aes(PreciseYrs, log_T) + labs(x="Age", y="Testost.", color="Sex")
   gg_PDS_T = gg_age_PDS + aes(PDS, log_T) + labs(x="PDS", y="Testost.", color="Sex")
@@ -280,9 +285,9 @@ plot_sample_composition = function(all_files, gg_save, run_regression) {
   
   if (gg_save) {
     if (data_name %in% c("human", "fitted_human")) {
-      ggsave(file.path(plot_dir, "/gg_PDS_composition.png"), gg_PDS_composition, width=4, height=2)
-      ggsave(file.path(plot_dir, "/gg_age_composition.png"), gg_age_composition, width=4, height=2)
-      ggsave(file.path(plot_dir, "/gg_T_composition.png"), gg_T_composition, width=6, height=3)
+      ggsave(file.path(plot_dir, "/gg_PDS_composition.png"), gg_PDS_composition, width=16, height=8)
+      ggsave(file.path(plot_dir, "/gg_age_composition.png"), gg_age_composition, width=16, height=8)
+      ggsave(file.path(plot_dir, "/gg_T_composition.png"), gg_T_composition, width=20, height=9)
       png(file.path(plot_dir, "/yrs_age_T_pair_plot.png"))
       pairs(ages[ages$sID < 300, c("PreciseYrs", "PDS", "log_T")], pch = 19, lower.panel=NULL, col=ages$Gender)
       dev.off()
@@ -308,20 +313,55 @@ plot_sample_composition = function(all_files, gg_save, run_regression) {
 
 ```{r Performance over age}
 plot_performance_over_age = function(ACCs, gg_save) {
+  
+  n_subj = sqrt(length(unique(ACCs$sID)))
+  
+  # Prepare data
+  ACCs$stay_fit = -0.25 -0.586402 + 0.171191 * ACCs$PreciseYrs -0.004136 * ACCs$PreciseYrs ^ 2  # results from summary(glmer(same_choice_01_back ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), all_files, binomial)); 10/08/2019; run on all subjects, IDs 12-448, ages 7.77-30
+  # ACCs$stay_fit_low = -0.25 -0.586402 + (0.171191 + 1.96 * 0.040369 / n_subj) * ACCs$PreciseYrs -(0.004136 + 1.96 * 0.001079 / n_subj) * ACCs$PreciseYrs ^ 2
+  # ACCs$stay_fit_hig = -0.25 -0.586402 + (0.171191 - 1.96 * 0.040369 / n_subj) * ACCs$PreciseYrs -(0.004136 - 1.96 * 0.001079 / n_subj) * ACCs$PreciseYrs ^ 2
+  ACCs$stay_fit_low = -0.25 -0.586402 + (0.171191 - 0.040369) * ACCs$PreciseYrs -(0.004136 - 0.001079) * ACCs$PreciseYrs ^ 2
+  ACCs$stay_fit_hig = -0.25 -0.586402 + (0.171191 + 0.040369) * ACCs$PreciseYrs -(0.004136 + 0.001079) * ACCs$PreciseYrs ^ 2
+  
+  ACCs$reward_fit = 35 + 120 * (-0.1233495 + 0.0490270 * ACCs$PreciseYrs -0.0013627 * ACCs$PreciseYrs ^ 2)  # summary(glmer(reward ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), all_files, binomial))
+  ACCs$reward_fit_low = 35 + 120 * (-0.1233495 + (0.0490270 - 0.0130263) * ACCs$PreciseYrs -(0.0013627 - 0.0003473) * ACCs$PreciseYrs ^ 2)
+  ACCs$reward_fit_hig = 35 + 120 * (-0.1233495 + (0.0490270 + 0.0130263) * ACCs$PreciseYrs -(0.0013627 + 0.0003473) * ACCs$PreciseYrs ^ 2)
 
+  ACCs$RT_fit = exp(7.405e+00 -1.694e-01 * ACCs$PreciseYrs + 4.003e-03 * ACCs$PreciseYrs ^ 2)  # summary(lmer(log(RT) ~ PreciseYrs + PreciseYrs2 + (1 | sID), subset(all_files, ACC==T & Gender=="Female")))
+  ACCs$RT_fit_hig = exp(7.405e+00 -(1.694e-01 + 2.267e-02) * ACCs$PreciseYrs + (4.003e-03 + 6.082e-04) * ACCs$PreciseYrs ^ 2)
+  ACCs$RT_fit_low = exp(7.405e+00 -(1.694e-01 - 2.267e-02) * ACCs$PreciseYrs + (4.003e-03 - 6.082e-04) * ACCs$PreciseYrs ^ 2)
+  
+  ACCs$RT_fit[ACCs$Gender == "Male"] = exp(7.193e+00 -1.645e-01 * ACCs$PreciseYrs + 3.870e-03 * ACCs$PreciseYrs ^ 2)[ACCs$Gender == "Male"]  # summary(lmer(log(RT) ~ PreciseYrs + PreciseYrs2 + (1 | sID), subset(all_files, ACC==T & Gender=="Male")))
+  ACCs$RT_fit_hig[ACCs$Gender == "Male"] = exp(7.193e+00 -(1.645e-01 + 3.470e-02) * ACCs$PreciseYrs + (3.870e-03 + 9.184e-04) * ACCs$PreciseYrs ^ 2)[ACCs$Gender == "Male"]
+  ACCs$RT_fit_low[ACCs$Gender == "Male"] = exp(7.193e+00 -(1.645e-01 - 3.470e-02) * ACCs$PreciseYrs + (3.870e-03 - 9.184e-04) * ACCs$PreciseYrs ^ 2)[ACCs$Gender == "Male"]
+  
   # Correct over age
-  gg_ACC_age = ggplot(ACCs, aes(PreciseYrs, mean_ACC, color=Gender)) +
-    geom_point() +
-    geom_smooth()
+  gg_ACC_age =
+    ggplot(ACCs, aes(PreciseYrs, mean_ACC, color=Gender, fill=Gender)) +
+    geom_point()
+    # geom_smooth()
   
   # Stay over age
-  gg_stay_age = gg_ACC_age + aes(y=mean_stay)
-  
+  gg_stay_age =
+    gg_ACC_age + aes(y=mean_stay) +
+      geom_line(aes(y=stay_fit), color='black') +
+      # stat_function(fun = function(x) -0.586402 + 0.171191 * x -0.004136 * x ^ 2, color='black') +  # same as line above
+      geom_ribbon(aes(ymin=stay_fit_low, ymax=stay_fit_hig), linetype=0, fill='black', alpha=0.05) +
+      coord_cartesian(ylim=c(0.35, 0.93))
+
   # Coins won across age
-  gg_reward_age = gg_ACC_age + aes(y=mean_reward * 150)
+  gg_reward_age =
+    gg_ACC_age + aes(y=mean_reward * 120) +  # 120 is number of trials
+      geom_line(aes(y=reward_fit), color='black') +
+      geom_ribbon(aes(ymin=reward_fit_low, ymax=reward_fit_hig), linetype=0, fill='black', alpha=0.05) +
+      coord_cartesian(ylim=c(52, 80))
   
   # RTs across age
-  gg_RT_age = gg_ACC_age + aes(y=median_cor_RT)
+  gg_RT_age =
+    gg_ACC_age + aes(y=median_cor_RT) +
+      geom_line(aes(y=RT_fit)) +
+      geom_ribbon(aes(ymin=RT_fit_low, ymax=RT_fit_hig), linetype=0, alpha=0.1) +
+      coord_cartesian(ylim=c(0, 800))
   
   # Number of switches across age
   gg_switch_age = gg_ACC_age + aes(y=n_switches)
@@ -336,7 +376,6 @@ plot_performance_over_age = function(ACCs, gg_save) {
 }
 
 ```
-
 ```{r Count switches for each participant}
 plot_indivduals_for_exclusion = function(all_files, gg_save, exclude_UCB) {
   
@@ -378,7 +417,7 @@ plot_indivduals_for_exclusion = function(all_files, gg_save, exclude_UCB) {
   gender_excl = sort(subset(ACCs, is.na(Gender))$sID)
   PDS_excl = sort(subset(ACCs, is.na(PDS) & sID < 400)$sID)
   T_excl = sort(subset(ACCs, is.na(T1) & sID < 400)$sID)
-  age_excl = sort(subset(ACCs, is.na(age))$sID)
+  age_excl = sort(subset(ACCs, is.na(PreciseYrs))$sID)
   n_trials_excl = sort(subset(ACCs, n_trials < 120)$sID)
   switch_excl = sort(subset(ACCs, n_switches < 5)$sID)
   ACC_excl = sort(subset(ACCs, mean_ACC < 0.58)$sID)
@@ -386,7 +425,7 @@ plot_indivduals_for_exclusion = function(all_files, gg_save, exclude_UCB) {
   if (exclude_UCB) {
     above30_excl = c(above30_excl, subset(ACCs, sID > 400)$sID)
   }
-  print("Excluding subjetct 1004.")
+  print("Excluding subject 1004.")
   print(paste("Participants missing gender:", paste(gender_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% gender_excl)$PreciseYrs, collapse=', ')))
   # print(paste("Participants missing PDS:", paste(PDS_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% PDS_excl)$PreciseYrs, collapse=', ')))
   # print(paste("Participants missing T:", paste(T_excl, collapse=', '), "unsorted Ages:", paste(subset(ACCs, sID %in% T_excl)$PreciseYrs, collapse=', ')))
@@ -892,7 +931,7 @@ if (data_name == "simulated_human") {
   patt = ".*csv"
   
   for (data_dir in data_dirs) {
-    # data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/simulate/simulations/Bbpr_age_z_271'
+    data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/simulate/simulations/RLabnp2_age_z_271'
     folder_name = strsplit(data_dir, "/")[[1]][length(strsplit(data_dir, "/")[[1]])]
     model_name = strsplit(folder_name, "_")[[1]][1]
     print(model_name)
@@ -1205,60 +1244,6 @@ if (gg_save) {
   ggsave(file.path(plot_dir, "gg_genrec_BF.png"), gg_genrec_BF, width=8, height=8)
   ggsave(file.path(plot_dir, "gg_genrec_RL.png"), gg_genrec_RL, width=12, height=8)
 }
-```
-
-```{r regression ACC / RT ~ age * testosterone}
-
-# Vizualize effects of age and testosterone on ACC & RT
-median_RT = ddply(subset(all_files, ACC=T), .(sID, Gender, PreciseYrs, log_T), RT=median(RT), log_T=median(log_T), z=NA, summarize)
-# gg_age_testosterone =
-  ggplot(median_RT, aes(PreciseYrs, log_T, color=Gender)) + geom_point()
-
-# gg_age_RT =
-  ggplot(subset(median_RT, PreciseYrs<24), aes(PreciseYrs, RT, color=log_T)) + geom_point() + geom_smooth()
-# gg_T_RT =
-  ggplot(subset(median_RT, PreciseYrs<24), aes(log_T, RT, color=Gender)) + geom_point() + geom_smooth()
-
-# gg_age_RT =
-  ggplot(subset(median_RT, PreciseYrs>=11 & PreciseYrs<=14), aes(PreciseYrs, RT, color=log_T)) + geom_point() + geom_smooth()
-# gg_T_RT =
-  ggplot(subset(median_RT, PreciseYrs>=11 & PreciseYrs<=14), aes(log_T, RT, color=Gender)) + geom_point() + geom_smooth()
-
-mean_ACC = ddply(all_files, .(sID, Gender, PreciseYrs, log_T), ACC=mean(ACC), log_T=median(log_T), summarize)
-# gg_age_ACC =
-  ggplot(subset(mean_ACC, PreciseYrs<24), aes(PreciseYrs, ACC, color=log_T)) + geom_point() + geom_smooth()
-# gg_T_ACC =
-  ggplot(subset(mean_ACC, PreciseYrs<24), aes(log_T, ACC, color=Gender)) + geom_point() + geom_smooth()
-  
-# gg_T_PDS =
-  ggplot(subset(all_files, PreciseYrs<20), aes(PDS, log_T, color=PreciseYrs, shape=factor(Gender))) + geom_point()
-
-# z-score predictors
-# Calculate regression models
-reg_dat = subset(all_files, age_group!="25-30")
-# reg_dat = subset(all_files, PreciseYrs>=11 & PreciseYrs<=14)
-# reg_dat = subset(all_files, PreciseYrs<20)
-reg_dat$PreciseYrs_z = (reg_dat$PreciseYrs - mean(reg_dat$PreciseYrs, na.rm=T)) / sd(reg_dat$PreciseYrs, na.rm=T)
-reg_dat$T1_log = log(reg_dat$T1)
-reg_dat$T1_z = (reg_dat$T1_log - mean(reg_dat$T1_log, na.rm=T)) / sd(reg_dat$T1_log, na.rm=T)
-reg_dat$Gender = factor(reg_dat$Gender)
-reg_dat$log_RT = log(reg_dat$RT)
-# reg_dat$pub = (log(reg_dat$T1) - mean(log(reg_dat$T1), na.rm=T)) / sd(log(reg_dat$T1), na.rm=T) + (reg_dat$PDS - mean(reg_dat$PDS, na.rm=T)) / ggplot(reg_dat, aes(PreciseYrs, pub)) + geom_point()
-hist(reg_dat$RT)
-hist(reg_dat$log_RT)
-summary(lmer(log_RT ~ PreciseYrs_z * T1_z + (1 | sID) + (1 | Gender), subset(reg_dat, ACC==T), na.action=na.omit, REML=F, verbose=T))
-summary(glmer(ACC ~ PreciseYrs_z * T1_z + (1 | sID) + (1 | Gender), reg_dat, binomial))
-
-summary(lmer(log_RT ~ PreciseYrs_z + (1 | sID) + (1 | Gender), subset(reg_dat, ACC==T), na.action=na.omit, REML=F, verbose=T))
-summary(glmer(ACC ~ PreciseYrs_z + (1 | sID) + (1 | Gender), reg_dat, binomial))
-
-summary(lmer(log_RT ~ PreciseYrs_z * T1_z + (1 | sID), subset(reg_dat, ACC==T & Gender=="Female"), na.action=na.omit, REML=F, verbose=T))
-summary(lmer(log_RT ~ PreciseYrs_z * T1_z + (1 | sID), subset(reg_dat, ACC==T & Gender=="Male"), na.action=na.omit, REML=F, verbose=T))
-summary(glmer(ACC ~ PreciseYrs_z * T1_z + (1 | sID), subset(reg_dat, Gender=="Female"), binomial))
-summary(glmer(ACC ~ PreciseYrs_z * T1_z + (1 | sID), subset(reg_dat, Gender=="Male"), binomial))
-
-# summary(subset(reg_dat, is.na(T1), select=c("RT", "log_RT", "T1", "T1_z", "PreciseYrs", "PreciseYrs_z"))$T1_z)
-# summary(reg_dat)
 ```
 
 ```{r Fit exponential model to regression weights}
