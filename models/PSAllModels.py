@@ -33,10 +33,11 @@ import itertools
 # ]
 
 model_names = [
+    'RLabnp2lqyt'
     # 'RLabcnplyoqt',
     # 'RLabnp2',
     # 'RLab', 'RLabc', 'RLabcp', 'RLabcpn', 'RLabcnpx',
-    'RLabcxnplyoqtu',
+    # 'RLabcxnplyoqtu',
     # 'RLabcxnp',
     # 'Bbspry',
     # 'Bbsprywtv',
@@ -500,6 +501,11 @@ def create_model(choices, rewards, group, age,
                     else:
                         calpha = pm.Beta('calpha', alpha=1, beta=1, shape=n_subj, testval=0.5 * T.ones(n_subj, dtype='float32'))
                     print("Adding free parameter calpha.")
+
+                elif '2' in model_name:
+                    calpha = pm.Deterministic('calpha', 1 * alpha)
+                    print("Setting calpha = alpha")
+
                 else:
                     calpha = 0
                     print("Setting calpha = 0.")
@@ -515,12 +521,18 @@ def create_model(choices, rewards, group, age,
                         cnalpha_unbound = pm.Deterministic('cnalpha_unbound', cnalpha_intercept[group] + cnalpha_slope[group] * slope_variable + cnalpha_slope2[group] * T.sqr(slope_variable))
                         cnalpha = pm.Deterministic('cnalpha', T.nnet.sigmoid(cnalpha_unbound))
                         print("Drawing slope, intercept, and noise for cnalpha.")
+
                     else:
                         cnalpha = pm.Beta('cnalpha', alpha=1, beta=1, shape=n_subj, testval=0.5 * T.ones(n_subj, dtype='float32'))
                     print("Adding free parameter cnalpha.")
                 # elif 'c' in model_name:
                 #     cnalpha = pm.Deterministic('cnalpha', 1 * calpha)
                 #     print("Setting cnalpha = calpha.")
+
+                elif '2' in model_name:
+                    cnalpha = pm.Deterministic('cnalpha', 1 * nalpha)
+                    print("Setting cnalpha = nalpha")
+
                 else:
                     cnalpha = 0
                     print("Setting cnalpha = 0.")
