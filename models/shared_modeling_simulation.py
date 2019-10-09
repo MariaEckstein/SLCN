@@ -21,8 +21,10 @@ def get_paths(run_on_cluster):
                 'fitting results': base_path + '/ProbSwitch/fitting/',
                 'SLCN info': base_path + '/ProbSwitch/SLCNinfo2.csv',
                 'ages': base_path + '/ProbSwitch/ages.csv',
-                'RL_simulations': base_path + '/ProbSwitch/PSsimulations/RLabcnpx_age_z_271/',
-                'BF_simulations': base_path + '/ProbSwitch/PSsimulations/Bbpr_age_z_271/',
+                # 'RL_simulations': base_path + '/ProbSwitch/PSsimulations/RLabcnp2_age_z_271/',
+                'RL_simulations': base_path + '/ProbSwitch/PSsimulations/RLabnp2_age_z_271/',
+                # 'BF_simulations': base_path + '/ProbSwitch/PSsimulations/Bbpr_age_z_271/',
+                'BF_simulations': base_path + '/ProbSwitch/PSsimulations/Bbspr_age_z_271/',
                 'old simulations': base_path + '/PShumanData/fit_par/',
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
@@ -34,8 +36,10 @@ def get_paths(run_on_cluster):
                 'PS reward versions': base_path + 'data/ProbSwitch_rewardversions.csv',
                 'ages': base_path + 'data/ages.csv',
                 'ages_cluster': base_path + 'data/ages_cluster.csv',
-                'RL_simulations': base_path + '/PShumanData/fitting/map_indiv/new_ML_models/simulate/simulations/RLabcnpx_age_z_271/',
-                'BF_simulations': base_path + '/PShumanData/fitting/map_indiv/new_ML_models/simulate/simulations/Bbpr_age_z_271/',
+                # 'RL_simulations': base_path + '/PShumanData/fitting/map_indiv/new_ML_models/simulate/simulations/RLabcnpx_age_z_271/',
+                # 'BF_simulations': base_path + '/PShumanData/fitting/map_indiv/new_ML_models/simulate/simulations/Bbpr_age_z_271/',
+                'RL_simulations': base_path + '/PShumanData/fitting/map_indiv/new_ML_models/simulate/simulations/RLabnp2_age_z_271/',
+                'BF_simulations': base_path + '/PShumanData/fitting/map_indiv/new_ML_models/simulate/simulations/Bbspr_age_z_271/',
                 'old simulations': base_path + '/PSGenRecCluster/fit_par/',
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
