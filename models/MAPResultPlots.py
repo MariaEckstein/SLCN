@@ -81,6 +81,9 @@ class AnalyzePSModels:
                 pd.DataFrame(self.summary).to_csv(self.get_file_name('summary'))
                 waic = data['WAIC']
                 trace = data['trace']
+                samples_0 = data['trace']._straces[0].samples  # chain 0
+                samples_1 = data['trace']._straces[1].samples  # chain 1
+                samples_all = {key: list(samples_0[key]) + list(samples_1[key]) for key in samples_0.keys()}
                 nll = 0
             else:
                 self.summary = data['map']
@@ -94,6 +97,20 @@ class AnalyzePSModels:
 
             # Get model_name and param_names
             self.get_param_names_from_summary()
+
+            # Get p-values
+            slope_params = []
+            if self.fit_mcmc:
+                if self.indiv_param_names[0] + '_slope' in samples_all.keys():
+                    slope_params = [name + '_slope' for name in self.indiv_param_names]
+                if self.indiv_param_names[0] + '_2_slope' in samples_all.keys():
+                    slope_params += [name + '_2_slope' for name in self.indiv_param_names]
+
+            p_values = pd.DataFrame()
+            for slope_param in slope_params:
+                row = pd.DataFrame(data=[np.mean(np.array(samples_all[slope_param]) > 0)], index=[slope_param], columns=['p'])
+                p_values = p_values.append(row)
+            p_values.to_csv(self.get_file_name('p_values'))
 
             # Add model WAIC score
             self.modelwise_LLs.append([self.model_name, self.slope_variable, self.n_subj, waic, nll])
@@ -128,7 +145,7 @@ class AnalyzePSModels:
                 self.fitted_params.loc[self.fitted_params['Gender'] == 2, 'Gender'] = 'Female'
 
                 # Add '_quant' columns for age, PDS, T1
-                if np.any(self.fitted_params['PreciseYrs'] < 20):
+                if np.any(self.fitted_params['PreciseYrs'] < 18):
                     self.get_quantile_groups('PreciseYrs')
                     self.get_quantile_groups('PDS')
                     self.get_quantile_groups('T1')
@@ -188,6 +205,8 @@ class AnalyzePSModels:
             return "{0}plots/trialwise_LLs_{1}_{2}_{3}_{4}.png".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj, file_name)
         elif file_name == 'subjwise_LLs':
             return "{0}plots/subjwise_LLs{1}.csv".format(self.save_dir, file_name_apx)
+        elif file_name == 'p_values':
+            return "{0}plots/p_values_{1}_{2}_{3}.csv".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj)
         else:
             raise ValueError("File can be 'fitted_params_g', 'fitted_params', or 'summary'. Fix get_file_name().")
 
@@ -257,7 +276,7 @@ class AnalyzePSModels:
 
             try:
                 self.fitted_params_g = pd.read_csv(self.get_file_name('fitted_params_g'), index_col=0)  # TODO comment back in!
-                # self.fitted_params_g = pd.read_csv(self.save_dir + '/g/params_g_RLabcxnplyoqtu_age_z_271_pymc3.csv', index_col=0)
+                # self.fitted_params_g = pd.read_csv(self.save_dir + '/params_g_Bbsprywtv_age_z_291_pymc3.csv', index_col=0)
                 # self.fitted_params_g = pd.read_csv(self.save_dir + '/params_g_Bbsprywtv_age_z_271_pymc3.csv', index_col=0)
                 # self.fitted_params_g = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_g_Bbsprywtv_age_z_271_pymc3.csv', index_col=0)
             except FileNotFoundError:
@@ -265,7 +284,7 @@ class AnalyzePSModels:
 
             if self.fit_mcmc:
                 self.summary = pd.read_csv(self.get_file_name('summary'), index_col=0)  # TODO comment back in!
-                # self.summary = pd.read_csv(self.save_dir + '/g/summary_RLabcxnplyoqtu_age_z_271_pymc3.csv', index_col=0)
+                # self.summary = pd.read_csv(self.save_dir + '/plots/summary_Bbsprywtv_age_z_291_pymc3.csv', index_col=0)
                 # self.summary = pd.read_csv(self.save_dir + '/g/summary_Bbsprytv_age_z_271_pymc3.csv', index_col=0)
                 # self.summary = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/plots/summary_Bbsprywtv_age_z_271_pymc3.csv', index_col=0)
                 self.get_param_names_from_summary()
@@ -273,8 +292,8 @@ class AnalyzePSModels:
                 self.fitted_params['alpha_minus_calpha'] = self.fitted_params['alpha'] - self.fitted_params['calpha']
                 self.fitted_params['alpha_minus_nalpha'] = self.fitted_params['alpha'] - self.fitted_params['nalpha']
                 self.fitted_params['nalpha_minus_cnalpha'] = self.fitted_params['nalpha'] - self.fitted_params['cnalpha']
-                self.indiv_param_names = ['beta', 'persev', 'alpha', 'nalpha', 'calpha', 'cnalpha',
-                                          'alpha_minus_calpha', 'alpha_minus_nalpha', 'nalpha_minus_cnalpha']
+                self.indiv_param_names = ['beta', 'persev', 'alpha', 'nalpha']#, 'calpha', 'cnalpha',
+                                          # 'alpha_minus_calpha', 'alpha_minus_nalpha', 'nalpha_minus_cnalpha']
             elif 'B' in self.file_name:
                 self.indiv_param_names = ['p_reward', 'p_switch', 'beta', 'persev']
 
@@ -506,16 +525,19 @@ class AnalyzePSModels:
 
 # Main script
 data = {
-    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/',
-    # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/mice/',
-    'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv',
-    'n_trials': 120,
+    # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/genrec/simRL/',  #/genrec/simBbspr/',
+    # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/',
+    # 'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv',
+    # 'n_trials': 120,
+    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/mice/',
+    'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv',
+    'n_trials': 780,
     'make_csvs_from_pickle': True,
     'make_analyses': True,
     'make_traceplot': False,
     'make_plots': True,
     'waic_criterion_for_analysis': 1e6,
-    'fit_mcmc': True,
+    'fit_mcmc': False,
     'run_on_humans': True,
 }
 

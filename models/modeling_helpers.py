@@ -124,19 +124,19 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids
             subj_age = SLCNinfo[SLCNinfo['ID'] == sID]['PreciseYrs'].values
             subj_gender = SLCNinfo[SLCNinfo['ID'] == sID]['Gender'].values
             subj_PDS = SLCNinfo[SLCNinfo['ID'] == sID]['PDS'].values
-            subj_T1 = SLCNinfo[SLCNinfo['ID'] == sID]['T1'].values
+            subj_meanT = SLCNinfo[SLCNinfo['ID'] == sID]['meanT'].values
             if not subj_age:
                 subj_age = [np.nan]
             if not subj_gender:
                 subj_gender = [np.nan]
-            age = age.append([[sID, *subj_age, *subj_gender, *subj_PDS, *subj_T1]])
+            age = age.append([[sID, *subj_age, *subj_gender, *subj_PDS, *subj_meanT]])
             file_idx += 1
         else:
             print("file {0} has only {2} rows (minimum is {1}) and will be excluded from analyses!".
                   format(filename, n_trials, agent_data.shape[0]))
 
     # Remove excess columns
-    age.columns = ['sID', 'age', 'gender', 'PDS', 'T1']
+    age.columns = ['sID', 'age', 'gender', 'PDS', 'meanT']
     rewards = np.delete(rewards, range(file_idx, n_subj), 1)
     choices = np.delete(choices, range(file_idx, n_subj), 1)
 
@@ -173,7 +173,7 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids
     idxs_over30 = age['age'] > 30
     idxs_without_gender = np.isnan(age['gender'])
     idxs_without_PDS = np.isnan(age['PDS'])
-    idxs_without_T1 = np.isnan(age['T1'])
+    idxs_without_meanT = np.isnan(age['meanT'])
 
     # Find subjects with outlier performance (checked in R on 2019-06-11)
     # "Participants with n_switches < 5: 45, 102, 1004"
@@ -189,15 +189,15 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids
 
     # Remove marked subjects
     if fit_slopes and kids_and_teens_only:
-        keep = np.invert(idxs_without_age | idxs_without_gender | idxs_with_bad_perf | idxs_without_T1 | idxs_without_PDS)
+        keep = np.invert(idxs_without_age | idxs_without_gender | idxs_with_bad_perf | idxs_without_meanT | idxs_without_PDS)
         print("Subjects {} are missing PDS and are removed from analyses!".format(
             age.loc[idxs_without_PDS, 'sID'].values))
         print(
-            "Subjects {} are missing T1 and are removed from analyses!".format(age.loc[idxs_without_T1, 'sID'].values))
+            "Subjects {} are missing meanT and are removed from analyses!".format(age.loc[idxs_without_meanT, 'sID'].values))
     elif fit_slopes and adults_only:
-        keep = np.invert(idxs_without_age | idxs_over30 | idxs_without_gender | idxs_with_bad_perf | idxs_without_T1)
+        keep = np.invert(idxs_without_age | idxs_over30 | idxs_without_gender | idxs_with_bad_perf | idxs_without_meanT)
         print(
-            "Subjects {} are missing T1 and are removed from analyses!".format(age.loc[idxs_without_T1, 'sID'].values))
+            "Subjects {} are missing meanT and are removed from analyses!".format(age.loc[idxs_without_meanT, 'sID'].values))
     else:
         keep = np.invert(idxs_without_age | idxs_over30 | idxs_without_gender | idxs_with_bad_perf)
     n_subj = np.sum(keep)
@@ -211,13 +211,13 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids
     # z-score age
     age['age_z'] = (age['age'] - np.nanmean(age['age'])) / np.nanstd(age['age'])
     age['PDS_z'] = (age['PDS'] - np.nanmean(age['PDS'])) / np.nanstd(age['PDS'])
-    age['T1_log'] = np.log(age['T1'])
+    age['meanT_log'] = np.log(age['meanT'])
     age['pymc3_idx'] = range(len(age))
     for g in [1, 2]:
-        age.loc[age['gender'] == g, 'T1_z'] = (age.loc[age['gender'] == g, 'T1'] - np.nanmean(
-            age.loc[age['gender'] == g, 'T1'])) / np.nanstd(age.loc[age['gender'] == g, 'T1'])
-        age.loc[age['gender'] == g, 'T1_log_z'] = (age.loc[age['gender'] == g, 'T1_log'] - np.nanmean(
-            age.loc[age['gender'] == g, 'T1_log'])) / np.nanstd(age.loc[age['gender'] == g, 'T1_log'])
+        age.loc[age['gender'] == g, 'meanT_z'] = (age.loc[age['gender'] == g, 'meanT'] - np.nanmean(
+            age.loc[age['gender'] == g, 'meanT'])) / np.nanstd(age.loc[age['gender'] == g, 'meanT'])
+        age.loc[age['gender'] == g, 'meanT_log_z'] = (age.loc[age['gender'] == g, 'meanT_log'] - np.nanmean(
+            age.loc[age['gender'] == g, 'meanT_log'])) / np.nanstd(age.loc[age['gender'] == g, 'meanT_log'])
     pd.DataFrame(age).to_csv(get_paths(run_on_cluster)['ages'], index=False)
     print("Saved ages.csv to {}".format(get_paths(run_on_cluster)['ages']))
 
