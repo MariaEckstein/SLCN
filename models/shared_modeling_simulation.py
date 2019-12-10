@@ -22,9 +22,9 @@ def get_paths(run_on_cluster):
                 'SLCN info': base_path + '/ProbSwitch/SLCNinfo2.csv',
                 'ages': base_path + '/ProbSwitch/ages.csv',
                 # 'RL_simulations': base_path + '/ProbSwitch/PSsimulations/RLabcnp2_age_z_271/',
-                'RL_simulations': base_path + '/ProbSwitch/PSsimulations/RLabnp2_age_z_271/',
+                'RL_simulations': base_path + '/ProbSwitch/PSsimulations/RLabnp2_age_z_291/',
                 # 'BF_simulations': base_path + '/ProbSwitch/PSsimulations/Bbpr_age_z_271/',
-                'BF_simulations': base_path + '/ProbSwitch/PSsimulations/Bbspr_age_z_271/',
+                'BF_simulations': base_path + '/ProbSwitch/PSsimulations/Bbspr_age_z_291/',
                 'old simulations': base_path + '/PShumanData/fit_par/',
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 

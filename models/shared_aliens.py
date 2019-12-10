@@ -10,7 +10,11 @@ rs = RandomStreams()
 
 
 # Initial Q-value for actions and TS
-alien_initial_Q = 1.2
+def get_alien_initial_q(model_name):
+    if model_name == 'Bayes':
+        return 1 / 3
+    else:
+        return 1.2
 
 
 def get_alien_paths(run_on_cluster=False):
@@ -38,18 +42,22 @@ def se(dat):
 def update_Qs_sim(season, alien,
                   Q_low, Q_high,
                   beta, beta_high, alpha, alpha_high, forget, forget_high,
-                  n_subj, n_actions, n_TS, task,
-                  action=[], verbose=False):
+                  n_subj, n_actions, n_TS, task, alien_initial_Q,
+                  model_name, action=[], verbose=False):
 
     # Select TS
     Q_high_sub = Q_high[np.arange(n_subj), season]  # Q_high_sub.shape -> (n_subj, n_TS)
     p_high = softmax(beta_high * Q_high_sub, axis=1)   # p_high.shape -> (n_subj, n_TS)
-    # TS = season  # Flat
-    # TS = 0  # fs
-    # TS = Q_high_sub.argmax(axis=1)  # Hierarchical deterministic
-    TS = np.array([np.random.choice(a=n_TS, p=p_high_subj) for p_high_subj in p_high])  # Hierarchical softmax
+    if model_name == 'flat':
+        TS = season
+    elif model_name == 'fs':
+        TS = 0
+    elif model_name == 'hier_det':
+        TS = Q_high_sub.argmax(axis=1)
+    elif (model_name == 'hier') or (model_name == 'Bayes'):
+        TS = np.array([np.random.choice(a=n_TS, p=p_high_subj) for p_high_subj in p_high])
 
-    # Calculate action probabilities based on TS and select action
+    # Select action
     Q_low_sub = Q_low[np.arange(n_subj), TS, alien]  # Q_low_sub.shape -> [n_subj, n_actions]
     p_low = softmax(beta * Q_low_sub, axis=1)
     if len(action) == 0:  # action can be provided as participant-chosen actions when calculating human values
@@ -60,14 +68,23 @@ def update_Qs_sim(season, alien,
     Q_low = (1 - forget) * Q_low + forget * alien_initial_Q  # Q_low.shape -> [n_subj, n_TS, n_aliens, n_actions]
     Q_high = (1 - forget_high) * Q_high + forget_high * alien_initial_Q
 
-    # Calculate RPEs & update Q-values
-    current_trial_high = np.arange(n_subj), season, TS
-    RPE_high = reward - Q_high[current_trial_high]
-    Q_high[current_trial_high] += alpha_high * RPE_high
-
+    # Update low-level Q-values
     current_trial_low = np.arange(n_subj), TS, alien, action
-    RPE_low = reward - Q_low[current_trial_low]
+    if model_name == 'Bayes':
+        RPE_low = correct - Q_low[current_trial_low]  # TODO Test
+    else:
+        RPE_low = reward - Q_low[current_trial_low]
     Q_low[current_trial_low] += alpha * RPE_low
+
+    # Update high-level Q-values
+    current_trial_high = np.arange(n_subj), season, TS
+    if model_name == 'Bayes':
+        p_r_given_TS_s_a = Q_low.transpose([0, 2, 3, 1])[np.arange(n_subj), alien, action]
+        Q_high[np.arange(n_subj), season] *= p_r_given_TS_s_a  # P(TS|C) *= P(r|TS,s,a) [=Q(a|TS,s)]
+        Q_high[np.arange(n_subj), season] /= np.sum(Q_high[np.arange(n_subj), season], axis=1, keepdims=True)
+    else:
+        RPE_high = reward - Q_high[current_trial_high]
+        Q_high[current_trial_high] += alpha_high * RPE_high
 
     if verbose:
         print("Q_high_sub:\n", Q_high_sub.round(3))
@@ -79,7 +96,7 @@ def update_Qs_sim(season, alien,
         print("reward:", reward)
         print("correct:", correct)
         print("RPE_low:", RPE_low.round(3))
-        print("RPE_high:", RPE_high.round(3))
+        # print("RPE_high:", RPE_high.round(3))
         print("new Q_high_sub:\n", Q_high[np.arange(n_subj), season].round(3))
         print("new Q_low_sub:\n", Q_low[np.arange(n_subj), TS, alien].round(3))
 
@@ -125,17 +142,17 @@ def update_Qs(season, alien, action, reward,
 
 
 def simulate_competition_phase(model_name, final_Q_high, final_Q_low, task,
-                               n_seasons, n_aliens, n_sim, beta_high):
-    n_blocks_comp = 30  # 3 in humans; 30 to get a better signal
+                               n_seasons, n_aliens, n_sim, beta_high, n_blocks_comp=3):
+
     comp_data = pd.DataFrame(np.full((1, 4), np.nan),
                              columns=['perc_selected_better', 'se', 'choice', 'phase'])
 
     # Select between two seasons
-    if model_name == 'hier':
-        Q_season = np.max(final_Q_high, axis=2)  # n_sim x n_seasons (value of highest-valued TS for each season)
+    if (model_name == 'hier') or (model_name == 'Bayes'):
+        Q_season = np.max(final_Q_high, axis=2)  # [n_sim, n_seasons] (value of highest-valued TS for each season)
     elif model_name == 'flat':
-        Q_alien_corr_action = np.max(final_Q_low, axis=3)  # n_sim x n_seasons x n_aliens (alien values if correct action)
-        Q_season = np.mean(Q_alien_corr_action, axis=2)  # n_sim x n_seasons (average over aliens in each season)
+        Q_alien_corr_action = np.max(final_Q_low, axis=3)  # [n_sim, n_seasons, n_aliens] (alien values if correct action)
+        Q_season = np.mean(Q_alien_corr_action, axis=2)  # [n_sim, n_seasons] (average over aliens in each season)
 
     for i, season_pair in enumerate(combinations(range(n_seasons), 2)):
 
@@ -145,31 +162,37 @@ def simulate_competition_phase(model_name, final_Q_high, final_Q_low, task,
 
         # Calculate stats
         selected_better_sim = np.mean(season_choice == min(season_pair), axis=1)
+        # selected_better_sim = p_season[:, 0]  # prob. of choosing lower-numbered [=0-indexed] TS
         selected_better_mean, selected_better_se = np.mean(selected_better_sim), np.std(selected_better_sim) / np.sqrt(len(selected_better_sim))
         comp_data.loc[i] = [selected_better_mean, selected_better_se, str(season_pair), 'season']
 
-    # Select between two aliens in the same season
-    p_TS = softmax(beta_high.reshape(n_sim, 1, 1) * final_Q_high, axis=2)  # n_sim x n_seasons x n_TS (prob. of each TS in each season)
-    Q_alien = np.max(final_Q_low, axis=3)  # n_sim x n_seasons x n_aliens (alien values for correct action)
+    # Select between aliens (same season)
+    p_TS = softmax(beta_high.reshape(n_sim, 1, 1) * final_Q_high, axis=2)  # [n_sim, n_seasons, n_TS] (prob. of each TS in each season)
+    Q_alien = np.max(final_Q_low, axis=3)  # [n_sim, n_TS, n_aliens] (alien values for most-rewarded actions)
+
     for season in range(n_seasons):
-
-        # Select TS for given season
-        if model_name == 'hier':
-            selected_TS = [np.random.choice(a=range(n_seasons), p=p_sim) for p_sim in p_TS[:, season]]  # n_sim (TS selected by each sim)
-        elif model_name == 'flat':
-            selected_TS = season * np.ones(n_sim, dtype=int)
-
-        # Select alien given TS
         for alien_pair in combinations(range(n_aliens), 2):
-            Q_aliens = np.array([Q_alien[np.arange(n_sim), selected_TS, alien] for alien in alien_pair])
-            p_aliens = softmax(Q_aliens, axis=0)
-            alien_choice = np.array([np.random.choice(a=alien_pair, size=n_blocks_comp, p=sim_p) for sim_p in p_aliens.T])
 
-            # Calculate stats
+            # True alien values
             true_Q_aliens = np.max(task.TS[season], axis=1)[list(alien_pair)]
-            if true_Q_aliens[0] != true_Q_aliens[1]:
+            if true_Q_aliens[0] != true_Q_aliens[1]:  # exclude aliens with identical values
+
+                # Select TS
+                if (model_name == 'hier') or (model_name == 'Bayes'):
+                    selected_TS = [np.random.choice(a=range(n_seasons), p=p_sim) for p_sim in
+                                   p_TS[:, season]]  # [n_sim] (TS selected by each sim)
+                elif model_name == 'flat':
+                    selected_TS = season * np.ones(n_sim, dtype=int)
+
+                # Choose alien based on agent's learned alien values
+                Q_aliens = np.array([Q_alien[np.arange(n_sim), selected_TS, alien] for alien in alien_pair]).T  # [n_sim, n_presented_aliens]
+                p_aliens = softmax(Q_aliens, axis=1)
+                alien_choice = np.array([np.random.choice(a=alien_pair, size=n_blocks_comp, p=sim_p) for sim_p in p_aliens])
+
+                # Calculate stats
                 better_alien = alien_pair[np.argmax(true_Q_aliens)]
                 selected_better_sim = np.mean(alien_choice == better_alien, axis=1)
+                # selected_better_sim = p_aliens[:, 0]
                 selected_better_mean, selected_better_se = np.mean(selected_better_sim), np.std(selected_better_sim) / np.sqrt(len(selected_better_sim))
                 comp_data.loc[i+1] = [selected_better_mean, selected_better_se, str(season) + str(alien_pair), 'season-alien']
                 i += 1
@@ -180,26 +203,26 @@ def simulate_competition_phase(model_name, final_Q_high, final_Q_low, task,
 def simulate_rainbow_phase(n_seasons, model_name, n_sim,
                            beta, beta_high, final_Q_low, final_Q_high):
 
-    if model_name == 'hier':
+    if (model_name == 'hier') or (model_name == 'Bayes'):
         # Hierarchical agents first select a TS, then an action within this TS, according to the seen alien.
         # TS are selected by comparing their maximum values, i.e., the values in the season in which they are correct
         # Actions are selected like in the initial learning phase, i.e., by comparing the values of the different
         # actions, given the alien. TS and actions are selected using softmax (rather than, e.g., max).
 
         # Calculate p(TS) <- softmax(Q(TS))
-        Q_TS = np.max(final_Q_high, axis=1)  # n_sim x TS. Find the correct TS in each season.
-        p_TS = softmax(beta_high * Q_TS, axis=1)  # n_sim x TS
+        Q_TS = np.max(final_Q_high, axis=1)  # [n_sim, TS] Find the correct TS in each season.
+        p_TS = softmax(beta_high * Q_TS, axis=1)  # [n_sim, TS]
 
-        # Calculate p(action|alien) <- p(TS) * p(action|alien,TS)
-        final_p_low = softmax(final_Q_low, axis=3)  # TODO: add beta *
+        # Calculate p(action|alien) <- \sum_{TS} p(TS) * p(action|alien,TS)
+        final_p_low = softmax(beta[:, :, np.newaxis, np.newaxis] * final_Q_low, axis=3)
         p_alien_action_TS = p_TS.reshape(n_sim, n_seasons, 1, 1) * final_p_low
         p_alien_action = np.sum(p_alien_action_TS, axis=1)
 
     elif model_name == 'flat':
-        # Flat agents select actions based on how much reward they haven given for this alien, averaged over seasons.
+        # Flat agents select actions based on how much reward they haven gotten for this alien, averaged over seasons.
 
-        Q_alien_action = np.mean(final_Q_low, axis=1)  # n_sim x n_aliens x n_actions. Av. value of each action for each alien
-        p_alien_action = softmax(Q_alien_action, axis=2)  # n_sim x n_aliens x n_actions. Corresponding probabilities
+        Q_alien_action = np.mean(final_Q_low, axis=1)  # [n_sim, n_aliens, n_actions] Av. value of each action for each alien
+        p_alien_action = softmax(Q_alien_action, axis=2)  # [n_sim, n_aliens, n_actions] Corresponding probabilities
 
     # Average over simulations
     rainbow_dat = np.mean(p_alien_action, axis=0)
@@ -271,7 +294,7 @@ def get_summary_initial_learn(seasons, corrects, aliens, actions,
 
     # Get intrusion errors (accuracy according to current TS, previous TS, and other TS)
     first_alien_new_season = aliens[season_changes][1:]  # remove very first round
-    first_action_new_season = actions[season_changes][1:]  # because there is not previous TS
+    first_action_new_season = actions[season_changes][1:]  # because there is no previous TS
     first_acc_new_season = corrects[season_changes][1:]
 
     current_TS = seasons[season_changes][1:]

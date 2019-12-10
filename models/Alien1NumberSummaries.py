@@ -11,27 +11,27 @@ from scipy import stats
 import seaborn as sns
 
 from AlienTask import Task
-from shared_aliens import alien_initial_Q, update_Qs_sim, get_alien_paths,\
+from shared_aliens import get_alien_initial_q, update_Qs_sim, get_alien_paths,\
     get_summary_initial_learn, get_summary_cloudy, simulate_competition_phase, simulate_rainbow_phase, get_summary_rainbow,\
     read_in_human_data, se
 
 
 # Define things
 run_on_cluster = False
-do_analyze_humans = True
+do_analyze_humans = False
 do_calculate_best_summary = False
-do_calculate_summaries = False
+do_calculate_summaries = True
 do_read_in_and_visualize_summaries = True
 do_isomap = False
-do_save_selected_agents = False
+do_save_selected_agents = True
 if do_analyze_humans:
     import seaborn as sns
 if do_isomap:
     from sklearn import manifold, decomposition, preprocessing
-model_name = 'hier'
-models = ['flat', 'hier']
+model_name = 'Bayes'
+models = ['flat', 'hier', 'Bayes']
 n_iter = 1000
-n_sim_per_subj, n_subj = 10, 31  # n_sim_per_sub = 20, n_subj = 31 (version3.1)
+n_sim_per_subj, n_subj = 1, 2  # n_sim_per_sub = 20, n_subj = 31 (version3.1)  # TODO should be 1, 31-x (1 sim per person; exclude excluded subjects)
 n_sim = n_sim_per_subj * n_subj
 n_actions, n_aliens, n_seasons, n_TS = 3, 4, 3, 3
 human_data_path = get_alien_paths()["human data prepr"]
@@ -41,11 +41,11 @@ if model_name == 'hier':
         {'alpha': [0, 1], 'beta': [1, 20], 'forget': [0, 1],
          'alpha_high': [0, 1], 'beta_high': [1, 20], 'forget_high': [0, 1]
          })
-elif model_name == 'flat':
+elif (model_name == 'flat') or (model_name == 'Bayes'):  # TODO Bayes should also have forget_high
     param_names = ['alpha', 'beta', 'forget']
     param_ranges = pd.DataFrame.from_dict({'alpha': [0, 1], 'beta': [1, 20], 'forget': [0, 1]})
 else:
-    raise(NameError, 'model_name must be "flat" or "hier"!')
+    raise(NameError, 'model_name must be "flat", "hier", or "Bayes"!')
 
 IL_cols = ['IL_saving_av', 'IL_saving_first_trial', 'IL_saving_last_trial',  # savings
            'IL_acc_current_TS', 'IL_acc_prev_TS', 'IL_acc_other_TS',  # intrusion errors
@@ -64,15 +64,15 @@ RB_cols = ['RB_alien0_action0', 'RB_alien0_action1', 'RB_alien0_action2',
 RB_sum_cols = ['TS0', 'TS1', 'TS2', 'None', 'TS0_se', 'TS1_se', 'TS2_se', 'None_se', 'TS2minusTS0']
 summary_dat_cols = param_names + IL_cols + CL_cols + CO_cols[:2] + RB_cols
 
-plot_dir = get_alien_paths(run_on_cluster)['fitting results'] + '/SummariesInsteadOfFitting/'
+plot_dir = os.path.join(get_alien_paths(run_on_cluster)['fitting results'], 'SummariesInsteadOfFitting_revision')  # Where will the simulated summary data be saved and read from?
 now = datetime.datetime.now()
 save_id = '{0}_{1}_{2}_{3}'.format(model_name, param_names, [str(i) for i in np.asarray(param_ranges)], '_'.join([str(i) for i in [now.year, now.month, now.day, now.hour, now.minute]]))
 
-plot_save_dir = 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/paperplots/'
+plot_save_dir = os.path.join(plot_dir, 'plots')  # 'C:/Users/maria/MEGAsync/Berkeley/TaskSets/paperplots/'  # where will the plots be saved that we create here to show the distributions of flat and hier, with red line for humans?
 
 # Create task
 task = Task(n_subj)
-n_trials, _, _ = task.get_trial_sequence(get_alien_paths(run_on_cluster)["human data prepr"],
+n_trials, _, _, _, _ = task.get_trial_sequence(get_alien_paths(run_on_cluster)["human data prepr"],
                                          n_subj, n_sim_per_subj, range(n_subj),
                                          phases=("1InitialLearning", "2CloudySeason"))
 
@@ -82,7 +82,7 @@ n_trials_ = {'1InitialLearn': np.sum(task.phase == '1InitialLearning'),
 trials = {'1InitialLearn': range(n_trials_['1InitialLearn']),
           '2CloudySeason': range(n_trials_['1InitialLearn'],
                                  n_trials_['1InitialLearn'] + n_trials_['2CloudySeason']),
-          '4RainbowSeason': range(n_trials_['2CloudySeason'],
+          '4RainbowSeason': range(n_trials_['2CloudySeason'],  # TODO: Why does this work? shouldn't be range(n_trials_['1InitialLearn'] + n_trials_['2CloudySeason'], n_trials_['1InitialLearn'] + n_trials_['2CloudySeason'] + n_trials_['4RainbowSeason'])?
                                   n_trials_['2CloudySeason'] + n_trials_['4RainbowSeason'])}
 
 # Get human data
@@ -192,7 +192,7 @@ if do_analyze_humans:
               plot_name='5Savings.png', figsize=(6, 4),
               ylabel="Savings")
 
-    # Rainbow phase correclation between human and simulated actions
+    # Rainbow phase correlation between human and simulated actions
     rb_cor = np.corrcoef(hum_rainbow_dat[0].flatten(), ag_rainbow_dat.astype(float).flatten())[0, 1]
     stats.pearsonr(hum_rainbow_dat[0].flatten(), ag_rainbow_dat.astype(float).flatten())
 
@@ -222,15 +222,15 @@ if do_analyze_humans:
 
 
 # Function to calculate summaries
-def get_summary(parameters, param_ranges, n_sim, n_subj):
+def get_summary(parameters, param_ranges, n_sim, n_subj, model_name, alien_initial_Q):
 
     # Get parameters
     parameters = param_ranges.loc[0] + (param_ranges.loc[1] - param_ranges.loc[0]) * parameters
 
     beta_shape = (n_sim, 1)  # Q_low_sub.shape -> [n_subj, n_actions]
     beta_high_shape = (n_sim, 1)  # Q_high_sub.shape -> [n_subj, n_TS]
-    forget_high_shape = (n_sim, 1, 1)  # -> [n_subj, n_seasons, n_TS]
     forget_shape = (n_sim, 1, 1, 1)  # Q_low[0].shape -> [n_subj, n_TS, n_aliens, n_actions]
+    forget_high_shape = (n_sim, 1, 1)  # -> [n_subj, n_seasons, n_TS]
 
     alpha = parameters['alpha'] * np.ones(n_sim)
     beta = parameters['beta'] * np.ones(beta_shape)
@@ -264,7 +264,7 @@ def get_summary(parameters, param_ranges, n_sim, n_subj):
             update_Qs_sim(season, alien,
                           Q_low, Q_high,
                           beta, beta_high, alpha, alpha_high, forget, forget_high,
-                          n_sim, n_actions, n_TS, task, verbose=False)
+                          n_sim, n_actions, n_TS, task, alien_initial_Q, model_name, verbose=False)
 
         # Store trial data
         seasons[trial] = season
@@ -319,7 +319,7 @@ def get_summary(parameters, param_ranges, n_sim, n_subj):
         else:
             season_switches = season != old_season
 
-        if model_name == 'hier':
+        if (model_name == 'hier') or (model_name == 'Bayes'):
             Q_high[season_switches] = alien_initial_Q  # re-start search for the right TS when season changes
         elif model_name == 'flat':
             Q_low[season_switches] = alien_initial_Q  # re-learn a new policy from scratch when season changes
@@ -331,7 +331,7 @@ def get_summary(parameters, param_ranges, n_sim, n_subj):
             update_Qs_sim(0 * season, alien,
                           Q_low, Q_high,
                           beta, beta_high, alpha, alpha_high, forget, forget_high,
-                          n_sim, n_actions, n_TS, task)
+                          n_sim, n_actions, n_TS, task, alien_initial_Q, model_name)
 
         # Store trial data
         seasons[trial] = season
@@ -364,6 +364,7 @@ if do_calculate_best_summary:
     print(summary)  # check that it agrees with what we have in the paper! (This is just to double-check that I'm using the right parameters for the simulations!
 
 # Get summaries for different parameters
+alien_initial_Q = get_alien_initial_q(model_name)
 if do_calculate_summaries:
     summaries = pd.DataFrame(np.full((n_iter, len(summary_dat_cols)), np.nan), columns=summary_dat_cols)
     for iter in range(n_iter):
@@ -375,7 +376,7 @@ if do_calculate_summaries:
         # params = [0.1, 0.8, 0]
 
         params = np.random.rand(len(param_names))
-        summaries.loc[iter] = get_summary(params, param_ranges, n_sim, n_subj)
+        summaries.loc[iter] = get_summary(params, param_ranges, n_sim, n_subj, model_name, alien_initial_Q)
 
         # Save summaries to disk (every trial)
         save_path = plot_dir + save_id + '_summaries.csv'
@@ -392,6 +393,7 @@ if do_read_in_and_visualize_summaries:
     filenames = glob.glob(os.path.join(plot_dir, '*.csv'))
     filenames = [filename for filename in filenames if 'alpha' in filename]  # don't read in selected_agents.csv etc.
     print('Reading in {} files.'.format(len(filenames)))
+
     all_summaries = pd.DataFrame(columns=param_names)
     for filename in filenames:
         summaries = pd.read_csv(filename, index_col=0)
