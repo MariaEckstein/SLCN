@@ -153,6 +153,8 @@ def simulate_competition_phase(model_name, final_Q_high, final_Q_low, task,
     elif model_name == 'flat':
         Q_alien_corr_action = np.max(final_Q_low, axis=3)  # [n_sim, n_seasons, n_aliens] (alien values if correct action)
         Q_season = np.mean(Q_alien_corr_action, axis=2)  # [n_sim, n_seasons] (average over aliens in each season)
+    else:
+        raise ValueError("model_name must be 'hier', 'Bayes', or 'flat'.")
 
     for i, season_pair in enumerate(combinations(range(n_seasons), 2)):
 
@@ -380,7 +382,8 @@ def get_summary_cloudy(seasons, corrects, n_sim, trials_cloudy):
 def read_in_human_data(human_data_path, n_trials, n_aliens, n_actions, exclude=False):
     print("Reading in human data from {}!".format(human_data_path))
 
-    file_names = [file_name for file_name in os.listdir(human_data_path) if "pick" not in file_name]
+    file_names = [file_name for file_name in os.listdir(human_data_path)
+                  if ("pick" not in file_name) and (os.path.isfile(os.path.join(human_data_path, file_name)))]
     if exclude:
         old_n_files = len(file_names)
         file_names = [file_name for file_name in file_names if not file_name[-7:-4] in exclude]
