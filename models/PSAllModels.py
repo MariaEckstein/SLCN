@@ -3,73 +3,30 @@ save_dir_appx = 'mice/'
 import itertools
 
 # GET LIST OF MODELS TO RUN
-# # List of selected models
-# slope_appxs_abcnp = []
-# slope_appxs_abcxp = []
-# slope_appxs_bspr = []
-#
-# for i in range(6):
-#     slope_appxs_abcnp.extend([''.join(i) for i in list(itertools.combinations('lyoqt', i))])
-#     slope_appxs_abcxp.extend([''.join(i) for i in list(itertools.combinations('lyout', i))])
-# for i in range(5):
-#     slope_appxs_bspr.extend([''.join(i) for i in list(itertools.combinations('ywtv', i))])
-#
-# model_names = ['RLabcnp' + appx for appx in slope_appxs_abcnp]
-# model_names.extend(['Bbspr' + appx for appx in slope_appxs_bspr])
-# model_names.extend(['RLabcxp' + appx for appx in slope_appxs_abcxp])
-
-# # model_names = ['RLabcnplyoqt', 'RLabcxplyout']
-# # model_names = ['WSLS', 'WSLSy', 'WSLSS', 'WSLSy']
-# model_names = ['Bbsprywvt', 'RLabcnplyoqt'] #  ['Bbsrywv']
-# model_names = ['RLab', 'RLabc', 'RLabcn', 'RLabcnp']
-# model_names = ['RLabcnp']
-# model_names = [
-#     # 'RLabcp', 'RLabcpn', 'RLabxp', 'RLabcpx', 'RLab', 'RLabc',
-#     # 'Bbpr', 'Bbspr', 'Bbsp', 'Bb', 'Bbs',
-#     # 'Bbsprywtv', 'Bbspry', 'Bbspryw', 'Bbsprt', 'Bbsprv',
-#     # 'Bbspr', 'Bbsprywtv',
-#     'RLabcpnlyoqt', 'RLabcpnl', 'RLabcpny', 'RLabcpno', 'RLabcpnq', 'RLabcpnt',
-#     # 'WSLS', 'WSLSS'
-# ]
-
 model_names = [
-    'RLab', 'RLabc', 'RLabcp', 'RLabcpn', 'RLabcpnx', 'RLabnp2',# 'Bbspr',
-    # 'RLabcnplyoqt',
-    # 'RLabnp2',
-    # 'RLab', 'RLabc', 'RLabcp', 'RLabcpn', 'RLabcnpx',
-    # 'RLabcxnplyoqtu',
-    # 'RLabcxnp',
-    # 'Bbspry',
-    # 'Bbsprywtv',
-    # 'RLab', 'RLabcxpS', 'RLabcxpSi', 'RLabcxpSS', 'RLabcxpSSi', 'RLabcxpSm',
+    'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd', 'RLabcpnxd', 'RLabnp2d',
     # 'WSLS', 'WSLSS',
     # 'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
-    # 'RLabcnpx', 'Bbpr',
 ]
 
-# # All possible models
-# model_names = []
-#
-# # Add RL models
-# for c in ['', 'c']:
-#     for n in ['', 'n']:
-#         for x in ['', 'x']:
-#             for p in ['', 'p']:
-#                 for S in ['']:  # , 'S', 'SS']:  # , 'SSS'
-#                     model_names.append('RLab' + c + n + x + p + S)
-#                     if S == 'S' or S == 'SS':
-#                         model_names.append('RLab' + c + n + x + p + S + 'i')
-# #
-# # # Add strategy models
-# # model_names.extend(['WSLS', 'WSLSS'])
-#
-# # Add Bayesian models
-# for s in ['', 's']:
-#     for p in ['', 'p']:
-#         for r in ['', 'r']:
-#             model_names.append('Bb' + s + p + r)
+# Legend for letters -> parameters
+## All models
+# 'b' -> beta; 'y' -> slope
+# 'p' -> choice perseverance / sticky choice; 't' -> slope
+## RL models
+# 'a' -> alpha; 'l' -> slope
+# 'c' -> counterfactual alpha; 'o' -> slope
+# 'n' -> negative alpha; 'q' -> slope
+# 'x' -> counterfactual negative alpha; 'u' -> slope
+# 'd' -> left-bias; 'f' -> slope
+# 'm' -> ???; 'z' -> slope
+## Bayesian models
+# 's' -> p_switch; 'w' -> slope
+# 'r' -> p_reward; 'v' -> slope
 
-print("Getting ready to run {0} models: {1}".format(len(model_names), model_names))
+run_on = 'mice'  # 'humans', 'mice'
+
+print("Getting ready to run {} {} models: {}".format(len(model_names), run_on, model_names))
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -81,7 +38,7 @@ import seaborn as sns
 import theano
 import theano.tensor as T
 from shared_modeling_simulation import *
-from modeling_helpers import load_data, get_save_dir_and_save_id, print_logp_info
+from modeling_helpers import load_data, load_mouse_data, get_save_dir_and_save_id, print_logp_info
 
 floatX = 'float32'
 theano.config.floatX = 'float32'
@@ -270,7 +227,7 @@ def create_model(choices, rewards, group, age,
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
         os.makedirs(save_dir + 'plots/')
-    print("Working on model '{0}', which has {1} free parameters. Save_dir: {2}".format(model_name, n_params, save_dir))
+    print("Working on model '{}', which has {} free parameters. Save_dir: {}".format(model_name, n_params, save_dir))
 
     # Get fixed Q-values for WSLS and WSLSS
     if 'WSLSS' in model_name:  # "stay unless you fail to receive reward twice in a row for the same action."
@@ -281,7 +238,7 @@ def create_model(choices, rewards, group, age,
         Qs = get_WSLS_Qs(n_trials, n_subj)
         Qs = theano.shared(np.asarray(Qs, dtype='float32'))
 
-    print("Compiling models for {0} with {1} samples and {2} tuning steps...\n".format(fitted_data_name, n_samples, n_tune))
+    print("Compiling models for {} {} with {} samples and {} tuning steps...\n".format(n_subj, fitted_data_name, n_samples, n_tune))
     with pm.Model() as model:
         if not fit_individuals:
 
@@ -361,65 +318,6 @@ def create_model(choices, rewards, group, age,
 
         else:  # if fit_individuals == True:
 
-            # beta = pm.Gamma('beta', alpha=1, beta=1, shape=n_subj)
-            #
-            # if 'p' in model_name:
-            #     persev = pm.Normal('persev', mu=0, sd=1, shape=n_subj, testval=0.01 * T.ones(n_subj))
-            # else:
-            #     persev = pm.Deterministic('persev', T.zeros(n_subj, dtype='float32'))
-            #     print("Setting persev = 0.")
-            #
-            # if 'RL' in model_name:
-            #     if 'a' in model_name:
-            #         alpha = pm.Beta('alpha', alpha=1, beta=1, shape=n_subj, testval=0.8 * T.ones(n_subj))
-            #     else:
-            #         alpha = pm.Deterministic('alpha', T.ones(n_subj, dtype='float32'))
-            #         print("Setting alpha = 1.")
-            #
-            #     if 'n' in model_name:
-            #         nalpha = pm.Beta('nalpha', alpha=1, beta=1, shape=n_subj, testval=0.8 * T.ones(n_subj))
-            #     else:
-            #         nalpha = pm.Deterministic('nalpha', 1 * alpha)
-            #         print("Setting nalpha = alpha.")
-            #
-            #     if 'c' in model_name:
-            #         calpha_sc = pm.Beta('calpha_sc', alpha=1, beta=1, shape=n_subj, testval=0.8 * T.ones(n_subj))
-            #     else:
-            #         calpha_sc = 0
-            #         print("Setting calpha_sc = 0.")
-            #
-            #     if 'x' in model_name:
-            #         cnalpha_sc = pm.Beta('cnalpha_sc', alpha=1, beta=1, shape=n_subj, testval=0.8 * T.ones(n_subj))
-            #     elif 'c' in model_name:
-            #         cnalpha_sc = pm.Deterministic('cnalpha_sc', 1 * calpha_sc)
-            #         print("Setting cnalpha_sc = calpha_sc.")
-            #     else:
-            #         cnalpha_sc = 0
-            #         print("Setting cnalpha_sc = 0.")
-            #
-            #     if 'm' in model_name:
-            #         m = pm.Beta('m', alpha=1, beta=1, shape=n_subj, testval=0.8 * T.ones(n_subj))
-            #     else:
-            #         m = pm.Deterministic('m', 0 * alpha)
-            #         print("Setting m = 0.")
-            #
-            #     calpha = pm.Deterministic('calpha', alpha * calpha_sc)
-            #     cnalpha = pm.Deterministic('cnalpha', nalpha * cnalpha_sc)
-            #
-            # elif 'B' in model_name:
-            #     p_noisy = pm.Deterministic('p_noisy', 1e-5 * T.ones(n_subj, dtype='float32'))
-            #     if 's' in model_name:
-            #         p_switch = pm.Beta('p_switch', alpha=1, beta=1, shape=n_subj, testval=0.1 * T.ones(n_subj))
-            #     else:
-            #         p_switch = pm.Deterministic('p_switch', 0.05081582 * T.ones(n_subj))  # checked on 2019-06-03 in R: `mean(all_files$switch_trial)`
-            #         print("Setting p_switch = 0.05081582.")
-            #
-            #     if 'r' in model_name:
-            #         p_reward = pm.Beta('p_reward', alpha=1, beta=1, shape=n_subj, testval=0.8 * T.ones(n_subj))
-            #     else:
-            #         p_reward = pm.Deterministic('p_reward', 0.75 * T.ones(n_subj))  # 0.75 because p_reward is the prob. of getting reward if choice is correct
-            #         print("Setting p_reward = 0.75.")
-
             if 'y' in model_name:  # model with slope
                 beta_intercept = pm.Gamma('beta_intercept', alpha=1, beta=1, shape=n_groups)  # , testval=0.5 * T.ones(n_groups, dtype='int32'))
                 beta_slope = pm.Uniform('beta_slope', lower=-10, upper=10, shape=n_groups, testval=0.5 * T.ones(n_groups, dtype='int32'))
@@ -451,6 +349,22 @@ def create_model(choices, rewards, group, age,
                 persev = pm.Deterministic('persev', T.zeros(n_subj, dtype='float32'))
 
             if 'RL' in model_name:
+                if 'd' in model_name:
+                    if 'f' in model_name:
+                        bias_intercept = pm.Uniform('bias_intercept', lower=-1, upper=1, shape=n_groups, testval=0.1 * T.ones(n_groups, dtype='int32'))
+                        bias_slope = pm.Uniform('bias_slope', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                        if contrast == 'quadratic':
+                            bias_slope2 = pm.Uniform('bias_slope2', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                        else:
+                            bias_slope2 = T.zeros(n_groups, dtype='int16')
+                        bias = pm.Deterministic('bias', bias_intercept[group] + bias_slope[group] * slope_variable + bias_slope2[group] * T.sqr(slope_variable))
+                        print("Drawing slope, intercept, and noise for bias.")
+                    else:
+                        bias = pm.Uniform('bias', lower=-1, upper=1, shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter bias.")
+                else:
+                    bias = pm.Deterministic('bias', T.zeros(n_subj, dtype='float32'))
+
                 if 'a' in model_name:
                     if 'l' in model_name:
                         alpha_intercept = pm.Beta('alpha_intercept', alpha=1, beta=1, shape=n_groups, testval=0.75 * T.ones(n_groups, dtype='int32'))
@@ -669,7 +583,7 @@ def create_model(choices, rewards, group, age,
                                choices[2:], rewards[2:]  # prev_choice, prev_reward (state in S and SS models)
                                ],
                     outputs_info=[p_right],
-                    non_sequences=[n_subj, beta, persev])
+                    non_sequences=[n_subj, beta, persev, bias])
 
             elif n_trials_back == 1:
                 p_right, _ = theano.scan(  # shape: (n_trials-2, n_subj)
@@ -843,71 +757,36 @@ else:
     fit_individuals = True
 
 
-def replace_nans(data, n_trials):
-
-    data = data[:n_trials]
-    data[np.isnan(data)] = np.random.binomial(1, 0.5, np.sum(np.isnan(data)))
-
-    return data
-
-
 # Load behavioral data on which to run the model(s)
 # Run all models
 nll_bics = pd.DataFrame()
 for model_name in model_names:
 
-    # # Load human data
-    # n_subj, rewards, choices, group, n_groups, age = load_data(
-    #     run_on_cluster, n_groups=n_groups, n_subj='all', kids_and_teens_only=kids_and_teens_only,  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
-    #     adults_only=adults_only, n_trials=120,
-    #     fit_slopes=any([i in model_name for i in 'lyouqtwv' for model_name in model_names]))  # make sure I load the same data for every model...
-    #
-    # n_subj, rewards, choices, group, n_groups, age = load_data(
-    #     run_on_cluster, fitted_data_name='BF_simulations', n_groups=n_groups, n_subj='all', kids_and_teens_only=kids_and_teens_only,  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
-    #     adults_only=adults_only, n_trials=120,
-    #     fit_slopes=any([i in model_name for i in 'lyouqtwv' for model_name in model_names]))  # make sure I load the same data for every model...
+    if run_on == 'humans':
 
-    # Load mouse data
-    rewards_j = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PSMouseData/Juvi_Reward.csv').T.values  # row: sessions; cols: trials
-    choices_j = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PSMouseData/Juvi_Choice.csv').T.values
-    rewards_a = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PSMouseData/Adult_Reward.csv').T.values
-    choices_a = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PSMouseData/Adult_Choice.csv').T.values
+        # Load human data
+        n_subj, rewards, choices, group, n_groups, age = load_data(
+            run_on_cluster, n_groups=n_groups, n_subj='all', kids_and_teens_only=kids_and_teens_only,  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
+            adults_only=adults_only, n_trials=120,
+            fit_slopes=any([i in model_name for i in 'lyouqtwv' for model_name in model_names]))  # make sure I load the same data for every model...
 
-    # Clean mouse data
-    n_trials_per_animal = np.sum(np.invert(np.isnan(rewards_j)), axis=0)
-    sns.distplot(n_trials_per_animal)
-    n_trials = np.round(np.percentile(n_trials_per_animal, 0.8)).astype('int')
-    rewards_j = replace_nans(rewards_j, n_trials).astype('int')
-    choices_j = replace_nans(choices_j, n_trials).astype('int')
-    rewards_a = replace_nans(rewards_a, n_trials).astype('int')
-    choices_a = replace_nans(choices_a, n_trials).astype('int')
+        # n_subj, rewards, choices, group, n_groups, age = load_data(
+        #     run_on_cluster, fitted_data_name='BF_simulations', n_groups=n_groups, n_subj='all', kids_and_teens_only=kids_and_teens_only,  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
+        #     adults_only=adults_only, n_trials=120,
+        #     fit_slopes=any([i in model_name for i in 'lyouqtwv' for model_name in model_names]))  # make sure I load the same data for every model...
 
-    # Combine juvenile and adult data
-    rewards = np.hstack([rewards_j, rewards_a])
-    choices = np.hstack([choices_j, choices_a])
+    elif run_on == 'mice':
 
-    n_subj = np.shape(rewards)[1]
-    assert np.shape(rewards) == np.shape(choices)
-    group = np.zeros(n_subj)
-    n_groups = len(np.unique(group))
-    mID_j = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PSMouseData/Juvi_AnimalID.csv').T.values.flatten()
-    mID_a = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PSMouseData/Adult_AnimalID.csv').T.values.flatten()
-    age = pd.DataFrame()
-    age['mID'] = np.concatenate([mID_j, mID_a])
+        # Load mouse data
+        n_subj, rewards, choices, group, n_groups, age = load_mouse_data('C:/Users/maria/MEGAsync/SLCN/PSMouseData/',
+                                                                         first_session_only=False,
+                                                                         fit_sessions_individually=True,
+                                                                         temp_hack=True)
 
-    # Pull out age, gender, etc.
-    # formula: session_ID=[session_ID;animal_idn*100000 + age*100+ (strcmp(animal_gender,'F')+1)*10 + strcmp(animal_treatment,'Juvenile')+1];
-    age['sID'] = round(age['mID'] / 100000)
-    age['age'] = round((age['mID'] - age['sID'] * 100000) / 100)
-    age['Gender'] = (age['mID'] - age['sID'] * 100000 - age['age'] * 100) / 10
-    age['treatment'] = age['mID'] - age['sID'] * 100000 - age['age'] * 100 - age['Gender'] * 10
-    age['age'] = 0
-    age['T1'] = 0
-    age['PDS'] = 0
-    age['PreciseYrs'] = 1000
+    # Saving as csv
     ages_dir = 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv'
     print("Saving ages to " + ages_dir)
-    age.to_csv(ages_dir)
+    age.to_csv(ages_dir, index=False)
 
     # slope_variables = get_slope_variables(model_name, kids_and_teens_only, adults_only)
     slope_variables = ['age_z']  # ['PDS_z', 'meanT_log_z']

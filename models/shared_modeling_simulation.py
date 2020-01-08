@@ -182,7 +182,7 @@ def p_from_Q_0(
         prev_prev_choice, prev_prev_reward,
         prev_choice, prev_reward,
         init_p, n_subj,
-        beta, persev):
+        beta, persev, bias):
 
     # Comment in for p_from_Q_0 (letter models)
     index0 = T.arange(n_subj, dtype='int32'), 0
@@ -192,13 +192,13 @@ def p_from_Q_0(
     Qs0 = Qs[index0]
     Qs1 = Qs[index1]
 
-    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
+    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan
 
     Qs1 = Qs1 + prev_choice * persev
     Qs0 = Qs0 + (one - prev_choice) * persev
 
     # softmax-transform Q-values into probabilities
-    p_right = one / (one + np.exp(beta * (Qs0 - Qs1)))  # 0 = left action; 1 = right action
+    p_right = one / (one + np.exp(beta * (Qs0 - Qs1 + bias)))  # 0 = left action; 1 = right action
     p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
 
     return p_right

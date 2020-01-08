@@ -155,6 +155,7 @@ class AnalyzePSModels:
 
             # Add missing (non-fitted) parameters and save
             self.fill_in_missing_params()
+            self.fitted_params['model'] = self.model_name
             self.fitted_params.to_csv(self.get_file_name('fitted_params'), index=False)
 
             # Create csv for group-level fitted parameters

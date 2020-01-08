@@ -85,6 +85,84 @@ def load_aliens_data(run_on_cluster, fitted_data_name, param_names, file_name_su
     return [n_subj, n_trials, seasons, aliens, actions, rewards, true_params]
 
 
+def replace_nans(data, n_trials):
+
+    data = data[:n_trials]
+    data[np.isnan(data)] = np.random.binomial(1, 0.5, np.sum(np.isnan(data)))
+
+    return data
+
+
+def load_mouse_data(data_dir, first_session_only, fit_sessions_individually, temp_hack=False):
+
+    # Load mouse data
+    rewards_j = pd.read_csv(os.path.join(data_dir, 'Juvi_Reward.csv')).T.values
+    choices_j = pd.read_csv(os.path.join(data_dir, 'Juvi_Choice.csv')).T.values
+    rewards_a = pd.read_csv(os.path.join(data_dir, 'Adult_Reward.csv')).T.values
+    choices_a = pd.read_csv(os.path.join(data_dir, 'Adult_Choice.csv')).T.values
+    fullID_j = pd.read_csv(os.path.join(data_dir, 'Juvi_AnimalID.csv')).T.values.flatten()
+    fullID_a = pd.read_csv(os.path.join(data_dir, 'Adult_AnimalID.csv')).T.values.flatten()
+
+    # Clean mouse data
+    n_trials_per_animal = np.sum(np.invert(np.isnan(rewards_j)), axis=0)
+    sns.distplot(n_trials_per_animal)
+    n_trials = np.round(np.percentile(n_trials_per_animal, 0.8)).astype('int')
+    rewards_j = replace_nans(rewards_j, n_trials).astype('int')
+    choices_j = replace_nans(choices_j, n_trials).astype('int')
+    rewards_a = replace_nans(rewards_a, n_trials).astype('int')
+    choices_a = replace_nans(choices_a, n_trials).astype('int')
+
+    # Combine juvenile and adult data
+    age = pd.DataFrame()
+    age['fullID'] = np.concatenate([fullID_j, fullID_a])
+    rewards = np.hstack([rewards_j, rewards_a])  # rows: trials; cols: sessions & animals
+    choices = np.hstack([choices_j, choices_a])
+    assert np.shape(rewards) == np.shape(choices)
+
+    # Pull out age, gender, etc.
+    # formula: session_ID=[session_ID;animal_idn*100000 + age*100 + (strcmp(animal_gender,'F')+1)*10 + strcmp(animal_treatment,'Juvenile')+1];
+    age['animal'] = [int(str(row)[:-5]) for row in age['fullID']]
+    age['PreciseYrs'] = [int(str(row)[-5:-2]) for row in age['fullID']]
+    age['Gender'] = [int(str(row)[-2:-1]) for row in age['fullID']]
+    age['treatment'] = [int(str(row)[-1:]) for row in age['fullID']]
+
+    # Add more stuff
+    age['session'] = 0
+    for animal in np.unique(age['animal']):
+        n = np.sum(age['animal'] == animal)
+        age.loc[age['animal'] == animal, 'session'] = range(n)
+    age['age_z'] = (age['PreciseYrs'] - np.mean(age['PreciseYrs'])) / np.std(age['PreciseYrs'])
+    age['T1'] = 0
+    age['PDS'] = 0
+
+    # Get groups
+    group = np.zeros(age.shape[0])
+    n_groups = len(np.unique(group))
+
+    # Subset data?
+    if first_session_only:
+        idx = age['session'] == 0
+        age = age.loc[idx]
+        rewards = rewards.T[idx].T
+        choices = choices.T[idx].T
+        group = group[idx]
+    if fit_sessions_individually:
+        age['sID'] = age['fullID']
+    else:
+        age['sID'] = age['animal']
+
+    # Temporary solution to remove double entry of animal 2304312
+    if temp_hack:
+        idx = age['fullID'] != 2304312
+        age = age.loc[idx]
+        rewards = rewards.T[idx].T
+        choices = choices.T[idx].T
+        group = group[idx]
+        n_subj = len(np.unique(age['sID']))
+
+    return n_subj, rewards, choices, group, n_groups, age
+
+
 def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids_and_teens_only=False, adults_only=False,
               n_subj='all', n_trials=120, fit_slopes=False):
 
@@ -221,7 +299,7 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids
     pd.DataFrame(age).to_csv(get_paths(run_on_cluster)['ages'], index=False)
     print("Saved ages.csv to {}".format(get_paths(run_on_cluster)['ages']))
 
-    return [n_subj, rewards, choices, group, n_groups, age]
+    return (n_subj, rewards, choices, group, n_groups, age)
 
 
 def get_save_dir_and_save_id(run_on_cluster, file_name_suff, fitted_data_name, n_samples):
