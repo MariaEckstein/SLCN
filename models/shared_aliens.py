@@ -71,7 +71,7 @@ def update_Qs_sim(season, alien,
     # Update low-level Q-values
     current_trial_low = np.arange(n_subj), TS, alien, action
     if model_name == 'Bayes':
-        RPE_low = correct - Q_low[current_trial_low]  # TODO Test
+        RPE_low = correct - Q_low[current_trial_low]
     else:
         RPE_low = reward - Q_low[current_trial_low]
     Q_low[current_trial_low] += alpha * RPE_low
@@ -292,7 +292,9 @@ def get_summary_initial_learn(seasons, corrects, aliens, actions,
     saving_last_trial = rep_rep[-1, -1] - rep_rep[0, -1]  # last trial only
     saving_av = np.mean(rep_rep[-1] - rep_rep[0])  # average over all 40 trials
 
-    savings = [saving_av, saving_first_trial, saving_last_trial]
+    # savings = [saving_av, saving_first_trial, saving_last_trial]
+    savings = pd.DataFrame(data=[saving_av, saving_first_trial, saving_last_trial],
+                           index=['IL_saving_av', 'IL_saving_first_trial', 'IL_saving_last_trial'])
 
     # Get intrusion errors (accuracy according to current TS, previous TS, and other TS)
     first_alien_new_season = aliens[season_changes][1:]  # remove very first round
@@ -309,10 +311,12 @@ def get_summary_initial_learn(seasons, corrects, aliens, actions,
     acc_prev_TS = task.TS[prev_TS, first_alien_new_season, first_action_new_season] > 1
     acc_other_TS = task.TS[other_TS, first_alien_new_season, first_action_new_season] > 1
 
-    intrusion_errors = [np.mean(acc_current_TS), np.mean(acc_prev_TS), np.mean(acc_other_TS)]
-    intrusion_errors_se = [np.std(np.mean(acc_current_TS, axis=0)) / np.sqrt(n_sim),
-                           np.std(np.mean(acc_prev_TS, axis=0)) / np.sqrt(n_sim),
-                           np.std(np.mean(acc_other_TS, axis=0)) / np.sqrt(n_sim)]
+    intrusion_errors = pd.DataFrame(data=[np.mean(acc_current_TS), np.mean(acc_prev_TS), np.mean(acc_other_TS)],
+                                    index=['IL_acc_current_TS', 'IL_acc_prev_TS', 'IL_acc_other_TS'])
+    intrusion_errors_se = pd.DataFrame(data=[np.std(np.mean(acc_current_TS, axis=0)) / np.sqrt(n_sim),
+                                             np.std(np.mean(acc_prev_TS, axis=0)) / np.sqrt(n_sim),
+                                             np.std(np.mean(acc_other_TS, axis=0)) / np.sqrt(n_sim)],
+                                       index=['IL_acc_current_TS_se', 'IL_acc_prev_TS_se', 'IL_acc_other_TS_se'])
 
     # Get performance index for each TS (% correct for aliens with same value in different TS)
     def get_mean_acc_for_season_alien(season, alien, another_alien=False):
@@ -334,11 +338,14 @@ def get_summary_initial_learn(seasons, corrects, aliens, actions,
 
     # Note: I'm not using aliens with reward == 2 because they all overlap with other TS (TS1->TS2; TS2->TS0)
 
-    TS_acc = np.mean(np.array([Q7_mean_se[:, 0], Q3_mean_se[:, 0]]), axis=0)
-    TS_acc_se = np.mean(np.array([Q7_mean_se[:, 1], Q3_mean_se[:, 1]]), axis=0)
-    TS_corr = np.corrcoef(TS_acc, np.arange(3))
+    TS_acc = pd.DataFrame(data=np.mean(np.array([Q7_mean_se[:, 0], Q3_mean_se[:, 0]]), axis=0),
+                          index=['IL_perf_TS0', 'IL_perf_TS1', 'IL_perf_TS2'])
+    TS_acc_se = pd.DataFrame(data=np.mean(np.array([Q7_mean_se[:, 1], Q3_mean_se[:, 1]]), axis=0),
+                             index=['IL_perf_TS0_se', 'IL_perf_TS1_se', 'IL_perf_TS2_se'])
+    TS_corr = np.corrcoef(TS_acc.values.flatten(), np.arange(3))
+    TS_corr = pd.DataFrame(data=[TS_corr[0, 1]], index=['IL_perf_TS_corr'])
 
-    return savings + intrusion_errors + intrusion_errors_se + list(TS_acc) + list(TS_acc_se) + [TS_corr[0, 1]]
+    return pd.concat([savings, intrusion_errors, intrusion_errors_se, TS_acc, TS_acc_se, TS_corr])
 
 
 def get_summary_cloudy(seasons, corrects, n_sim, trials_cloudy):
@@ -376,7 +383,10 @@ def get_summary_cloudy(seasons, corrects, n_sim, trials_cloudy):
         plt.legend()
         plt.show()
 
-    return list(learning_curve_rep[:4]) + list(learning_curve_rep_se[:4]) + [slope] + list(TS_slopes)
+    return pd.DataFrame(data=list(learning_curve_rep[:4]) + list(learning_curve_rep_se[:4]) + [slope] + list(TS_slopes),
+                        index=['CL_acc_trial0', 'CL_acc_trial1', 'CL_acc_trial2', 'CL_acc_trial3',
+                               'CL_acc_trial0_se', 'CL_acc_trial1_se', 'CL_acc_trial2_se', 'CL_acc_trial3_se',
+                               'CL_slope', 'CL_slope_TS0', 'CL_slope_TS1', 'CL_slope_TS2'])
 
 
 def read_in_human_data(human_data_path, n_trials, n_aliens, n_actions, exclude=False):

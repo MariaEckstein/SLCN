@@ -641,8 +641,8 @@ def get_n_params(model_name, n_subj, n_groups, contrast='linear'):
 
     if 'RL' in model_name:
 
-        # Flat model: subtract 2 letters for 'RL'; remaining chars are free parameters; every subj has 1 param
-        n_params = n_subj * (len(model_name) - 2)
+        # Flat model
+        n_params = n_subj * (len(model_name) - 2)  # subtract 2 letters for 'RL'; every subj has own set of params
 
         if 'SSS' in model_name:
             n_params = n_params - 3 * n_subj  # -3 chars for 'SSS'
@@ -652,20 +652,9 @@ def get_n_params(model_name, n_subj, n_groups, contrast='linear'):
             n_params = n_params - 1 * n_subj
 
         # Slope models
-        if 'z' in model_name:  # slope for m
-            n_params = n_params - 2 * n_subj + n_params_per_group  # not 1 param / subj, but 4 params / group ([slope, int] * [male, female])
-        if 'l' in model_name:  # slope for alpha
-            n_params = n_params - 2 * n_subj + n_params_per_group
-        if 'y' in model_name:  # slope for beta
-            n_params = n_params - 2 * n_subj + n_params_per_group
-        if 'o' in model_name:  # slope for calpha
-            n_params = n_params - 2 * n_subj + n_params_per_group
-        if 'q' in model_name:  # slope for nalpha
-            n_params = n_params - 2 * n_subj + n_params_per_group
-        if 'u' in model_name:  # slope for cnalpha
-            n_params = n_params - 2 * n_subj + n_params_per_group
-        if 't' in model_name:  # slope for persev
-            n_params = n_params - 2 * n_subj + n_params_per_group
+        for slope_letter in ['z', 'l', 'y', 'o', 'q', 'u', 't', 'f']:
+            if slope_letter in model_name:
+                n_params = n_params - 2 * n_subj + n_params_per_group  # not 1 param / subj, but 4 params / group ([slope, int] * [male, female])
 
     elif 'B' in model_name:
 
@@ -673,14 +662,9 @@ def get_n_params(model_name, n_subj, n_groups, contrast='linear'):
         n_params = n_subj * (len(model_name) - 1)  # subtract 1 letter for 'B'
 
         # Slope models
-        if 'y' in model_name:
-            n_params = n_params - 2 * n_subj + n_params_per_group
-        if 'v' in model_name:  # slope for p_reward
-            n_params = n_params - 2 * n_subj + n_params_per_group
-        if 'w' in model_name:  # slope for p_switch
-            n_params = n_params - 2 * n_subj + n_params_per_group
-        if 't' in model_name:  # slope for persev
-            n_params = n_params - 2 * n_subj + n_params_per_group
+        for slope_letter in ['y', 'v', 'w', 't']:
+            if slope_letter in model_name:
+                n_params = n_params - 2 * n_subj + n_params_per_group
 
     elif 'WSLSS' in model_name:
         n_params = len(model_name) - 5
