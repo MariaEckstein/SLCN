@@ -10,7 +10,7 @@ import pickle
 import seaborn as sns
 sns.set(style='whitegrid')
 
-from shared_modeling_simulation import get_paths, get_n_params
+from PSModelFunctions2 import get_paths, get_n_params
 import scipy.stats as stats
 
 
@@ -387,6 +387,8 @@ class AnalyzePSModels:
                 self.indiv_param_names.append('cnalpha')
             if 'p' in self.model_name:
                 self.indiv_param_names.append('persev')
+            if 'd' in self.model_name:
+                self.indiv_param_names.append('bias')
             if 's' in self.model_name:
                 self.indiv_param_names.append('p_switch')
             if 'r' in self.model_name:

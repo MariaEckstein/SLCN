@@ -7,8 +7,8 @@ import seaborn as sns
 sns.set(style='whitegrid')
 
 from PStask import Task
-from shared_modeling_simulation import get_paths, update_Q_sim, get_n_trials_back, p_from_Q_sim, get_WSLS_Qs, get_WSLSS_Qs, get_likelihoods, post_from_lik_sim
-from modeling_helpers import load_data
+from PSModelFunctions2 import get_paths, update_Q_sim, p_from_Q_sim, get_WSLS_Qs, get_WSLSS_Qs, get_likelihoods, post_from_lik_sim#, get_n_trials_back
+from PSModelFunctions3 import load_data
 
 
 def get_parameters(data_dir, file_name, model_name, sID_order, n_subj='all', n_sim_per_subj=2):
@@ -55,7 +55,7 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
 
     # SIMULATE AGENTS ON THE TASK
     # Get n_trials_back
-    n_trials_back = get_n_trials_back(model_name)
+    # n_trials_back = get_n_trials_back(model_name)
 
     # Get reward versions
     reward_versions = pd.read_csv(get_paths(run_on_cluster=False)['PS reward versions'], index_col=0)
@@ -81,23 +81,23 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
     elif 'WSLS' in model_name:
         Qs = get_WSLS_Qs(2, n_sim)[0]
 
-    if n_trials_back == 0:
-        Qs_trials = np.zeros((n_trials, n_sim, 2))
-    elif n_trials_back == 1:
-        Qs_trials = np.zeros((n_trials, n_sim, 2, 2, 2))
-    elif n_trials_back == 2:
-        Qs_trials = np.zeros((n_trials, n_sim, 2, 2, 2, 2, 2))
+    # if n_trials_back == 0:
+    Qs_trials = np.zeros((n_trials, n_sim, 2))
+    # elif n_trials_back == 1:
+    #     Qs_trials = np.zeros((n_trials, n_sim, 2, 2, 2))
+    # elif n_trials_back == 2:
+    #     Qs_trials = np.zeros((n_trials, n_sim, 2, 2, 2, 2, 2))
 
     # Initialize task
     task_info_path = get_paths(run_on_cluster=False)['PS task info']
     task = Task(task_info_path, n_sim)
 
     if not calculate_NLL_from_data:
-        print('\nSimulating {0} {3} agents ({2} simulations each) on {1} trials (n_trials_back = {4}).\n'.format(
-            n_subj, n_trials, n_sim_per_subj, model_name, n_trials_back))
+        print('\nSimulating {0} {3} agents ({2} simulations each) on {1} trials).\n'.format(
+            n_subj, n_trials, n_sim_per_subj, model_name))
     else:
-        print('\nCalculating NLLs for {0} {2} agents on {1} trials (n_trials_back = {3}).'.format(
-            n_subj, n_trials, model_name, n_trials_back))
+        print('\nCalculating NLLs for {0} {2} agents on {1} trials).'.format(
+            n_subj, n_trials, model_name))
 
     for trial in range(n_trials):
 
@@ -108,18 +108,18 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
         # Initialize Q-values
         if 'RL' in model_name:
             if trial <= 2:
-                if n_trials_back == 0:
-                    Qs = 0.5 * np.ones((n_sim, 2))  # shape: (n_sim, n_choice)
-                elif n_trials_back == 1:
-                    if 'i' in model_name:
-                        Qs = get_WSLS_Qs(2, n_sim)[0]
-                    else:
-                        Qs = 0.5 * np.ones((n_sim, 2, 2, 2))  # shape: (n_sim, n_prev_choice, n_prev_reward, n_choice)
-                elif n_trials_back == 2:
-                    if 'i' in model_name:
-                        Qs = get_WSLSS_Qs(2, n_sim)[0]
-                    else:
-                        Qs = 0.5 * np.ones((n_sim, 2, 2, 2, 2, 2))  # shape: (n_sim, n_prev_prev_choice, n_prev_prev_reward, n_prev_choice, n_prev_reward, n_choice)
+                # if n_trials_back == 0:
+                Qs = 0.5 * np.ones((n_sim, 2))  # shape: (n_sim, n_choice)
+                # elif n_trials_back == 1:
+                #     if 'i' in model_name:
+                #         Qs = get_WSLS_Qs(2, n_sim)[0]
+                #     else:
+                #         Qs = 0.5 * np.ones((n_sim, 2, 2, 2))  # shape: (n_sim, n_prev_choice, n_prev_reward, n_choice)
+                # elif n_trials_back == 2:
+                #     if 'i' in model_name:
+                #         Qs = get_WSLSS_Qs(2, n_sim)[0]
+                #     else:
+                #         Qs = 0.5 * np.ones((n_sim, 2, 2, 2, 2, 2))  # shape: (n_sim, n_prev_prev_choice, n_prev_prev_reward, n_prev_choice, n_prev_reward, n_choice)
                 _ = 0  # for theano.scan debug issues
 
             # Update Q-values (starting on third trial)
@@ -130,7 +130,7 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
                     choices[trial - 1], rewards[trial - 1],  # prev_choice, prev_reward -> used for updating Q-values
                     Qs, _,
                     parameters['alpha'], parameters['nalpha'], parameters['calpha'], parameters['cnalpha'],
-                    n_sim, n_trials_back, verbose=verbose)
+                    n_sim, verbose=verbose)
 
         # Translate Q-values into action probabilities
         if 'RL' in model_name or 'WSLS' in model_name:
@@ -143,7 +143,7 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
                     choices[trial - 1], rewards[trial - 1],
                     p_right, n_sim,
                     np.array(parameters['beta']), parameters['persev'],
-                    n_trials_back, verbose=verbose)
+                    verbose=verbose)
 
         elif 'B' in model_name:
             if trial == 0:
@@ -209,22 +209,22 @@ def simulate_model_from_parameters(parameters, data_dir, n_subj, n_trials=120, n
     if 'RL' in model_name and make_plots:
         for subj in range(min(n_sim, 5)):
             plt.figure()
-            if n_trials_back == 0:
-                plt.plot(Qs_trials[:, subj, 0], label='L')
-                plt.plot(Qs_trials[:, subj, 1], label='R')
+            # if n_trials_back == 0:
+            plt.plot(Qs_trials[:, subj, 0], label='L')
+            plt.plot(Qs_trials[:, subj, 1], label='R')
 
-            elif n_trials_back == 1:
-                # what I should see:
-                # LOL & R0R overlap perfectly (also L1L & R1R, L0R & R0L, and L1R & R1L)
-                # L0L & L0R trade off (also L1L & L1R, etc.)
-                plt.plot(Qs_trials[:, subj, 0, 0, 0], label='L0L')
-                plt.plot(Qs_trials[:, subj, 1, 0, 1], label='R0R')
-                plt.plot(Qs_trials[:, subj, 0, 0, 1], label='L0R')
-                plt.plot(Qs_trials[:, subj, 1, 0, 0], label='R0L')
-                plt.plot(Qs_trials[:, subj, 1, 1, 1], label='R1R')
-                plt.plot(Qs_trials[:, subj, 0, 1, 0], label='L1L')
-                plt.plot(Qs_trials[:, subj, 0, 1, 1], label='L1R')
-                plt.plot(Qs_trials[:, subj, 1, 1, 0], label='R1L')
+            # elif n_trials_back == 1:
+            #     # what I should see:
+            #     # LOL & R0R overlap perfectly (also L1L & R1R, L0R & R0L, and L1R & R1L)
+            #     # L0L & L0R trade off (also L1L & L1R, etc.)
+            #     plt.plot(Qs_trials[:, subj, 0, 0, 0], label='L0L')
+            #     plt.plot(Qs_trials[:, subj, 1, 0, 1], label='R0R')
+            #     plt.plot(Qs_trials[:, subj, 0, 0, 1], label='L0R')
+            #     plt.plot(Qs_trials[:, subj, 1, 0, 0], label='R0L')
+            #     plt.plot(Qs_trials[:, subj, 1, 1, 1], label='R1R')
+            #     plt.plot(Qs_trials[:, subj, 0, 1, 0], label='L1L')
+            #     plt.plot(Qs_trials[:, subj, 0, 1, 1], label='L1R')
+            #     plt.plot(Qs_trials[:, subj, 1, 1, 0], label='R1L')
             plt.ylim((0, 1))
             plt.legend()
         plt.show()
