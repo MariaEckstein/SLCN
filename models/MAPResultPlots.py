@@ -69,7 +69,7 @@ class AnalyzePSModels:
 
             # Load pickled model fitting results
             print("\nLoading {0} from {1}".format(file_name, self.save_dir))
-            with open(self.save_dir + file_name, 'rb') as handle:
+            with open(os.path.join(self.save_dir, file_name), 'rb') as handle:
                 data = pickle.load(handle)
 
             # Unpack it
@@ -532,7 +532,7 @@ data = {
     # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/',
     # 'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv',
     # 'n_trials': 120,
-    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/mice/',
+    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/',
     'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv',
     'n_trials': 780,
     'make_csvs_from_pickle': True,

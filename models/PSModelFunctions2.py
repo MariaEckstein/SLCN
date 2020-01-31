@@ -31,7 +31,7 @@ def get_paths(run_on_cluster):
     else:
         base_path = 'C:/Users/maria/MEGAsync/SLCN'
         return {'human data': base_path + 'data/ProbSwitch/',
-                'fitting results': base_path + '/PShumanData/fitting/map_indiv/',
+                'fitting results': base_path + '/PShumanData/fitting/',
                 'SLCN info': base_path + 'data/SLCNinfo2.csv',
                 'PS reward versions': base_path + 'data/ProbSwitch_rewardversions.csv',
                 'ages': base_path + 'data/ages.csv',
@@ -440,8 +440,6 @@ def update_Q_0(
 
 
 def update_Q_sim(
-        prev_prev_choice, prev_prev_reward,
-        prev_choice, prev_reward,
         choice, reward,
         Qs, _,
         alpha, nalpha, calpha, cnalpha,
@@ -452,18 +450,6 @@ def update_Q_sim(
     # if n_trials_back == 0:
     index = np.arange(n_subj), choice
     cindex = np.arange(n_subj), 1 - choice
-
-    # elif n_trials_back == 1:
-    #     index = np.arange(n_subj), prev_choice, prev_reward, choice  # action taken (e.g., left & reward -> left)
-    #     cindex = np.arange(n_subj), prev_choice, prev_reward, 1 - choice  # counterf. action (e.g., left & reward -> right)
-    #     mindex = np.arange(n_subj), 1 - prev_choice, prev_reward, 1 - choice  # mirror action (e.g., right & reward -> right)
-    #     cmindex = np.arange(n_subj), 1 - prev_choice, prev_reward, choice  # counterf. mir. ac. (e.g, right & reward -> left)
-    #
-    # elif n_trials_back == 2:
-    #     index = np.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice  # action taken (e.g., left & reward -> left)
-    #     cindex = np.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice  # counterf. action (e.g., left & reward -> right)
-    #     mindex = np.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice  # mirror action (e.g., right & reward -> right)
-    #     cmindex = np.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice  # counterf. mir. ac. (e.g, right & reward -> left)
 
     # Get reward prediction errors (RPEs)
     RPE = (1 - Qs[index]) * reward  # RPEs for positive outcomes (reward == 1)
@@ -479,13 +465,6 @@ def update_Q_sim(
     # Update counterfactual action
     Qs[cindex] += calpha * cRPE + cnalpha * cnRPE  # add cRPE at all pos. outcomes, and cnRPE at all neg. outcomes
 
-    # if n_trials_back > 0:
-    #     # Update mirror action (comment out for letter models)
-    #     Qs[mindex] += alpha * RPE + nalpha * nRPE
-    #
-    #     # Update counterfactual mirror action (comment out for letter models)
-    #     Qs[cmindex] += calpha * cRPE + cnalpha * cnRPE
-
     if verbose:
         print('upd_Q - index: ', index)
         print('upd_Q - cindex: ', cindex)
@@ -500,32 +479,23 @@ def update_Q_sim(
 
 def p_from_Q_sim(
         Qs,
-        prev_prev_choice, prev_prev_reward,
         prev_choice, prev_reward,
         init_p, n_subj,
         beta, persev,
-        n_trials_back, verbose):
+        verbose):
 
     """Should be the blueprint for the theano functions."""
 
-    if n_trials_back == 0:
-        index0 = np.arange(n_subj, dtype='int32'), 0
-        index1 = np.arange(n_subj, dtype='int32'), 1
+    # if n_trials_back == 0:
+    index0 = np.arange(n_subj, dtype='int32'), 0
+    index1 = np.arange(n_subj, dtype='int32'), 1
 
-    elif n_trials_back == 1:
-        index0 = np.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 0
-        index1 = np.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 1
-
-    elif n_trials_back == 2:
-        index0 = np.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 0
-        index1 = np.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
-
-    # Add perseverance bonus
-    Qs1 = Qs[index1]
+    # Add perseverance bonus (not permanent)
     Qs0 = Qs[index0]
+    Qs1 = Qs[index1]
 
-    Qs1 += prev_choice * persev
     Qs0 += (1 - prev_choice) * persev
+    Qs1 += prev_choice * persev
 
     # softmax-transform Q-values into probabilities
     p_right = 1 / (1 + np.exp(list(beta * (Qs0 - Qs1))))  # 0 = left action; 1 = right action
@@ -617,17 +587,6 @@ def post_from_lik_sim(lik_cor, lik_inc, scaled_persev_bonus,
     # p_r is the actual probability of right, which is the prior for the next trial
     # p_right is p_r after adding perseveration and log-transform, used to select actions
     return p_r, p_right, p_right0
-
-
-def get_n_trials_back(model_name):
-    if 'SSS' in model_name:  # abSSS, etc.
-        return 3
-    elif 'SS' in model_name:  # WSLSS, abSS, etc.
-        return 2
-    elif 'S' in model_name:  # WSLS and abS, abcS, etc.
-        return 1
-    else:  # ab, abc, etc.; Bayes models
-        return 0
 
 
 def get_n_params(model_name, n_subj, n_groups, contrast='linear'):
