@@ -557,6 +557,17 @@ plot_RTs_ACC_choice_rewards_stay = function(all_files, ACC_subj, ACC_subj_block,
   gg_ACC_blocks_PDS = gg_ACC_blocks + aes(group=PDS_group, color=PDS_group) + labs(color="PDS")
   gg_ACC_blocks_T = gg_ACC_blocks + aes(group=T_group, color=T_group) + labs(color="Testost.")
   gg_ACC_blocks_T$data = subset(gg_ACC_blocks$data, !is.na(T_group))
+
+  gg_ACC_blocks_inset = ggplot(subset(ACC_subj, trialsinceswitch==1), aes(age_group, ACC, fill=age_group)) +
+    scale_fill_manual(values=colors_3and1) +
+    stat_summary(geom="bar") +
+    stat_summary() +
+    theme(legend.position = "none") +
+    facet_grid(~ Gender)
+  gg_ACC_blocks_inset_PDS = gg_ACC_blocks_inset + aes(x=PDS_group, fill=PDS_group)
+  gg_ACC_blocks_inset_PDS$data = subset(gg_ACC_blocks_inset_PDS$data, !is.na(PDS_group))
+  gg_ACC_blocks_inset_T = gg_ACC_blocks_inset + aes(x=T_group, fill=T_group)
+  gg_ACC_blocks_inset_T$data = subset(gg_ACC_blocks_inset_T$data, !is.na(T_group))
   
   gg_ACC_block_blocks = gg_ACC_blocks + facet_grid(Gender ~ trial_block)
   gg_ACC_block_blocks$data = ACC_subj_block
@@ -638,6 +649,10 @@ plot_RTs_ACC_choice_rewards_stay = function(all_files, ACC_subj, ACC_subj_block,
     ggsave(file.path(plot_dir, "/stay_plot_block.png"), stay_plot_block, width = 5, height = 3)
     ggsave(file.path(plot_dir, "/stay_plot_PDS.png"), stay_plot_PDS, width = 3.3, height = 2.2 + length(unique(stay_plot$data$model_name)))
     ggsave(file.path(plot_dir, "/stay_plot_T.png"), stay_plot_T, width = 3.3, height = 2.2 + length(unique(stay_plot$data$model_name)))
+    
+    ggsave(file.path(plot_dir, "/gg_ACC_blocks_inset_PDS.png"), gg_ACC_blocks_inset_PDS, width = 2, height = 2 + length(unique(stay_plot$data$model_name)))
+    ggsave(file.path(plot_dir, "/gg_ACC_blocks_inset_T.png"), gg_ACC_blocks_inset_T, width = 2, height = 2 + length(unique(stay_plot$data$model_name)))
+    ggsave(file.path(plot_dir, "/gg_ACC_blocks_inset.png"), gg_ACC_blocks_inset, width = 2, height = 2 + length(unique(stay_plot$data$model_name)))
   }
 }
 ```
@@ -935,6 +950,18 @@ plot_regression = function(nback_regr_dat, gg_save) {
   rewnorew_regr_T = rewnorew_regr + aes(color=T_group) + labs(color="Testost.")
   rewnorew_regr_T$data = subset(rewnorew_regr$data, !is.na(T_group))
   
+  dat = subset(nback_regr_dat, model == "rewardNoReward" & back %in% 1:5)
+  gg_regr_inset = ggplot(subset(dat, back==1 & predictor != "(Intercept)"), aes(age_group, Estimate, fill=age_group)) +
+    stat_summary(geom="bar") +
+    stat_summary() +
+    scale_fill_manual(values=colors_3and1) +
+    theme(legend.position="none") +
+    facet_wrap(predictor ~ Gender, scales="free")
+  gg_regr_inset_PDS = gg_regr_inset + aes(x=PDS_group, fill=PDS_group)
+  gg_regr_inset_PDS$data = subset(gg_regr_inset_PDS$data, !is.na(PDS_group))
+  gg_regr_inset_T = gg_regr_inset + aes(x=T_group, fill=T_group)
+  gg_regr_inset_T$data = subset(gg_regr_inset_T$data, !is.na(T_group))
+
   if (gg_save) {
     ggsave(file.path(plot_dir, "gg_nback_regr_agecats.png"), gg_nback_regr_agecats) #8, height=1 + 2 * length(unique(gg_ACC_blocks$data$model_name)))
     ggsave(file.path(plot_dir, "gg_nback_regr_agecats_sig.png"), gg_nback_regr_agecats_sig) #8, height=1 + 2 * length(unique(gg_ACC_blocks$data$model_name)))
@@ -943,6 +970,10 @@ plot_regression = function(nback_regr_dat, gg_save) {
     ggsave(file.path(plot_dir, "rewnorew_regr_age.png"), rewnorew_regr) #5, height=3 + length(unique(gg_ACC_blocks$data$model_name)))
     ggsave(file.path(plot_dir, "rewnorew_regr_PDS.png"), rewnorew_regr_PDS) #5, height=3 + length(unique(gg_ACC_blocks$data$model_name)))
     ggsave(file.path(plot_dir, "rewnorew_regr_T.png"), rewnorew_regr_T) #5, height=3 + length(unique(gg_ACC_blocks$data$model_name)))
+    
+    ggsave(file.path(plot_dir, "gg_regr_inset.png"), gg_regr_inset, width=2.5, height=3.5)
+    ggsave(file.path(plot_dir, "gg_regr_inset_PDS.png"), gg_regr_inset_PDS, width=2.5, height=3.5)
+    ggsave(file.path(plot_dir, "gg_regr_inset_T.png"), gg_regr_inset_T, width=2.5, height=3.5)
   }
 }
 ```
@@ -964,7 +995,7 @@ desired_columns = c("sID", "version", "selected_box", "p_right", "reward", "RT",
 ages_file_dir = "C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv"
 human_data_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch"
 param_file_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_mcmc_models_cluster"
-dir_to_all_simulations = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/simulate/simulations'
+dir_to_all_simulations = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/new_ML_models/MCMC/clustermodels/simulate/simulations'
 
 # Notes
 # ggsave(..., useDingbats=FALSE) is supposed to help with illustrator problems
@@ -1030,7 +1061,7 @@ if (data_name == "simulated_human") {
   patt = ".*mat"
   
   # Create plot_dir
-  plot_dir = file.path(human_data_dir, "PlotsWithUCB")
+  plot_dir = file.path(human_data_dir, "PlotsWithoutUCB")
   if (!dir.exists(plot_dir)) {
     dir.create(plot_dir)
   }
@@ -1068,6 +1099,86 @@ if (data_name == "simulated_human") {
   nback_regr_dat = run_regressions(all_files_regr)
   plot_regression(nback_regr_dat, gg_save)
 }
+```
+
+```{r Summary analyses for models and humans}
+# Get human data
+plot_dir = file.path(human_data_dir, "PlotsWithoutUCB")
+ages = get_ages(ages_file_dir)
+all_files = get_data(human_data_dir, "human", ".*mat")
+all_files = finish_all_files(all_files, ages)
+excl_subj = plot_indivduals_for_exclusion(all_files, gg_save, exclude_UCB)
+all_files = subset(all_files, !sID %in% excl_subj)
+stuff = get_ACC_reward_subj(all_files)
+ACC_subj = stuff[[1]]
+reward_subj = stuff[[3]]
+all_files_regr = get_regression_dat(all_files)
+nback_regr_dat = run_regressions(all_files_regr)
+
+all_files_regr$model_name = "no_model"
+nback_regr_dat$model_name = "no_model"
+
+# Get simulated data
+data_dirs = list.dirs(dir_to_all_simulations, recursive=F)
+patt = ".*csv"
+
+for (data_dir in data_dirs) {
+  plot_dir = file.path(data_dir, "Plots")
+  folder_name = strsplit(data_dir, "/")[[1]][length(strsplit(data_dir, "/")[[1]])]
+  model_name = strsplit(folder_name, "_")[[1]][1]
+  print(model_name)
+  
+  # Get data
+  ages = get_ages(ages_file_dir)
+  sim_all_files = get_data(data_dir, "simulated_human", ".*csv")
+  sim_all_files = finish_all_files(sim_all_files, ages)
+  
+  # Exclude subjects
+  sim_excl_subj = plot_indivduals_for_exclusion(sim_all_files, gg_save, exclude_UCB)
+  sim_all_files = subset(sim_all_files, !sID %in% sim_excl_subj)
+  
+  # Create summary data
+  sim_stuff = get_ACC_reward_subj(sim_all_files)  # ACC_subj, ACC_subj_block, reward_subj, reward_subj_block, ACCs
+  sim_ACC_subj = sim_stuff[[1]]
+  sim_reward_subj = sim_stuff[[3]]
+  sim_all_files_regr = get_regression_dat(sim_all_files)
+  sim_nback_regr_dat = run_regressions(sim_all_files_regr)
+  
+  sim_all_files_regr$model_name = model_name
+  sim_nback_regr_dat$model_name = model_name
+  sim_reward_subj$model_name = model_name
+  sim_ACC_subj$model_name = model_name
+
+  all_files = rbind(all_files, sim_all_files)
+  reward_subj = rbind(reward_subj, sim_reward_subj)
+  ACC_subj = rbind(ACC_subj, sim_ACC_subj)
+  nback_regr_dat = rbind(nback_regr_dat, sim_nback_regr_dat)
+}
+```
+
+```{r Plot}
+# Plot
+## "Apparent switch trials" (3rd bar of stay_plot)
+ggplot(subset(reward_subj, outcome_21_back=="reward, no reward"), aes(age_group, 100 * stay, group=model_name, color=model_name)) +
+  stat_summary() +
+  stat_summary(geom="line") +
+  facet_grid(~ Gender)
+
+## Asymptotic behavior (non-switch trials in gg_ACC_blocks)
+asymp_trials = c(-3:-2, 3:7)
+ggplot(subset(ACC_subj, trialsinceswitch %in% asymp_trials), aes(age_group, 100 * ACC, group=model_name, color=model_name)) +
+  stat_summary() +
+  stat_summary(geom="line") +
+  facet_grid(~ Gender)
+
+## Effect of positive and negative outcomes (rewnorew_regr)
+dat = subset(nback_regr_dat, model == "rewardNoReward" & back %in% 1:5)
+ggplot(subset(dat, back==1 & predictor != "(Intercept)"), aes(age_group, Estimate, group=model_name, color=model_name)) +
+  stat_summary() +
+  stat_summary(geom="line") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~ predictor, scales="free")
+
 ```
 
 # Run regression models
@@ -1111,27 +1222,22 @@ summary(lmer(same_choice_01_back ~ PDS + Gender + (1 | sID), subset(all_files, o
 summary(lmer(same_choice_01_back ~ logTz + Gender + (1 | sID), subset(all_files, outcome_21_back=='reward, no reward' & PreciseYrs < 18)))
 
 # At the same time, younger participants reached lower long-term performance, as revealed in the significant effect of age on accuracy in a logistic regression in trials 3-7 post-switch (females: all $\beta's > 0.088$, all $p's < 0.43$, males: all $\beta's > 0.099$, all $p's< 0.032$; Fig. \ref{figure:BehaviorHuman}A)
-for (since in c(-3:-2, 3:7)) {
-  print(paste("trials since switch:", since))
-  # print(summary(glmer(ACC ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), subset(all_files, trialsinceswitch == since), binomial)))
-  # print(summary(glmer(ACC ~ PDS + Gender + (1 | sID), subset(all_files, trialsinceswitch == since & PreciseYrs < 18), binomial)))
-  print(summary(glmer(ACC ~ logTz + Gender + (1 | sID), subset(all_files, trialsinceswitch == since & PreciseYrs < 18), binomial)))
-}
+since_dat = subset(all_files, trialsinceswitch %in% c(-3, -2, 3:7))
+print(summary(glmer(ACC ~ PreciseYrs + PreciseYrs2 + Gender + trialsinceswitch + (1 | sID), since_dat, binomial)))
+print(summary(glmer(ACC ~ PDS + Gender + (1 | sID), subset(since_dat, PreciseYrs < 18), binomial)))
+print(summary(glmer(ACC ~ logTz + Gender + (1 | sID), subset(since_dat, PreciseYrs < 18), binomial)))
 
 # Indeed, younger children showed greater sensitivity to negative reward in a logistic regression predicting actions on trial $t+i$ from actions and outcomes on trial $t$, as revealed by significant effect of age on the regression coefficients (females: $\beta=0.54$, $p=0.0026$, males: $\beta=0.33$, $p=0.019$, Fig. \ref{figure:BehaviorHuman}).
-print(summary(lm(Estimate ~ PreciseYrs + PreciseYrs2 + Gender + back, subset(nback_regr_dat, model == "rewardNoReward" & predictor == "reward" & back %in% 1:5))))
-print(summary(lm(Estimate ~ PreciseYrs + PreciseYrs2 + Gender + back, subset(nback_regr_dat, model == "rewardNoReward" & predictor == "noReward" & back %in% 1:5))))
+dat = subset(nback_regr_dat, model == "rewardNoReward" & back %in% 1:5)
+print(summary(lm(Estimate ~ PreciseYrs + PreciseYrs2 + Gender + back, subset(dat, predictor == "reward"))))
+print(summary(lm(Estimate ~ PreciseYrs + PreciseYrs2 + Gender + back, subset(dat, predictor == "noReward"))))
 
-print(summary(lm(Estimate ~ PDS + Gender + back, subset(nback_regr_dat, model == "rewardNoReward" & predictor == "reward" & back %in% 1:5 & PreciseYrs < 18))))
-print(summary(lm(Estimate ~ PDS + Gender + back, subset(nback_regr_dat, model == "rewardNoReward" & predictor == "noReward" & back %in% 1:5 & PreciseYrs < 18))))
-print(summary(lm(Estimate ~ logTz + Gender + back, subset(nback_regr_dat, model == "rewardNoReward" & predictor == "reward" & back %in% 1:5 & PreciseYrs < 18))))
-print(summary(lm(Estimate ~ logTz + Gender + back, subset(nback_regr_dat, model == "rewardNoReward" & predictor == "noReward" & back %in% 1:5 & PreciseYrs < 18))))
-  
-for (backi in 1:5) {
-  print(paste("Back:", backi))
-  # print(summary(lm(Estimate ~ PreciseYrs + PreciseYrs2 + Gender, subset(nback_regr_dat, model == "rewardNoReward" & predictor == "noReward" & back == backi))))
-  print(summary(lm(Estimate ~ PreciseYrs + PreciseYrs2 + Gender, subset(nback_regr_dat, model == "rewardNoReward" & predictor == "reward" & back == backi))))
-}
+teen_dat = subset(nback_regr_dat, model == "rewardNoReward" & back %in% 1:5 & PreciseYrs < 18)
+print(summary(lm(Estimate ~ PDS + Gender + back, subset(teen_dat, predictor == "reward"))))
+print(summary(lm(Estimate ~ PDS + Gender + back, subset(teen_dat, predictor == "noReward"))))
+print(summary(lm(Estimate ~ logTz + Gender + back, subset(teen_dat, predictor == "reward"))))
+print(summary(lm(Estimate ~ logTz + Gender + back, subset(teen_dat, predictor == "noReward"))))
+
 ```
 ```{r}
 # infos = strsplit(colnames(fitted_slopes)[2:length(colnames(fitted_slopes))], "_")
