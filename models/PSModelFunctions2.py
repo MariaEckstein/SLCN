@@ -44,156 +44,97 @@ def get_paths(run_on_cluster):
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}
 
 
-def get_WSLSS_Qs(n_trials, n_subj):
-
-    """code strategy 'stay unless you failed to receive reward twice in a row for the same action.'"""
-
-    Qs = np.zeros((n_trials, n_subj, 2, 2, 2, 2, 2))  # (..., prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice)
-    Qs[:, :, :, :, 1, 1, 1] = 1  # ...     R & 1 -> R
-    Qs[:, :, :, :, 0, 1, 0] = 1  # ...     L & 1 -> L
-    Qs[:, :, 1, 1, 1, 0, 1] = 1  # R & 1 & R & 0 -> R
-    Qs[:, :, 1, 0, 1, 0, 0] = 1  # R & 0 & R & 0 -> L
-    Qs[:, :, 0, 1, 1, 0, 0] = 1  # L & 1 & R & 0 -> L
-    Qs[:, :, 0, 0, 1, 0, 0] = 1  # L & 0 & R & 0 -> L
-    Qs[:, :, 1, 1, 0, 0, 1] = 1  # R & 1 & L & 0 -> R
-    Qs[:, :, 1, 0, 0, 0, 1] = 1  # R & 0 & L & 0 -> R
-    Qs[:, :, 0, 0, 0, 0, 1] = 1  # L & 0 & L & 0 -> R
-    Qs[:, :, 0, 1, 0, 0, 0] = 1  # L & 1 & L & 0 -> L
-    return Qs
-
-
-def get_WSLS_Qs(n_trials, n_subj):
-
-    """code strategy 'stay unless you failed to receive reward twice in a row for the same action.'"""
-
-    Qs = np.zeros((n_trials, n_subj, 2, 2, 2))  # (..., prev_choice, prev_reward, choice)
-    Qs[:, :, 1, 1, 1] = 1  # R & 1 -> R
-    Qs[:, :, 0, 1, 0] = 1  # L & 1 -> L
-    Qs[:, :, 1, 0, 0] = 1  # R & 0 -> L
-    Qs[:, :, 0, 0, 1] = 1  # L & 0 -> R
-    return Qs
-
-
-# def p_from_Q(
-#         Qs,
-#         prev_prev_choice, prev_prev_reward,
-#         prev_choice, prev_reward,
-#         init_p,
-#         n_subj, beta, persev):
+# def get_WSLSS_Qs(n_trials, n_subj):
 #
-#     """This is the 'raw' function. Others are copied from this one."""
+#     """code strategy 'stay unless you failed to receive reward twice in a row for the same action.'"""
 #
-#     # Comment in for p_from_Q_0 (letter models)
-#     index0 = T.arange(n_subj, dtype='int32'), 0
-#     index1 = T.arange(n_subj, dtype='int32'), 1
+#     Qs = np.zeros((n_trials, n_subj, 2, 2, 2, 2, 2))  # (..., prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice)
+#     Qs[:, :, :, :, 1, 1, 1] = 1  # ...     R & 1 -> R
+#     Qs[:, :, :, :, 0, 1, 0] = 1  # ...     L & 1 -> L
+#     Qs[:, :, 1, 1, 1, 0, 1] = 1  # R & 1 & R & 0 -> R
+#     Qs[:, :, 1, 0, 1, 0, 0] = 1  # R & 0 & R & 0 -> L
+#     Qs[:, :, 0, 1, 1, 0, 0] = 1  # L & 1 & R & 0 -> L
+#     Qs[:, :, 0, 0, 1, 0, 0] = 1  # L & 0 & R & 0 -> L
+#     Qs[:, :, 1, 1, 0, 0, 1] = 1  # R & 1 & L & 0 -> R
+#     Qs[:, :, 1, 0, 0, 0, 1] = 1  # R & 0 & L & 0 -> R
+#     Qs[:, :, 0, 0, 0, 0, 1] = 1  # L & 0 & L & 0 -> R
+#     Qs[:, :, 0, 1, 0, 0, 0] = 1  # L & 1 & L & 0 -> L
+#     return Qs
 #
-#     # Comment in for p_from_Q_1 (WSLS, abS, etc.)
-#     index0 = T.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 0
-#     index1 = T.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 1
 #
-#     # Comment in for p_from_Q_2 (WSLSS, abSS, etc.)
-#     index0 = T.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 0
-#     index1 = T.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
+# def get_WSLS_Qs(n_trials, n_subj):
 #
-#     # Comment in for p_from_Q_3 (WSLSS, abSS, etc.)
-#     index0 = T.arange(n_subj, dtype='int32'), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 0
-#     index1 = T.arange(n_subj, dtype='int32'), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
+#     """code strategy 'stay unless you failed to receive reward twice in a row for the same action.'"""
 #
-#     # Add perseverance bonus
-#     Qs0 = Qs[index0]
-#     Qs1 = Qs[index1]
+#     # Qs = np.zeros((n_trials, n_subj, 2, 2, 2))  # (..., prev_choice, prev_reward, choice)
+#     # Qs[:, :, 1, 1, 1] = 1  # R & 1 -> R
+#     # Qs[:, :, 0, 1, 0] = 1  # L & 1 -> L
+#     # Qs[:, :, 1, 0, 0] = 1  # R & 0 -> L
+#     # Qs[:, :, 0, 0, 1] = 1  # L & 0 -> R
 #
-#     one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
-#     # upcast problem 1: (np.array(1, dtype='float32') + np.array(1, dtype='int32')).dtype >>> dtype('float64')
-#     # fix: (np.array(1, dtype='float32') + np.array(1, dtype='int16')).dtype >>> dtype('float32')
-#     # upcast problem 2: (1 - np.array(1, dtype='float32')).dtype >>> dtype('float64')
-#     # fix (np.array(1, dtype='int16') - np.array(1, dtype='float32')).dtype >>> dtype('float32')
-#
-#     Qs1 = Qs1 + prev_choice * persev  # upcast problem 1
-#     Qs0 = Qs0 + (one - prev_choice) * persev  # upcast problem 2
-#
-#     # softmax-transform Q-values into probabilities
-#     p_right = one / (one + np.exp(beta * (Qs0 - Qs1)))  # 0 = left action; 1 = right action
-#     p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
-#
-#     return p_right
+#     Qs = np.zeros((n_trials, n_subj, 2))  # (n_trials, n_subj, choice)
+#     Qs[:, :, 1, 1, 1] = 1  # R & 1 -> R
+#     Qs[:, :, 0, 1, 0] = 1  # L & 1 -> L
+#     Qs[:, :, 1, 0, 0] = 1  # R & 0 -> L
+#     Qs[:, :, 0, 0, 1] = 1  # L & 0 -> R
+#     return Qs
 
 
-# def update_Q(
-#         prev_prev_choice, prev_prev_reward,
-#         prev_choice, prev_reward,
-#         choice, reward,
-#         Qs, _,
-#         alpha, nalpha, calpha, cnalpha, m, n_subj):
-#
-#     """This is the 'raw' function. Others are copied from this one."""
-#
-#     # Comment in for update_Q_0 (letter models)
-#     index = T.arange(n_subj), choice
-#     cindex = T.arange(n_subj), 1 - choice
-#
-#     # Comment in for update_Q_1 (WSLS, abS, etc.)
-#     index = T.arange(n_subj), prev_choice, prev_reward, choice  # action taken (e.g., left & reward -> left)
-#     mindex = T.arange(n_subj), 1 - prev_choice, prev_reward, 1 - choice  # mirror action (e.g., right & reward -> right)
-#     cindex = T.arange(n_subj), prev_choice, prev_reward, 1 - choice  # counterf. action (e.g., left & reward -> right)
-#     cmindex = T.arange(n_subj), 1 - prev_choice, prev_reward, choice  # counterf. mir. ac. (e.g, right & reward -> left)
-#
-#     # Comment in for update_Q_2 (WSLSS, abSS, etc.)
-#     index = T.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice
-#     mindex = T.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice
-#     cindex = T.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice
-#     cmindex = T.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
-#
-#     # Comment in for update_Q_3 (WSLSS, abSS, etc.)
-#     index = T.arange(n_subj), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice
-#     mindex = T.arange(n_subj), 1 - prev_prev_prev_choice, prev_prev_prev_reward, 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice
-#     cindex = T.arange(n_subj), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice
-#     cmindex = T.arange(n_subj), 1 - prev_prev_prev_choice, prev_prev_prev_reward, 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
-#
-#     # Get reward prediction errors (RPEs)
-#     RPE = (1 - Qs[index]) * reward  # RPEs for positive outcomes (reward == 1)
-#     nRPE = (0 - Qs[index]) * (1 - reward)  # RPEs for negative outcomes (reward == 0)
-#
-#     # Get counterfactual prediction errors (cRPEs)
-#     cRPE = (0 - Qs[cindex]) * reward  # actual reward was 1; I think I would have gotten 0 for the other action
-#     cnRPE = (1 - Qs[cindex]) * (1 - reward)  # actual reward 0; would have gotten 1 for the other action
-#
-#     # Update action taken
-#     Qs = T.set_subtensor(Qs[index],
-#                          Qs[index] + alpha * RPE + nalpha * nRPE)  # add RPE for pos. & nRPE for neg. outcomes
-#
-#     # Update counterfactual action
-#     Qs = T.set_subtensor(Qs[cindex],
-#                          Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)  # add cRPE for pos. & cnRPE for neg. outcomes
-#
-#     # Update mirror action (comment out for letter models)
-#     Qs = T.set_subtensor(Qs[mindex],
-#                          Qs[mindex] + m * (alpha * RPE + nalpha * nRPE))
-#
-#     # Update counterfactual mirror action (comment out for letter models)
-#     Qs = T.set_subtensor(Qs[cmindex],
-#                          Qs[cmindex] + m * (calpha * cRPE + cnalpha * cnRPE))
-#
-#     return Qs, _
-
-
-def p_from_Q_0(
-        Qs,
-        prev_prev_choice, prev_prev_reward,
-        prev_choice, prev_reward,
-        init_p, n_subj,
-        beta, persev, bias):
-
-    # Comment in for p_from_Q_0 (letter models)
-    index0 = T.arange(n_subj, dtype='int32'), 0
-    index1 = T.arange(n_subj, dtype='int32'), 1
-
-    # Add perseverance bonus
-    Qs0 = Qs[index0]
-    Qs1 = Qs[index1]
+def p_from_prev_WSLS(prev_choice, prev_reward, p_right, beta, bias):
 
     one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan
 
+    r1 = prev_choice * prev_reward  # r1: right, reward
+    r0 = prev_choice * (one - prev_reward)  # r0: right, no reward
+    l1 = (one - prev_choice) * prev_reward  # l1: left, reward
+    l0 = (one - prev_choice) * (one - prev_reward)  # l0: left, no reward
+
+    p_right = one / (one + np.exp(beta * (l1 + r0 - r1 - l0 + bias)))
+
+    return p_right
+
+
+def p_from_prev_WSLSS(prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, p_right, beta, bias):
+
+    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan
+
+    # Makes you choose left
+    l1 = (one - prev_choice) * prev_reward
+    r0r0 = prev_prev_choice * (one - prev_prev_reward) * prev_choice * (one - prev_reward)
+    l1r0 = (one - prev_prev_choice) * prev_prev_reward * prev_choice * (one - prev_reward)
+    l0r0 = (one - prev_prev_choice) * (one - prev_prev_reward) * prev_choice * (one - prev_choice)
+    l1l0 = (one - prev_prev_choice) * prev_prev_reward * (one - prev_choice) * (one - prev_reward)
+
+    # Makes you choose right
+    r1 = prev_choice * prev_reward
+    l0l0 = (one - prev_prev_choice) * (one - prev_prev_reward) * (one - prev_choice) * (one - prev_reward)
+    r1l0 = prev_prev_choice * prev_prev_reward * (one - prev_choice) * (one - prev_reward)
+    r0l0 = prev_prev_choice * (one - prev_prev_reward) * (one - prev_choice) * (one - prev_reward)
+    r1r0 = prev_prev_choice * prev_prev_reward * prev_choice * (one - prev_reward)
+
+    theano.printing.Print('all')(l1 + r0r0 + l1r0 + l0r0 + l1l0 + r1 + l0l0 + r1l0 + r0l0 + r1r0)
+
+    p_right = one / (one + np.exp(beta * (l1 + r0r0 + l1r0 + l0r0 + l1l0 - r1 - l0l0 - r1l0 - r0l0 - r1r0 + bias)))
+
+    return p_right
+
+
+def p_from_Q(
+        Qs,
+        # prev_prev_choice, prev_prev_reward,
+        prev_choice, #prev_reward,
+        init_p, n_subj,
+        beta, persev, bias):
+
+    # index0 = T.arange(n_subj, dtype='int32'), 0
+    # index1 = T.arange(n_subj, dtype='int32'), 1
+
+    Qs0 = Qs[T.arange(n_subj, dtype='int32'), 0]  # left
+    Qs1 = Qs[T.arange(n_subj, dtype='int32'), 1]  # right
+
+    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan
+
+    # Add perseverance bonus
     Qs1 = Qs1 + prev_choice * persev
     Qs0 = Qs0 + (one - prev_choice) * persev
 
@@ -204,93 +145,9 @@ def p_from_Q_0(
     return p_right
 
 
-# def p_from_Q_1(
-#         Qs,
-#         prev_prev_choice, prev_prev_reward,
-#         prev_choice, prev_reward,
-#         init_p, n_subj,
-#         beta, persev):
-#
-#     # Comment in for p_from_Q_1 (WSLS, abS, etc.)
-#     index0 = T.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 0
-#     index1 = T.arange(n_subj, dtype='int32'), prev_choice, prev_reward, 1
-#
-#     # Add perseverance bonus
-#     Qs0 = Qs[index0]
-#     Qs1 = Qs[index1]
-#
-#     one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
-#
-#     Qs1 = Qs1 + prev_choice * persev
-#     Qs0 = Qs0 + (one - prev_choice) * persev
-#
-#     # softmax-transform Q-values into probabilities
-#     p_right = one / (one + np.exp(beta * (Qs0 - Qs1)))  # 0 = left action; 1 = right action
-#     p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
-#
-#     return p_right
-#
-#
-# def p_from_Q_2(
-#         Qs,
-#         prev_prev_choice, prev_prev_reward,
-#         prev_choice, prev_reward,
-#         init_p, n_subj,
-#         beta, persev):
-#
-#     # Comment in for p_from_Q_2 (WSLSS, abSS, etc.)
-#     index0 = T.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 0
-#     index1 = T.arange(n_subj, dtype='int32'), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
-#
-#     # Add perseverance bonus
-#     Qs0 = Qs[index0]
-#     Qs1 = Qs[index1]
-#
-#     one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
-#
-#     Qs1 = Qs1 + prev_choice * persev
-#     Qs0 = Qs0 + (one - prev_choice) * persev
-#
-#     # softmax-transform Q-values into probabilities
-#     p_right = one / (one + np.exp(beta * (Qs0 - Qs1)))  # 0 = left action; 1 = right action
-#     p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
-#
-#     return p_right
-#
-#
-# def p_from_Q_3(
-#         Qs,
-#         prev_prev_prev_choice, prev_prev_prev_reward,
-#         prev_prev_choice, prev_prev_reward,
-#         prev_choice, prev_reward,
-#         init_p, n_subj,
-#         beta, persev):
-#
-#     """Draft - not tested"""
-#
-#     # Comment in for p_from_Q_3 (WSLSS, abSS, etc.)
-#     index0 = T.arange(n_subj, dtype='int32'), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 0
-#     index1 = T.arange(n_subj, dtype='int32'), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1
-#
-#     # Add perseverance bonus
-#     Qs0 = Qs[index0]
-#     Qs1 = Qs[index1]
-#
-#     one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan, e.g.:
-#
-#     Qs1 = Qs1 + prev_choice * persev
-#     Qs0 = Qs0 + (one - prev_choice) * persev
-#
-#     # softmax-transform Q-values into probabilities
-#     p_right = one / (one + np.exp(beta * (Qs0 - Qs1)))  # 0 = left action; 1 = right action
-#     p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
-#
-#     return p_right
-
-
-def update_Q_0(
-        prev_prev_choice, prev_prev_reward,
-        prev_choice, prev_reward,
+def update_Q(
+        # prev_prev_choice, prev_prev_reward,
+        # prev_choice, prev_reward,
         choice, reward,
         Qs, _,
         alpha, nalpha, calpha, cnalpha, n_subj):
@@ -316,127 +173,6 @@ def update_Q_0(
                          Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)  # add cRPE for pos. & cnRPE for neg. outcomes
 
     return Qs, _
-
-
-# def update_Q_1(
-#         prev_prev_choice, prev_prev_reward,
-#         prev_choice, prev_reward,
-#         choice, reward,
-#         Qs, _,
-#         alpha, nalpha, calpha, cnalpha, m, n_subj):
-#
-#     # Comment in for update_Q_1 (WSLS, abS, etc.)
-#     index = T.arange(n_subj), prev_choice, prev_reward, choice  # action taken (e.g., left & reward -> left)
-#     mindex = T.arange(n_subj), 1 - prev_choice, prev_reward, 1 - choice  # mirror action (e.g., right & reward -> right)
-#     cindex = T.arange(n_subj), prev_choice, prev_reward, 1 - choice  # counterf. action (e.g., left & reward -> right)
-#     cmindex = T.arange(n_subj), 1 - prev_choice, prev_reward, choice  # counterf. mir. ac. (e.g, right & reward -> left)
-#
-#     # Get reward prediction errors (RPEs)
-#     RPE = (1 - Qs[index]) * reward  # RPEs for positive outcomes (reward == 1)
-#     nRPE = (0 - Qs[index]) * (1 - reward)  # RPEs for negative outcomes (reward == 0)
-#
-#     # Get counterfactual prediction errors (cRPEs)
-#     cRPE = (0 - Qs[cindex]) * reward  # actual reward was 1; I think I would have gotten 0 for the other action
-#     cnRPE = (1 - Qs[cindex]) * (1 - reward)  # actual reward 0; would have gotten 1 for the other action
-#
-#     # Update action taken
-#     Qs = T.set_subtensor(Qs[index],
-#                          Qs[index] + alpha * RPE + nalpha * nRPE)  # add RPE for pos. & nRPE for neg. outcomes
-#
-#     # Update counterfactual action
-#     Qs = T.set_subtensor(Qs[cindex],
-#                          Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)  # add cRPE for pos. & cnRPE for neg. outcomes
-#
-#     # Update mirror action (comment out for letter models)
-#     Qs = T.set_subtensor(Qs[mindex],
-#                          Qs[mindex] + m * (alpha * RPE + nalpha * nRPE))
-#
-#     # Update counterfactual mirror action (comment out for letter models)
-#     Qs = T.set_subtensor(Qs[cmindex],
-#                          Qs[cmindex] + m * (calpha * cRPE + cnalpha * cnRPE))
-#
-#     return Qs, _
-#
-#
-# def update_Q_2(
-#         prev_prev_choice, prev_prev_reward,
-#         prev_choice, prev_reward,
-#         choice, reward,
-#         Qs, _,
-#         alpha, nalpha, calpha, cnalpha, m, n_subj):
-#
-#     # Comment in for update_Q_2 (WSLSS, abSS, etc.)
-#     index = T.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice
-#     mindex = T.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice
-#     cindex = T.arange(n_subj), prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice
-#     cmindex = T.arange(n_subj), 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
-#
-#     # Get reward prediction errors (RPEs)
-#     RPE = (1 - Qs[index]) * reward  # RPEs for positive outcomes (reward == 1)
-#     nRPE = (0 - Qs[index]) * (1 - reward)  # RPEs for negative outcomes (reward == 0)
-#
-#     # Get counterfactual prediction errors (cRPEs)
-#     cRPE = (0 - Qs[cindex]) * reward  # actual reward was 1; I think I would have gotten 0 for the other action
-#     cnRPE = (1 - Qs[cindex]) * (1 - reward)  # actual reward 0; would have gotten 1 for the other action
-#
-#     # Update action taken
-#     Qs = T.set_subtensor(Qs[index],
-#                          Qs[index] + alpha * RPE + nalpha * nRPE)  # add RPE for pos. & nRPE for neg. outcomes
-#
-#     # Update counterfactual action
-#     Qs = T.set_subtensor(Qs[cindex],
-#                          Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)  # add cRPE for pos. & cnRPE for neg. outcomes
-#
-#     # Update mirror action (comment out for letter models)
-#     Qs = T.set_subtensor(Qs[mindex],
-#                          Qs[mindex] + m * (alpha * RPE + nalpha * nRPE))
-#
-#     # Update counterfactual mirror action (comment out for letter models)
-#     Qs = T.set_subtensor(Qs[cmindex],
-#                          Qs[cmindex] + m * (calpha * cRPE + cnalpha * cnRPE))
-#
-#     return Qs, _
-#
-#
-# def update_Q_3(
-#         prev_prev_prev_choice, prev_prev_prev_reward,
-#         prev_prev_choice, prev_prev_reward,
-#         prev_choice, prev_reward,
-#         choice, reward,
-#         Qs, _,
-#         alpha, nalpha, calpha, cnalpha, m, n_subj):
-#
-#     # Comment in for update_Q_3 (WSLSS, abSS, etc.)
-#     index = T.arange(n_subj), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, choice
-#     mindex = T.arange(n_subj), 1 - prev_prev_prev_choice, prev_prev_prev_reward, 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, 1 - choice
-#     cindex = T.arange(n_subj), prev_prev_prev_choice, prev_prev_prev_reward, prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, 1 - choice
-#     cmindex = T.arange(n_subj), 1 - prev_prev_prev_choice, prev_prev_prev_reward, 1 - prev_prev_choice, prev_prev_reward, 1 - prev_choice, prev_reward, choice
-#
-#     # Get reward prediction errors (RPEs)
-#     RPE = (1 - Qs[index]) * reward  # RPEs for positive outcomes (reward == 1)
-#     nRPE = (0 - Qs[index]) * (1 - reward)  # RPEs for negative outcomes (reward == 0)
-#
-#     # Get counterfactual prediction errors (cRPEs)
-#     cRPE = (0 - Qs[cindex]) * reward  # actual reward was 1; I think I would have gotten 0 for the other action
-#     cnRPE = (1 - Qs[cindex]) * (1 - reward)  # actual reward 0; would have gotten 1 for the other action
-#
-#     # Update action taken
-#     Qs = T.set_subtensor(Qs[index],
-#                          Qs[index] + alpha * RPE + nalpha * nRPE)  # add RPE for pos. & nRPE for neg. outcomes
-#
-#     # Update counterfactual action
-#     Qs = T.set_subtensor(Qs[cindex],
-#                          Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)  # add cRPE for pos. & cnRPE for neg. outcomes
-#
-#     # Update mirror action (comment out for letter models)
-#     Qs = T.set_subtensor(Qs[mindex],
-#                          Qs[mindex] + m * (alpha * RPE + nalpha * nRPE))
-#
-#     # Update counterfactual mirror action (comment out for letter models)
-#     Qs = T.set_subtensor(Qs[cmindex],
-#                          Qs[cmindex] + m * (calpha * cRPE + cnalpha * cnRPE))
-#
-#     return Qs, _
 
 
 def update_Q_sim(
@@ -514,7 +250,7 @@ def p_from_Q_sim(
 
 def get_likelihoods(rewards, choices, p_reward, p_noisy):
 
-    # p(r=r|choice=correct): Likelihood of outcome (reward 0 or 1) if choice was correct:
+    # p(r=r|choice=correct): Likelihood of outcome (reward 0 or 1) given choice was correct:
     #           |   reward==1   |   reward==0
     #           |---------------|-----------------
     # choice==1 | p_reward      | 1 - p_reward
@@ -524,7 +260,7 @@ def get_likelihoods(rewards, choices, p_reward, p_noisy):
     lik_cor_rew0 = choices * (1 - p_reward) + (1 - choices) * (1 - p_noisy)
     lik_cor = rewards * lik_cor_rew1 + (1 - rewards) * lik_cor_rew0
 
-    # p(r=r|choice=incorrect): Likelihood of outcome (reward 0 or 1) if choice was incorrect:
+    # p(r=r|choice=incorrect): Likelihood of outcome (reward 0 or 1) given choice was incorrect:
     #           |   reward==1   |   reward==0
     #           |---------------|-----------------
     # choice==1 | p_noisy       | 1 - p_noisy
@@ -633,45 +369,3 @@ def get_n_params(model_name, n_subj, n_groups, contrast='linear'):
         raise(ValueError, "I don't know the n_params for this model. Please go and update get_n_params.")
 
     return n_params
-
-
-
-# def softmax(X, axis=None):
-#     """
-#     Compute the softmax of each element along an axis of X.
-#
-#     Parameters
-#     ----------
-#     X: ND-Array. Probably should be floats.
-#     theta (optional): float parameter, used as a multiplier
-#         prior to exponentiation. Default = 1.0
-#     axis (optional): axis to compute values along. Default is the
-#         first non-singleton axis.
-#
-#     Returns an array the same size as X. The result will sum to 1
-#     along the specified axis.
-#     """
-#
-#     # make X at least 2d
-#     y = np.atleast_2d(X)
-#
-#     # find axis
-#     if axis is None:
-#         axis = next(j[0] for j in enumerate(y.shape) if j[1] > 1)
-#
-#     # subtract the max for numerical stability
-#     y = y - np.expand_dims(np.max(y, axis=axis), axis)
-#
-#     # exponentiate y
-#     y = np.exp(y)
-#
-#     # take the sum along the specified axis
-#     ax_sum = np.expand_dims(np.sum(y, axis=axis), axis)
-#
-#     # finally: divide elementwise
-#     p = y / ax_sum
-#
-#     # flatten if X was 1D
-#     if len(X.shape) == 1: p = p.flatten()
-#
-#     return p

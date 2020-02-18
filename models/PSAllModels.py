@@ -1,11 +1,11 @@
 run_on_cluster = False
-save_dir_appx = 'mice/'
+save_dir_appx = ""  # 'mice/'
 
 # GET LIST OF MODELS TO RUN
 model_names = [
-    'RLab', 'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd', 'RLabcpnxd', 'RLabnp2d',
-    'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
-    'WSLS', 'WSLSS',
+    # 'RLab', 'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd', 'RLabcpnxd', 'RLabnp2d',
+    # 'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
+    'WSLSS', 'WSLS',
 ]
 
 # Legend for letters -> parameters
@@ -23,7 +23,7 @@ model_names = [
 # 's' -> p_switch; 'w' -> slope
 # 'r' -> p_reward; 'v' -> slope
 
-run_on = 'mice'  # 'humans', 'mice'
+run_on = 'humans'  # 'humans', 'mice'
 
 print("Getting ready to run {} {} models: {}".format(len(model_names), run_on, model_names))
 
@@ -36,7 +36,7 @@ import pymc3 as pm
 import theano
 import theano.tensor as T
 from PSModelFunctions import create_parameter, get_slope_variables
-from PSModelFunctions2 import get_n_params, get_WSLSS_Qs, get_WSLS_Qs, update_Q_0, get_likelihoods, post_from_lik, p_from_Q_0
+from PSModelFunctions2 import get_n_params, update_Q, get_likelihoods, post_from_lik, p_from_Q, p_from_prev_WSLS, p_from_prev_WSLSS
 from PSModelFunctions3 import load_data, load_mouse_data, get_save_dir_and_save_id, print_logp_info
 
 floatX = 'float32'
@@ -63,7 +63,7 @@ def create_model(choices, rewards, group, age,
 
     # Create choices_both (first trial is persev_bonus for second trial = where Qs starts)
     if 'B' in model_name:
-        persev_bonus = 2 * choices - 1  # recode as -1 for choice==0 (left) and +1 for choice==1 (right)
+        persev_bonus = 2 * choices - 1  # -1 for choice==0 (left) and +1 for choice==1 (right)
         persev_bonus = theano.shared(np.asarray(persev_bonus, dtype='int16'))
 
     # Transform everything into theano.shared variables
@@ -82,14 +82,14 @@ def create_model(choices, rewards, group, age,
         os.makedirs(save_dir + 'plots/')
     print("Working on model '{}', which has {} free parameters. Save_dir: {}".format(model_name, n_params, save_dir))
 
-    # Get fixed Q-values for WSLS and WSLSS
-    if 'WSLSS' in model_name:  # "stay unless you fail to receive reward twice in a row for the same action."
-        Qs = get_WSLSS_Qs(n_trials, n_subj)
-        Qs = theano.shared(np.asarray(Qs, dtype='float32'))
+    # # Get fixed Q-values for WSLS and WSLSS
+    # if 'WSLSS' in model_name:  # "stay unless you fail to receive reward twice in a row for the same action."
+    #     Qs = get_WSLSS_Qs(n_trials, n_subj)
+    #     Qs = theano.shared(np.asarray(Qs, dtype='float32'))
 
-    elif 'WSLS' in model_name:  # "stay if you won; switch if you lost"
-        Qs = get_WSLS_Qs(n_trials, n_subj)
-        Qs = theano.shared(np.asarray(Qs, dtype='float32'))
+    # elif 'WSLS' in model_name:  # "stay if you won; switch if you lost"
+    #     Qs = get_WSLS_Qs(n_trials, n_subj)
+    #     Qs = theano.shared(np.asarray(Qs, dtype='float32'))
 
     print("Compiling models for {} {} with {} samples and {} tuning steps...\n".format(n_subj, fitted_data_name, n_samples, n_tune))
     with pm.Model() as model:
@@ -175,19 +175,20 @@ def create_model(choices, rewards, group, age,
             beta = pm.Uniform('beta', lower=0, upper=15, shape=n_subj, testval=2 * T.ones(n_subj, dtype='float32'))
             print("Adding free parameter beta.")
 
-            if 'p' in model_name:
+            if 'p' in model_name:  # all models
                 persev = pm.Uniform('persev', lower=-1, upper=1, shape=n_subj, testval=0 * T.ones(n_subj, dtype='float32'))
                 print("Adding free parameter persev.")
             else:
                 persev = pm.Deterministic('persev', T.zeros(n_subj, dtype='float32'))
 
-            if 'RL' in model_name:
+            if ('RL' in model_name) or ('WSLS' in model_name):  # RL and WSLS models
                 if 'd' in model_name:
                     bias = pm.Uniform('bias', lower=-1, upper=1, shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
                     print("Adding free parameter bias.")
                 else:
                     bias = pm.Deterministic('bias', T.zeros(n_subj, dtype='float32'))
 
+            if 'RL' in model_name:  # only RL models
                 if 'a' in model_name:
                     alpha = pm.Beta('alpha', alpha=1, beta=1, shape=n_subj, testval=0.5 * T.ones(n_subj, dtype='float32'))
                     print("Adding free parameter alpha.")
@@ -226,7 +227,7 @@ def create_model(choices, rewards, group, age,
                     cnalpha = 0
                     print("Setting cnalpha = 0.")
 
-            elif 'B' in model_name:
+            elif 'B' in model_name:  # only BF models
                 p_noisy = pm.Deterministic('p_noisy', 1e-5 * T.ones(n_subj, dtype='float32'))
                 if 's' in model_name:
                     p_switch = pm.Beta('p_switch', alpha=1, beta=1, shape=n_subj, testval=0.0508 * T.ones(n_subj, dtype='float32'))
@@ -242,7 +243,7 @@ def create_model(choices, rewards, group, age,
                     p_reward = pm.Deterministic('p_reward', 0.75 * T.ones(n_subj))  # 0.75 because p_reward is the prob. of getting reward if choice is correct
                     print("Setting p_reward = 0.75.")
 
-        # Initialize Q-values (with and without bias, i.e., option 'i')
+        # Initialize Q-values
         if 'RL' in model_name:
             if 'ab' in model_name:  # letter models
                 Qs = 0.5 * T.ones((n_subj, 2), dtype='float32')
@@ -250,28 +251,53 @@ def create_model(choices, rewards, group, age,
 
             # Calculate Q-values for all trials (RL models only)
             [Qs, _], _ = theano.scan(  # shape: (n_trials-2, n_subj, prev_choice); starts predicting at trial 3!
-                fn=update_Q_0,
+                fn=update_Q,
                 sequences=[
-                    choices[0:-2], rewards[0:-2],
-                    choices[1:-1], rewards[1:-1],
+                    # choices[0:-2], rewards[0:-2],
+                    # choices[1:-1], rewards[1:-1],
                     choices[2:], rewards[2:]],
                 outputs_info=[Qs, _],
                 non_sequences=[alpha, nalpha, calpha, cnalpha, n_subj])
 
-        if ('RL' in model_name) or ('WSLS' in model_name):
-
-            # Initialize p_right for a single trial
+            # Initialize p_right for first trial
             p_right = 0.5 * T.ones(n_subj, dtype='float32')  # shape: (n_subj)
 
             # Translate Q-values into probabilities for all trials
             p_right, _ = theano.scan(  # shape: (n_trials-2, n_subj)
-                fn=p_from_Q_0,
+                fn=p_from_Q,
                 sequences=[Qs,
-                           choices[1:-1], rewards[1:-1],
-                           choices[2:], rewards[2:]
+                           # choices[1:-1], rewards[1:-1],
+                           choices[2:], #rewards[2:]
                            ],
                 outputs_info=[p_right],
                 non_sequences=[n_subj, beta, persev, bias])
+
+        elif 'WSLS' in model_name:
+            print(model_name)
+
+            # Initialize p_right for first trial
+            p_right = 0.5 * T.ones(n_subj, dtype='float32')  # shape: (n_subj)
+
+            p_right, _ = theano.scan(
+                fn=p_from_prev_WSLS,
+                sequences=[choices[1:-1], rewards[1:-1],],
+                outputs_info=[p_right],
+                non_sequences=[beta, bias]
+            )
+
+        elif 'WSLSS' in model_name:
+            print(model_name)
+
+            # Initialize p_right for first trial
+            p_right = 0.5 * T.ones(n_subj, dtype='float32')  # shape: (n_subj)
+
+            p_right, _ = theano.scan(
+                fn=p_from_prev_WSLSS,
+                sequences=[choices[0:-2], rewards[0:-2], choices[1:-1], rewards[1:-1],],
+                outputs_info=[p_right],
+                non_sequences=[beta, bias]
+            )
+            theano.printing.Print('p_right')(p_right)
 
         elif 'B' in model_name:
 
@@ -298,20 +324,6 @@ def create_model(choices, rewards, group, age,
         # subjwise_LLs = pm.Deterministic('subjwise_LLs', T.sum(trialwise_LLs, axis=0))
 
         # theano.printing.Print('beta')(beta)
-        # theano.printing.Print('persev')(persev)
-        # theano.printing.Print('p_switch')(p_switch)
-        # theano.printing.Print('p_reward')(p_reward)
-        # # theano.printing.Print('alpha')(alpha)
-        # # theano.printing.Print('nalpha')(nalpha)
-        # # theano.printing.Print('calpha')(calpha)
-        # # theano.printing.Print('cnalpha')(cnalpha)
-        # # theano.printing.Print('Qs')(Qs)
-        # theano.printing.Print('choices')(choices)
-        # theano.printing.Print('rewards')(rewards)
-        # theano.printing.Print('p_right')(p_right)
-        # theano.printing.Print('trialwise_LLs')(trialwise_LLs)
-        # theano.printing.Print('T.sum(trialwise_LLs, axis=0)')(T.sum(trialwise_LLs, axis=0))
-        # theano.printing.Print('T.sum(trialwise_LLs)')(T.sum(trialwise_LLs))
 
         # Check model logp and RV logps (will crash if they are nan or -inf)
         if verbose or print_logps:
