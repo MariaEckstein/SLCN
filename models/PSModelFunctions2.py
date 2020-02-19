@@ -275,7 +275,7 @@ def get_likelihoods(rewards, choices, p_reward, p_noisy):
 
 def post_from_lik(lik_cor, lik_inc, scaled_persev_bonus,
                   p_r,
-                  p_switch, beta, verbose=False):
+                  p_switch, beta, bias, verbose=False):
 
     if verbose:
         print('old p_r:\n{0}'.format(p_r.round(3)))
@@ -290,8 +290,8 @@ def post_from_lik(lik_cor, lik_inc, scaled_persev_bonus,
     p_right0 = p_r + scaled_persev_bonus
 
     # Log-transform probabilities
-    # p_right = 1 / (1 + np.exp(list(-beta * (p_right0 - (1 - p_right0)))))
-    p_right = 1 / (1 + np.exp(-beta * (p_right0 - (1 - p_right0))))
+    # p_right = 1 / (1 + np.exp(list(-beta * (p_right0 - (1 - p_right0) + bias))))
+    p_right = 1 / (1 + np.exp(-beta * (p_right0 - (1 - p_right0) + bias)))
     p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
 
     # p_r is the actual probability of right, which is the prior for the next trial

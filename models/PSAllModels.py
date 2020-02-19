@@ -1,11 +1,11 @@
 run_on_cluster = False
-save_dir_appx = ""  # 'mice/'
+save_dir_appx = 'mice/'
 
 # GET LIST OF MODELS TO RUN
 model_names = [
     # 'RLab', 'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd', 'RLabcpnxd', 'RLabnp2d',
     # 'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
-    'WSLSS', 'WSLS',
+    'WSLSSd', 'WSLSd', #'WSLSS', 'WSLS',
 ]
 
 # Legend for letters -> parameters
@@ -23,7 +23,7 @@ model_names = [
 # 's' -> p_switch; 'w' -> slope
 # 'r' -> p_reward; 'v' -> slope
 
-run_on = 'humans'  # 'humans', 'mice'
+run_on = 'mice'  # 'humans', 'mice'
 
 print("Getting ready to run {} {} models: {}".format(len(model_names), run_on, model_names))
 
@@ -108,6 +108,22 @@ def create_model(choices, rewards, group, age,
                 persev = pm.Deterministic('persev', T.zeros(n_subj, dtype='float32'))
                 print("Setting persev = 0.")
 
+            if 'd' in model_name:  # TODO: test!!!
+                if 'f' in model_name:
+                    bias_intercept = pm.Uniform('bias_intercept', lower=-1, upper=1, shape=n_groups, testval=0.1 * T.ones(n_groups, dtype='int32'))
+                    bias_slope = pm.Uniform('bias_slope', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                    if contrast == 'quadratic':
+                        bias_slope2 = pm.Uniform('bias_slope2', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
+                    else:
+                        bias_slope2 = T.zeros(n_groups, dtype='int16')
+                    bias = pm.Deterministic('bias', bias_intercept[group] + bias_slope[group] * slope_variable + bias_slope2[group] * T.sqr(slope_variable))
+                    print("Drawing slope, intercept, and noise for bias.")
+                else:
+                    bias = pm.Uniform('bias', lower=-1, upper=1, shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                print("Adding free parameter bias.")
+            else:
+                bias = pm.Deterministic('bias', T.zeros(n_subj, dtype='float32'))
+
             if 'RL' in model_name:
                 if 'a' in model_name:
                     alpha = create_parameter('alpha', 'Beta', 'l' in model_name, n_groups, group, n_subj, upper, slope_variable, contrast)
@@ -138,22 +154,6 @@ def create_model(choices, rewards, group, age,
                 else:
                     cnalpha = pm.Deterministic('cnalpha', T.zeros(n_subj, dtype='float32'))
 
-                if 'd' in model_name:  # TODO: test!!!
-                    if 'f' in model_name:
-                        bias_intercept = pm.Uniform('bias_intercept', lower=-1, upper=1, shape=n_groups, testval=0.1 * T.ones(n_groups, dtype='int32'))
-                        bias_slope = pm.Uniform('bias_slope', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
-                        if contrast == 'quadratic':
-                            bias_slope2 = pm.Uniform('bias_slope2', lower=-1, upper=1, shape=n_groups, testval=-0.1 * T.ones(n_groups, dtype='int32'))
-                        else:
-                            bias_slope2 = T.zeros(n_groups, dtype='int16')
-                        bias = pm.Deterministic('bias', bias_intercept[group] + bias_slope[group] * slope_variable + bias_slope2[group] * T.sqr(slope_variable))
-                        print("Drawing slope, intercept, and noise for bias.")
-                    else:
-                        bias = pm.Uniform('bias', lower=-1, upper=1, shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
-                    print("Adding free parameter bias.")
-                else:
-                    bias = pm.Deterministic('bias', T.zeros(n_subj, dtype='float32'))
-
             elif 'B' in model_name:
 
                 p_noisy = 1e-5 * T.as_tensor_variable(1)
@@ -181,12 +181,11 @@ def create_model(choices, rewards, group, age,
             else:
                 persev = pm.Deterministic('persev', T.zeros(n_subj, dtype='float32'))
 
-            if ('RL' in model_name) or ('WSLS' in model_name):  # RL and WSLS models
-                if 'd' in model_name:
-                    bias = pm.Uniform('bias', lower=-1, upper=1, shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
-                    print("Adding free parameter bias.")
-                else:
-                    bias = pm.Deterministic('bias', T.zeros(n_subj, dtype='float32'))
+            if 'd' in model_name:
+                bias = pm.Uniform('bias', lower=-1, upper=1, shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                print("Adding free parameter bias.")
+            else:
+                bias = pm.Deterministic('bias', T.zeros(n_subj, dtype='float32'))
 
             if 'RL' in model_name:  # only RL models
                 if 'a' in model_name:
@@ -309,7 +308,7 @@ def create_model(choices, rewards, group, age,
             [p_r, p_right, p_right0], _ = theano.scan(fn=post_from_lik,  # shape (n_trials, n_subj); starts predicting at trial 1!
                                             sequences=[lik_cor, lik_inc, scaled_persev_bonus],
                                             outputs_info=[p_r, None, None],
-                                            non_sequences=[p_switch, beta])
+                                            non_sequences=[p_switch, beta, bias])
 
             if 'b' in model_name:
                 p_right = p_right[2:]  # predict from trial 3 onward, not trial 1 (consistent with RL / strat models)
