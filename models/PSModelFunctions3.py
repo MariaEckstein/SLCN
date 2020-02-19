@@ -93,31 +93,55 @@ def replace_nans(data, n_trials):
     return data
 
 
-def load_mouse_data(data_dir, first_session_only, fit_sessions_individually, temp_hack=False):
+def load_mouse_data(fitted_data_name, first_session_only, fit_sessions_individually, simulation_name='', temp_hack=False):
 
-    # Load mouse data
-    rewards_j = pd.read_csv(os.path.join(data_dir, 'Juvi_Reward.csv')).T.values
-    choices_j = pd.read_csv(os.path.join(data_dir, 'Juvi_Choice.csv')).T.values
-    rewards_a = pd.read_csv(os.path.join(data_dir, 'Adult_Reward.csv')).T.values
-    choices_a = pd.read_csv(os.path.join(data_dir, 'Adult_Choice.csv')).T.values
-    fullID_j = pd.read_csv(os.path.join(data_dir, 'Juvi_AnimalID.csv')).T.values.flatten()
-    fullID_a = pd.read_csv(os.path.join(data_dir, 'Adult_AnimalID.csv')).T.values.flatten()
+    if fitted_data_name == 'mice':
 
-    # Clean mouse data
-    n_trials_per_animal = np.sum(np.invert(np.isnan(rewards_j)), axis=0)
-    sns.distplot(n_trials_per_animal)
-    n_trials = np.round(np.percentile(n_trials_per_animal, 0.8)).astype('int')
-    rewards_j = replace_nans(rewards_j, n_trials).astype('int')
-    choices_j = replace_nans(choices_j, n_trials).astype('int')
-    rewards_a = replace_nans(rewards_a, n_trials).astype('int')
-    choices_a = replace_nans(choices_a, n_trials).astype('int')
+        # Data directory
+        data_dir = 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/'
 
-    # Combine juvenile and adult data
-    age = pd.DataFrame()
-    age['fullID'] = np.concatenate([fullID_j, fullID_a])
-    rewards = np.hstack([rewards_j, rewards_a])  # rows: trials; cols: sessions & animals
-    choices = np.hstack([choices_j, choices_a])
-    assert np.shape(rewards) == np.shape(choices)
+        # Load mouse data
+        rewards_j = pd.read_csv(os.path.join(data_dir, 'Juvi_Reward.csv')).T.values
+        choices_j = pd.read_csv(os.path.join(data_dir, 'Juvi_Choice.csv')).T.values
+        rewards_a = pd.read_csv(os.path.join(data_dir, 'Adult_Reward.csv')).T.values
+        choices_a = pd.read_csv(os.path.join(data_dir, 'Adult_Choice.csv')).T.values
+        fullID_j = pd.read_csv(os.path.join(data_dir, 'Juvi_AnimalID.csv')).T.values.flatten()
+        fullID_a = pd.read_csv(os.path.join(data_dir, 'Adult_AnimalID.csv')).T.values.flatten()
+
+        # Clean mouse data
+        n_trials_per_animal = np.sum(np.invert(np.isnan(rewards_j)), axis=0)
+        sns.distplot(n_trials_per_animal)
+        n_trials = np.round(np.percentile(n_trials_per_animal, 0.8)).astype('int')
+        rewards_j = replace_nans(rewards_j, n_trials).astype('int')
+        choices_j = replace_nans(choices_j, n_trials).astype('int')
+        rewards_a = replace_nans(rewards_a, n_trials).astype('int')
+        choices_a = replace_nans(choices_a, n_trials).astype('int')
+
+        # Combine juvenile and adult data
+        age = pd.DataFrame()
+        age['fullID'] = np.concatenate([fullID_j, fullID_a])
+        rewards = np.hstack([rewards_j, rewards_a])  # rows: trials; cols: sessions & animals
+        choices = np.hstack([choices_j, choices_a])
+        assert np.shape(rewards) == np.shape(choices)
+
+    elif fitted_data_name == 'simulations':
+
+        # Data directory
+        data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/simulations/'
+
+        # Load and reshape simulated data
+        dat = pd.read_csv(os.path.join(data_dir, simulation_name))
+
+        flat_choices = dat.actionall.apply(lambda x: int(x[1]))  # [int(dat.actionall[i][1]) for i in range(dat.shape[0])]
+        flat_rewards = dat.rewardall.apply(lambda x: int(x[1]))  # [int(dat.rewardall[i][1]) for i in range(dat.shape[0])]
+
+        matrix_shape = (int(dat.shape[0] / 725), 725)
+        matrix_fullIDs = np.array([dat.fullID]).reshape(matrix_shape).T
+        choices = np.array([flat_choices]).reshape(matrix_shape).T
+        rewards = np.array([flat_rewards]).reshape(matrix_shape).T
+
+        age = pd.DataFrame()
+        age['fullID'] = matrix_fullIDs[0]
 
     # Pull out age, gender, etc.
     # formula: session_ID=[session_ID;animal_idn*100000 + age*100 + (strcmp(animal_gender,'F')+1)*10 + strcmp(animal_treatment,'Juvenile')+1];
@@ -158,7 +182,7 @@ def load_mouse_data(data_dir, first_session_only, fit_sessions_individually, tem
         rewards = rewards.T[idx].T
         choices = choices.T[idx].T
         group = group[idx]
-        n_subj = len(np.unique(age['sID']))
+    n_subj = len(np.unique(age['sID']))
 
     return n_subj, rewards, choices, group, n_groups, age
 

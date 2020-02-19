@@ -5,7 +5,7 @@ save_dir_appx = 'mice/'
 model_names = [
     # 'RLab', 'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd', 'RLabcpnxd', 'RLabnp2d',
     # 'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
-    'WSLSSd', 'WSLSd', #'WSLSS', 'WSLS',
+    'WSLS', 'WSLSd', 'WSLSS', 'WSLSSd',
 ]
 
 # Legend for letters -> parameters
@@ -80,18 +80,10 @@ def create_model(choices, rewards, group, age,
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
         os.makedirs(save_dir + 'plots/')
+
     print("Working on model '{}', which has {} free parameters. Save_dir: {}".format(model_name, n_params, save_dir))
-
-    # # Get fixed Q-values for WSLS and WSLSS
-    # if 'WSLSS' in model_name:  # "stay unless you fail to receive reward twice in a row for the same action."
-    #     Qs = get_WSLSS_Qs(n_trials, n_subj)
-    #     Qs = theano.shared(np.asarray(Qs, dtype='float32'))
-
-    # elif 'WSLS' in model_name:  # "stay if you won; switch if you lost"
-    #     Qs = get_WSLS_Qs(n_trials, n_subj)
-    #     Qs = theano.shared(np.asarray(Qs, dtype='float32'))
-
     print("Compiling models for {} {} with {} samples and {} tuning steps...\n".format(n_subj, fitted_data_name, n_samples, n_tune))
+
     with pm.Model() as model:
         if not fit_individuals:
 
@@ -272,31 +264,24 @@ def create_model(choices, rewards, group, age,
                 non_sequences=[n_subj, beta, persev, bias])
 
         elif 'WSLS' in model_name:
-            print(model_name)
 
-            # Initialize p_right for first trial
             p_right = 0.5 * T.ones(n_subj, dtype='float32')  # shape: (n_subj)
-
             p_right, _ = theano.scan(
                 fn=p_from_prev_WSLS,
-                sequences=[choices[1:-1], rewards[1:-1],],
+                sequences=[choices[2:], rewards[2:],],
                 outputs_info=[p_right],
                 non_sequences=[beta, bias]
             )
 
         elif 'WSLSS' in model_name:
-            print(model_name)
 
-            # Initialize p_right for first trial
             p_right = 0.5 * T.ones(n_subj, dtype='float32')  # shape: (n_subj)
-
             p_right, _ = theano.scan(
                 fn=p_from_prev_WSLSS,
-                sequences=[choices[0:-2], rewards[0:-2], choices[1:-1], rewards[1:-1],],
+                sequences=[choices[1:-1], rewards[1:-1], choices[2:], rewards[2:],],
                 outputs_info=[p_right],
                 non_sequences=[beta, bias]
             )
-            theano.printing.Print('p_right')(p_right)
 
         elif 'B' in model_name:
 
@@ -321,8 +306,6 @@ def create_model(choices, rewards, group, age,
         # Calculate NLL
         trialwise_LLs = pm.Deterministic('trialwise_LLs', T.log(p_right[:-1] * choices[3:] + (1 - p_right[:-1]) * (1 - choices[3:])))
         # subjwise_LLs = pm.Deterministic('subjwise_LLs', T.sum(trialwise_LLs, axis=0))
-
-        # theano.printing.Print('beta')(beta)
 
         # Check model logp and RV logps (will crash if they are nan or -inf)
         if verbose or print_logps:
@@ -443,15 +426,17 @@ for model_name in model_names:
     elif run_on == 'mice':
 
         # Load mouse data
-        n_subj, rewards, choices, group, n_groups, age = load_mouse_data('C:/Users/maria/MEGAsync/SLCN/PSMouseData/',
-                                                                         first_session_only=False,
-                                                                         fit_sessions_individually=True,
-                                                                         temp_hack=True)
+        n_subj, rewards, choices, group, n_groups, age = load_mouse_data(
+            'mice',
+            first_session_only=False,
+            fit_sessions_individually=True,
+            # simulation_name='simulated_mice_WSLSSd_nagents10.csv',
+            temp_hack=False)
 
     # Saving as csv
     ages_dir = 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv'
-    print("Saving ages to " + ages_dir)
-    age.to_csv(ages_dir, index=False)
+    # print("Saving ages to " + ages_dir)
+    # age.to_csv(ages_dir, index=False)
 
     slope_variables = ['age_z']  # ['PDS_z', 'meanT_log_z']  # get_slope_variables(model_name, kids_and_teens_only, adults_only)
     for slope_variable in slope_variables:
