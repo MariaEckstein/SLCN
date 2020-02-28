@@ -150,7 +150,7 @@ def update_Q(
         # prev_choice, prev_reward,
         choice, reward,
         Qs, _,
-        alpha, nalpha, calpha, cnalpha, n_subj):
+        alpha, nalpha, calpha, cnalpha, cnalpha_rew, n_subj):
 
     # Comment in for update_Q_0 (letter models)
     index = T.arange(n_subj), choice
@@ -162,7 +162,9 @@ def update_Q(
 
     # Get counterfactual prediction errors (cRPEs)
     cRPE = (0 - Qs[cindex]) * reward  # actual reward was 1; I think I would have gotten 0 for the other action
-    cnRPE = (1 - Qs[cindex]) * (1 - reward)  # actual reward 0; would have gotten 1 for the other action
+    cnRPE = (cnalpha_rew - Qs[cindex]) * (1 - reward)  # actual reward 0; would have gotten 1 for the other action
+    # cRPE = (0 - Qs[cindex])  # would have gotten 0 for the other action
+    # cnRPE = cRPE
 
     # Update action taken
     Qs = T.set_subtensor(Qs[index],

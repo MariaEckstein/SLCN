@@ -2,13 +2,14 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
+# matplotlib.style.use('classic')
 import numpy as np
 import os
 import pandas as pd
 import pymc3 as pm
 import pickle
 import seaborn as sns
-sns.set(style='whitegrid')
+# sns.set(style='whitegrid')
 
 from PSModelFunctions2 import get_paths, get_n_params
 import scipy.stats as stats
@@ -101,8 +102,11 @@ class AnalyzePSModels:
             # Get p-values
             slope_params = []
             if self.fit_mcmc:
+                # if self.indiv_param_names[0] + '_int' in samples_all.keys():
+                #     slope_params += [name + '_int' for name in self.indiv_param_names]
                 if self.indiv_param_names[0] + '_slope' in samples_all.keys():
-                    slope_params = [name + '_slope' for name in self.indiv_param_names]
+                    slope_params += [name + '_int' for name in self.indiv_param_names]
+                    slope_params += [name + '_slope' for name in self.indiv_param_names]
                 if self.indiv_param_names[0] + '_2_slope' in samples_all.keys():
                     slope_params += [name + '_2_slope' for name in self.indiv_param_names]
 
@@ -117,8 +121,8 @@ class AnalyzePSModels:
             pd.DataFrame(self.modelwise_LLs).to_csv(self.get_file_name('modelwise_LLs', '_temp'), index=False)
 
             if self.fit_mcmc:
-                columns = [key for key in self.summary.keys() if 'trialwise_LLs' in key]
-                trialwise_LLs = self.summary.loc['mean', columns]
+                LL_keys = [key for key in self.summary.keys() if 'trialwise_LLs' in key]
+                trialwise_LLs = self.summary.loc['mean', LL_keys]
             else:
                 trialwise_LLs = pd.DataFrame(self.summary['trialwise_LLs'], columns=list(self.sID))
                 trialwise_LLs.to_csv(self.get_file_name('trialwise_LLs'), index=False)
@@ -128,11 +132,20 @@ class AnalyzePSModels:
                 pd.DataFrame(self.subjwise_LLs).to_csv(self.get_file_name('subjwise_LLs', '_temp'), index=False)
 
             # Create csv file for individuals' fitted parameters
+            self.fitted_params = []
             for param_name in self.indiv_param_names:
                 if not self.fit_mcmc:
                     self.fitted_params.append(self.summary[param_name])  # TODO seems like calpha reappears in calpha_sc plots?
                 else:
-                    self.fitted_params.append(list(self.summary.loc['mean', [param_name + '__' + str(i) for i in range(self.n_subj)]]))
+                    param_keys = [
+                        key for key in self.summary.keys()
+                        if (param_name in key) and (param_name[0] == key[0])
+                        and ('_a' not in key) and ('_b' not in key) and ('_mu' not in key)
+                        and ('_sd' not in key) and ('_int' not in key) and ('_slope' not in key)
+                    ]  # for new (and old?) models (after 02/19/2020)
+                    # keys = [param_name + '__' + str(i) for i in range(self.n_subj)]  # for old models (before 02/10/2020)
+                    self.fitted_params.append(list(self.summary.loc['mean', param_keys]))  # old
+                    # self.fitted_params.append(np.array(self.summary.loc['mean', param_keys]))  # new
             self.fitted_params = np.array(self.fitted_params).T
             self.fitted_params = pd.DataFrame(self.fitted_params, columns=self.indiv_param_names)
             self.fitted_params['sID'] = list(self.sID)
@@ -189,21 +202,21 @@ class AnalyzePSModels:
         elif file_name == 'summary':
             return '{0}plots/summary_{1}_{2}_{3}_pymc3.csv'.format(self.save_dir, self.model_name, self.slope_variable, self.n_subj)
         elif file_name == 'param_plot':
-            return "{0}plots/fitted_param_{4}_{1}_{2}_{3}.png".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj, file_name_apx)
+            return "{0}plots/fitted_param_{4}_{1}_{2}_{3}.svg".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj, file_name_apx)
         elif file_name == 'param_corrs':
             return "{0}plots/corrs_{1}_{2}_{3}.csv".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj)
         elif file_name == 'param_pairplot':
-            return "{0}plots/param_pairplot_{1}_{2}_{3}.png".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj)
+            return "{0}plots/param_pairplot_{1}_{2}_{3}.svg".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj)
         elif file_name == 'modelwise_LLs':
             return '{0}plots/modelwise_LLs{1}.csv'.format(self.save_dir, file_name_apx)
         elif file_name == 'traceplot':
-            return "{0}plots/traceplot_{1}_{2}_{3}.png".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj)
+            return "{0}plots/traceplot_{1}_{2}_{3}.svg".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj)
         elif file_name == 'AIC_plot':
-            return "{0}plots/modelwise_AICs.png".format(self.save_dir)
+            return "{0}plots/modelwise_AICs.svg".format(self.save_dir)
         elif file_name == 'trialwise_LLs':
             return "{0}plots/trialwise_LLs_{1}_{2}_{3}_{4}.csv".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj, file_name)
         elif file_name == 'trialwise_LLs_heatmap':
-            return "{0}plots/trialwise_LLs_{1}_{2}_{3}_{4}.png".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj, file_name)
+            return "{0}plots/trialwise_LLs_{1}_{2}_{3}_{4}.svg".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj, file_name)
         elif file_name == 'subjwise_LLs':
             return "{0}plots/subjwise_LLs{1}.csv".format(self.save_dir, file_name_apx)
         elif file_name == 'p_values':
@@ -275,13 +288,13 @@ class AnalyzePSModels:
             self.sID = self.fitted_params['sID']
             self.model_name, self.n_subj = self.get_info_from_filename(file_name)
 
-            try:
-                self.fitted_params_g = pd.read_csv(self.get_file_name('fitted_params_g'), index_col=0)  # TODO comment back in!
-                # self.fitted_params_g = pd.read_csv(self.save_dir + '/params_g_Bbsprywtv_age_z_291_pymc3.csv', index_col=0)
-                # self.fitted_params_g = pd.read_csv(self.save_dir + '/params_g_Bbsprywtv_age_z_271_pymc3.csv', index_col=0)
-                # self.fitted_params_g = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_g_Bbsprywtv_age_z_271_pymc3.csv', index_col=0)
-            except FileNotFoundError:
-                self.fitted_params_g = pd.DataFrame()
+            # try:
+            #     self.fitted_params_g = pd.read_csv(self.get_file_name('fitted_params_g'), index_col=0)  # TODO comment back in!
+            #     # self.fitted_params_g = pd.read_csv(self.save_dir + '/params_g_Bbsprywtv_age_z_291_pymc3.csv', index_col=0)
+            #     # self.fitted_params_g = pd.read_csv(self.save_dir + '/params_g_Bbsprywtv_age_z_271_pymc3.csv', index_col=0)
+            #     # self.fitted_params_g = pd.read_csv('C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/params_g_Bbsprywtv_age_z_271_pymc3.csv', index_col=0)
+            # except FileNotFoundError:
+            self.fitted_params_g = pd.DataFrame()
 
             if self.fit_mcmc:
                 self.summary = pd.read_csv(self.get_file_name('summary'), index_col=0)  # TODO comment back in!
@@ -528,13 +541,13 @@ class AnalyzePSModels:
 
 # Main script
 data = {
-    # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/MCMC/clustermodels/genrec/simRL/',  #/genrec/simBbspr/',
-    # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/map_indiv/new_ML_models/',
-    # 'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv',
-    # 'n_trials': 120,
-    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/',
-    'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv',
-    'n_trials': 780,
+    # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/new_ML_models/MCMC/clustermodels/genrec/new/',  #/genrec/simBbspr/',
+    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/',#new_ML_models/MCMC/clustermodels/',
+    'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv',
+    'n_trials': 120,
+    # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/',
+    # 'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv',
+    # 'n_trials': 780,
     'make_csvs_from_pickle': True,
     'make_analyses': True,
     'make_traceplot': False,

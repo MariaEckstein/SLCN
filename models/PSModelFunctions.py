@@ -86,7 +86,7 @@ def get_mu_sd(param_name, n_groups, sd=10):
 def create_parameter(param_name, distribution, fit_slope, n_groups, group, n_subj, upper, slope_variable, contrast,
                      sd_testval=0.5, slope_testval=0, int_testval=0.5, param_testval=0.5):
 
-    print("Adding free parameter {0}".format(param_name))
+    print("Adding free parameter {} ({})".format(param_name, distribution))
 
     if fit_slope:
         param_sd = get_sd(param_name, sd_testval, n_groups)
