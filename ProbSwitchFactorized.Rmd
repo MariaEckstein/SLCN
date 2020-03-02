@@ -452,7 +452,7 @@ run_regressions = function(all_files_regr) {
 # Main script
 
 ```{r Load packages, set parameters}
-library("ggplot2"); theme_set(theme_classic()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo"); library(lmerTest)#; library("corrplot")#; library("Hmisc")
+library("ggplot2"); theme_set(theme_classic()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo"); library(lmerTest); library("ggfortify")#; library("corrplot")#; library("Hmisc")
 
 exclude_UCB = F
 colors_3and1 = c("#00D000", "#00C055", "#00B0AA", "#00A0FF", "gray60", "grey50")
@@ -599,7 +599,7 @@ c_age_reward_validation =
 b_age_RT =
   b_age_ACC + aes(y=median_cor_RT, group=Gender) +
     # stat_summary(geom="line", color="black") +
-    stat_summary(color="black")
+    stat_summary(color="black", size=0.2)
 
 # Save plots
 ggsave(file.path(plot_dir, "b_age_ACC.png"), b_age_ACC, width=6, height=3)
@@ -619,8 +619,8 @@ e_age_stayappswitch_validation =
   stat_summary(geom="line")
 d_age_stayappswitch =
   ggplot(subset(reward_subj, outcome_21_back=="reward, no reward"), aes(age_group_, 100 * stay, group=1, color=Gender)) +
-  stat_summary() +
   geom_point(aes(x=PreciseYrs)) +
+  stat_summary() +
   stat_summary(geom="line") +
   facet_wrap(~ model_name)
   
@@ -708,15 +708,82 @@ summary(lm(p_switch ~ (beta_BF + persev_BF + p_reward) ^ 2, data=param_dat))  # 
 ```
 
 ```{r Model parameter PCA}
-param_pca = prcomp(param_dat[c("alpha", "nalpha", "p_switch", "p_reward", "beta_RL", "beta_BF", "persev_RL", "persev_BF")], center=T, scale.=T)
+param_names = c("alpha", "nalpha", "p_switch", "p_reward", "beta_RL", "beta_BF", "persev_RL", "persev_BF")
+param_pca = prcomp(param_dat[param_names], center=T, scale.=T)
 summary(param_pca)
 str(param_pca)
-param_pca$x
 
-library(devtools)
-install_github("vqv/ggbiplot")
-library(ggbiplot)
+# Entire PCA
+g_paramPC1_paramPC2 =
+  autoplot(param_pca, data=param_dat, colour="age_group",
+           loadings=T, loadings.label=T, loadings.label.size=3) +
+  scale_color_manual(values=colors_3and1)
+
+# Explained variance
+dat = data.frame(summary(param_pca)$importance)
+dat$index = rownames(dat)
+dat_l = melt(dat, id.vars="index")
+g_explained_variance =
+  ggplot(dat_l, aes(variable, value, group=1)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~ index)
+
+# PCs over age
+PCs = cbind(data.frame(param_pca$x), param_dat)
+PCs_l = melt(PCs, id.vars=c("sID", "Gender", "age_group", "PreciseYrs", "age_group_"))
+
+g_age_PCs =
+  ggplot(subset(PCs_l, variable %in% c("PC1", "PC2", "PC3", "PC4")),
+       aes(PreciseYrs, value, color=variable)) +
+  geom_point(alpha=0.2) +
+  stat_summary(aes(age_group_, group=variable), geom="line") +
+  stat_summary(aes(age_group_, group=variable), color="black")
+
+g_agegroup_PCs =
+  ggplot(subset(PCs_l, variable %in% c("PC1", "PC2", "PC3", "PC4")),
+       aes(age_group, value, color=variable, group=variable)) +
+  stat_summary(geom="line") +
+  stat_summary() +
+  facet_wrap(~ variable, scales="free")
+
+# Save plots
+ggsave(file.path(plot_dir, "g_paramPC1_paramPC2.png"), g_paramPC1_paramPC2, width=4, height=3)
+ggsave(file.path(plot_dir, "g_explained_variance.png"), g_explained_variance, width=6, height=3)
+ggsave(file.path(plot_dir, "g_age_PCs.png"), g_age_PCs, width=5, height=4)
+ggsave(file.path(plot_dir, "g_agegroup_PCs.png"), g_agegroup_PCs, width=5, height=4)
+
+pca_weights = data.frame(param_pca$rotation)
+pca_weights$index = rownames(pca_weights)
+pca_weights
+
+pca_weights_l = melt(pca_weights, id.vars="index")
+
+ggplot(subset(pca_weights_l, variable %in% c("PC1", "PC2", "PC3", "PC4")), aes(index, variable, fill=value)) +
+  geom_tile() +
+  labs(x="", y="")
+
+ggplot(subset(pca_weights_l, variable %in% c("PC1", "PC2", "PC3", "PC4")), aes(index, value)) +
+  stat_summary(geom="bar") +
+  # labs(x="", y="") +
+  facet_wrap(~ variable)
 ```
+```{r kmeans}
+autoplot(kmeans(param_dat[param_names], 5), data=param_dat)
+```
+```{r kmeans}
+library("cluster")
+autoplot(clara(param_dat[param_names], 5))
+autoplot(fanny(param_dat[param_names], 5), frame=T)
+autoplot(pam(param_dat[param_names], 5), frame.type="norm")
+```
+
+```{r lfda}
+library(lfda)
+model = lfda(param_dat[param_names], param_dat["age_group"], r=6, metric="plain")
+autoplot(model, data=param_dat, frame=T, frame.color="age_group")
+```
+
 # Run regression models
 
 ```{r CCN paper}

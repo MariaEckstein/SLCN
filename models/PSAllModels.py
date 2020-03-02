@@ -453,7 +453,7 @@ for model_name in model_names:
             temp_hack=False)
 
     # Saving as csv
-    ages_dir = 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv'
+    # ages_dir = 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv'
     # print("Saving ages to " + ages_dir)
     # age.to_csv(ages_dir, index=False)
 
