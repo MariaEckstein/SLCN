@@ -71,6 +71,7 @@ get_data = function(data_dir, data_name, patt) {
   filenames = list.files(data_dir, pattern = patt)
   print(paste(length(filenames), "filenames on the list."))
 
+  filename = filenames[1]  # DEBUG
   for(filename in filenames) {
 
     if (data_name == "human_mat") {
@@ -87,23 +88,6 @@ get_data = function(data_dir, data_name, patt) {
       subj_file = read.csv(file.path(data_dir, filename))
     }
     
-    if (data_name == "sim") {
-      
-      # Fill in arbitrary data
-      for (col_name in c("T_group", "PDS_group", "Columbia_cat")) {
-        if (!col_name %in% colnames(all_files)) {
-          all_files[,col_name] = 1
-        }
-      }
-      for (col_name in c("PDS", "meanT", "PreciseYrs", "log_T")) {
-        if (!col_name %in% colnames(all_files)) {
-          all_files[,col_name] = runif(1, 8, 30)
-        }
-      }
-      all_files$age_group = "50%"
-      all_files$Gender = "Male"
-    }
-
     # Make sure all files have the same columns
     ## Remove unwanted columns
     for (col_name in colnames(subj_file)) {
@@ -116,6 +100,23 @@ get_data = function(data_dir, data_name, patt) {
       if (!col_name %in% colnames(subj_file)) {
         subj_file[,col_name] = NA
       }
+    }
+
+    if (data_name == "PCsim") {
+      
+      # Fill in arbitrary data
+      for (col_name in c("T_group", "PDS_group", "Columbia_cat", "Category", "BMI", "Period_age", "Last_period", "Months", "T1", "T2", "T3")) {
+        if (!col_name %in% colnames(subj_file)) {
+          subj_file[,col_name] = 1
+        }
+      }
+      for (col_name in c("PDS", "meanT", "PreciseYrs", "log_T")) {
+        if (!col_name %in% colnames(subj_file)) {
+          subj_file[,col_name] = runif(1, 8, 30)
+        }
+      }
+      subj_file$age_group = "50%"
+      subj_file$Gender = "Male"
     }
 
     # Add columns
@@ -474,10 +475,12 @@ run_regressions = function(all_files_regr) {
 library("ggplot2"); theme_set(theme_classic()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo"); library(lmerTest); library("ggfortify"); library("RColorBrewer")#; library("corrplot")#; library("Hmisc")
 # display.brewer.all(n=NULL, type="all", select=NULL, exact.n=TRUE, colorblindFriendly=T)
 
+data_name = "PCsim"  # can be "PCsim" (only look at PC-based simulations) or "HumAndSim" (look at human data and BF-&RL-simulated data)
 exclude_UCB = F
 colors_3and1 = c("#00D000", "#00C055", "#00B0AA", "#00A0FF", "gray60", "grey50")
-colors_validation = brewer.pal(n=3, name="Set2")
+colors_validation = brewer.pal(n=8, name="Set2")
 colors_validation[2] = "black"
+colors_validation = c(colors_validation, colors_validation)
 parameter_names = c('alpha', 'beta', 'nalpha', 'calpha', 'cnalpha', 'p_switch', 'p_reward', 'persev')
 desired_columns = c("sID", "selected_box", "p_right", "reward", "RT", "correct", "correct_box", "model_name")
 
@@ -486,125 +489,127 @@ ages_file_dir = "C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv"
 human_data_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch"
 param_file_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/new_ML_models/MCMC/clustermodels/"
 dir_to_all_simulations = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/new_ML_models/MCMC/clustermodels/simulate/simulations'
+PC_sim_data_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch/PC_sim_dat"
 ```
 
 ```{r get simulated data}
-sim_data_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch/PC_sim_dat"
-patt = "PC1plus"
-plot_dir = file.path(sim_data_dir, "Plots")
-all_files = get_data(sim_data_dir, "sim", patt)
-
-## Add NA columns for wanted columns
-for (col_name in c("T_group", "PDS_group", "Columbia_cat")) {
-  if (!col_name %in% colnames(all_files)) {
-    all_files[,col_name] = 1
+if (data_name == "PCsim") {
+  
+  plot_dir = file.path(PC_sim_data_dir, "Plots")
+  
+  all_files = data.frame()
+  nback_regr_dat = data.frame()
+  reward_subj = data.frame()
+  ACC_subj = data.frame()
+  ACCs = data.frame()
+    
+  # Get simulated data
+  for (patt in c("PC1plus", "PC1minus", "PC2plus", "PC2minus", "PC3plus", "PC3minus", "PC4plus", "PC4minus", "PC5plus", "PC5minus")) {
+    
+    sim_all_files = get_data(PC_sim_data_dir, data_name, patt)
+    
+    sim_all_files = finish_all_files(sim_all_files)
+    # excl_subj = plot_indivduals_for_exclusion(sim_all_files, exclude_UCB)
+    # sim_all_files = subset(sim_all_files, !sID %in% excl_subj)
+    sim_stuff = get_ACC_reward_subj(sim_all_files)
+    sim_ACC_subj = sim_stuff[[1]]
+    sim_reward_subj = sim_stuff[[3]]
+    sim_ACCs = sim_stuff[[5]]
+    sim_all_files_regr = get_regression_dat(sim_all_files)
+    sim_nback_regr_dat = run_regressions(sim_all_files_regr)
+    sim_nback_regr_dat$age_group = "A"
+    
+    sim_all_files$model_name = patt
+    sim_all_files_regr$model_name = patt
+    sim_nback_regr_dat$model_name = patt
+    sim_reward_subj$model_name = patt
+    sim_ACC_subj$model_name = patt
+    sim_ACCs$model_name = patt
+    
+    all_files = rbind(all_files, sim_all_files)
+    nback_regr_dat = rbind(nback_regr_dat, sim_nback_regr_dat)
+    reward_subj = rbind(reward_subj, sim_reward_subj)
+    ACC_subj = rbind(ACC_subj, sim_ACC_subj)
+    ACCs = rbind(ACCs, sim_ACCs)
   }
+  
+  l = length(unique(all_files$model_name))  # to make figures wider
+  
 }
-for (col_name in c("PDS", "meanT", "PreciseYrs", "log_T")) {
-  if (!col_name %in% colnames(all_files)) {
-    all_files[,col_name] = runif(nrow(all_files), 8, 30)
-  }
-}
-# for (col_name in c("age_group", "Gender")) {
-#   if (!col_name %in% colnames(all_files)) {
-#     all_files[,col_name] = "A"
-#   }
-# }
-all_files$age_group = "50%"
-all_files$Gender = "Male"
-# all_files$PreciseYrs = runif(nrow(all_files), 8, 30)
-
-# half1 = round(nrow(all_files) / 2)
-# half2 = nrow(all_files) - half1
-# all_files$age_group = c(rep("A", half1), rep("B", half2))
-# all_files$Gender = c(rep("A", half1), rep("B", half2))
-
-all_files = finish_all_files(all_files)
-excl_subj = plot_indivduals_for_exclusion(all_files, exclude_UCB)
-# all_files = subset(all_files, !sID %in% excl_subj)
-stuff = get_ACC_reward_subj(all_files)
-ACC_subj = stuff[[1]]
-reward_subj = stuff[[3]]
-ACCs = stuff[[5]]
-all_files_regr = get_regression_dat(all_files)
-nback_regr_dat = run_regressions(all_files_regr)
-nback_regr_dat$age_group = "A"
-
-all_files$model_name = patt
-all_files_regr$model_name = patt
-nback_regr_dat$model_name = patt
-reward_subj$model_name = patt
-ACC_subj$model_name = patt
-ACCs$model_name = patt
 ```
 
 ```{r Read in human and simulated data}
-# Get human data
-plot_dir = file.path(human_data_dir, "Plots")
-ages = get_ages(ages_file_dir)
-all_files = get_data(human_data_dir, "human", ".*csv")  # ".*mat")
-all_files = merge(all_files, ages, all.x = T)
-all_files = finish_all_files(all_files)
-excl_subj = plot_indivduals_for_exclusion(all_files, exclude_UCB)
-all_files = subset(all_files, !sID %in% excl_subj)
-stuff = get_ACC_reward_subj(all_files)
-ACC_subj = stuff[[1]]
-reward_subj = stuff[[3]]
-ACCs = stuff[[5]]
-all_files_regr = get_regression_dat(all_files)
-nback_regr_dat = run_regressions(all_files_regr)
-nback_regr_dat = merge(nback_regr_dat, ages, all.x = T)
-nback_regr_dat = add_age_group_yrs(nback_regr_dat)
-
-all_files$model_name = "Human"
-all_files_regr$model_name = "Human"
-nback_regr_dat$model_name = "Human"
-reward_subj$model_name = "Human"
-ACC_subj$model_name = "Human"
-ACCs$model_name = "Human"
-
-# Get simulated data
-data_dirs = list.dirs(dir_to_all_simulations, recursive=F)
-patt = ".*csv"
-
-for (data_dir in data_dirs) {
-  # plot_dir = file.path(data_dir, "Plots")
-  folder_name = strsplit(data_dir, "/")[[1]][length(strsplit(data_dir, "/")[[1]])]
-  model_name = strsplit(folder_name, "_")[[1]][1]
-  print(model_name)
+if (data_name == "HumAndSim") {
   
-  # Get data
+  # Get human data
+  plot_dir = file.path(human_data_dir, "Plots")
   ages = get_ages(ages_file_dir)
-  sim_all_files = get_data(data_dir, "simulated_human", ".*csv")
-  sim_all_files = merge(sim_all_files, ages, all.x = T)
-  sim_all_files = finish_all_files(sim_all_files)
+  all_files = get_data(human_data_dir, "human", ".*csv")  # ".*mat")
+  all_files = merge(all_files, ages, all.x = T)
+  all_files = finish_all_files(all_files)
+  excl_subj = plot_indivduals_for_exclusion(all_files, exclude_UCB)
+  all_files = subset(all_files, !sID %in% excl_subj)
+  stuff = get_ACC_reward_subj(all_files)
+  ACC_subj = stuff[[1]]
+  reward_subj = stuff[[3]]
+  ACCs = stuff[[5]]
+  all_files_regr = get_regression_dat(all_files)
+  nback_regr_dat = run_regressions(all_files_regr)
+  nback_regr_dat = merge(nback_regr_dat, ages, all.x = T)
+  nback_regr_dat = add_age_group_yrs(nback_regr_dat)
   
-  # Exclude subjects
-  sim_excl_subj = plot_indivduals_for_exclusion(sim_all_files, exclude_UCB)
-  sim_all_files = subset(sim_all_files, !sID %in% sim_excl_subj)
+  all_files$model_name = "Human"
+  all_files_regr$model_name = "Human"
+  nback_regr_dat$model_name = "Human"
+  reward_subj$model_name = "Human"
+  ACC_subj$model_name = "Human"
+  ACCs$model_name = "Human"
   
-  # Create summary data
-  sim_stuff = get_ACC_reward_subj(sim_all_files)  # ACC_subj, ACC_subj_block, reward_subj, reward_subj_block, ACCs
-  sim_ACC_subj = sim_stuff[[1]]
-  sim_reward_subj = sim_stuff[[3]]
-  sim_ACCs = sim_stuff[[5]]
-  sim_all_files_regr = get_regression_dat(sim_all_files)
-  sim_nback_regr_dat = run_regressions(sim_all_files_regr)
-  sim_nback_regr_dat = merge(sim_nback_regr_dat, ages, all.x = T)
-  sim_nback_regr_dat = add_age_group_yrs(sim_nback_regr_dat)
+  # Get simulated data
+  data_dirs = list.dirs(dir_to_all_simulations, recursive=F)
+  patt = ".*csv"
   
-  sim_all_files$model_name = model_name
-  sim_all_files_regr$model_name = model_name
-  sim_nback_regr_dat$model_name = model_name
-  sim_reward_subj$model_name = model_name
-  sim_ACC_subj$model_name = model_name
-  sim_ACCs$model_name = model_name
-
-  all_files = rbind(all_files, sim_all_files)
-  nback_regr_dat = rbind(nback_regr_dat, sim_nback_regr_dat)
-  reward_subj = rbind(reward_subj, sim_reward_subj)
-  ACC_subj = rbind(ACC_subj, sim_ACC_subj)
-  ACCs = rbind(ACCs, sim_ACCs)
+  for (data_dir in data_dirs) {
+    # plot_dir = file.path(data_dir, "Plots")
+    folder_name = strsplit(data_dir, "/")[[1]][length(strsplit(data_dir, "/")[[1]])]
+    model_name = strsplit(folder_name, "_")[[1]][1]
+    print(model_name)
+  
+    # Get data
+    ages = get_ages(ages_file_dir)
+    sim_all_files = get_data(data_dir, "simulated_human", ".*csv")
+    sim_all_files = merge(sim_all_files, ages, all.x = T)
+    sim_all_files = finish_all_files(sim_all_files)
+  
+    # Exclude subjects
+    sim_excl_subj = plot_indivduals_for_exclusion(sim_all_files, exclude_UCB)
+    sim_all_files = subset(sim_all_files, !sID %in% sim_excl_subj)
+  
+    # Create summary data
+    sim_stuff = get_ACC_reward_subj(sim_all_files)  # ACC_subj, ACC_subj_block, reward_subj, reward_subj_block, ACCs
+    sim_ACC_subj = sim_stuff[[1]]
+    sim_reward_subj = sim_stuff[[3]]
+    sim_ACCs = sim_stuff[[5]]
+    sim_all_files_regr = get_regression_dat(sim_all_files)
+    sim_nback_regr_dat = run_regressions(sim_all_files_regr)
+    sim_nback_regr_dat = merge(sim_nback_regr_dat, ages, all.x = T)
+    sim_nback_regr_dat = add_age_group_yrs(sim_nback_regr_dat)
+  
+    sim_all_files$model_name = model_name
+    sim_all_files_regr$model_name = model_name
+    sim_nback_regr_dat$model_name = model_name
+    sim_reward_subj$model_name = model_name
+    sim_ACC_subj$model_name = model_name
+    sim_ACCs$model_name = model_name
+  
+    all_files = rbind(all_files, sim_all_files)
+    nback_regr_dat = rbind(nback_regr_dat, sim_nback_regr_dat)
+    reward_subj = rbind(reward_subj, sim_reward_subj)
+    ACC_subj = rbind(ACC_subj, sim_ACC_subj)
+    ACCs = rbind(ACCs, sim_ACCs)
+  }
+  
+  l = 0  # don't make figures wider
 }
 ```
 
@@ -641,8 +646,8 @@ s_outcome12back_stay_agegroup = a_outcome12back_stay +
   scale_fill_manual(values=colors_3and1)
   
 # Save plots
-ggsave(file.path(plot_dir, "a_trialsinceswitch_ACC.png"), a_trialsinceswitch_ACC, width=5, height=2)
-ggsave(file.path(plot_dir, "a_outcome12back_stay.png"), a_outcome12back_stay, width=3, height=2)
+ggsave(file.path(plot_dir, "a_trialsinceswitch_ACC.png"), a_trialsinceswitch_ACC, width=5 + l, height=2)
+ggsave(file.path(plot_dir, "a_outcome12back_stay.png"), a_outcome12back_stay, width=3 + l, height=2)
 
 ggsave(file.path(plot_dir, "s_trialsinceswitch_ACC_agegroup.png"), s_trialsinceswitch_ACC_agegroup, width=5, height=2)
 ggsave(file.path(plot_dir, "s_outcome12back_stay_agegroup.png"), s_outcome12back_stay_agegroup, width=5, height=2)
@@ -682,7 +687,7 @@ ggsave(file.path(plot_dir, "s_outcome12back_stay_agegroup.png"), s_outcome12back
 
 # Correct over age
 c_age_ACC_validation =
-  ggplot(ACCs, aes(age_group, mean_ACC, group=model_name, color=model_name, linetype=model_name!="Human")) +  # 
+  ggplot(ACCs, aes(age_group, 100 * mean_ACC, group=model_name, color=model_name, linetype=model_name!="Human")) +  # 
   stat_summary() +
   scale_color_manual(values=colors_validation) +
   stat_summary(geom='line')
@@ -695,7 +700,7 @@ c_age_ACC_validation =
 # (b_age_ACC =
 #   b_basic + geom_point(aes(y=mean_ACC)))
 (b_age_ACC =
-  ggplot(ACCs, aes(x=PreciseYrs, y=mean_ACC, color=Gender, group=1)) +
+  ggplot(ACCs, aes(x=PreciseYrs, y=100 * mean_ACC, color=Gender, group=1)) +
   geom_point(size=0.3) +
   geom_smooth(method="lm", formula=y ~ x + I(x^2), color="black", size=0.5, alpha=0.3) +
   facet_wrap(~ model_name))
@@ -793,12 +798,16 @@ b_age_logregr$data = subset(pn_regr_dat, model_name=="Human")
 rew_min_nor = subset(pn_regr_dat, back %in% c(1, 2) & predictor=="noReward", select=c(sID, back, sig_Estimate, model_name))
 rew_min_nor = reshape(rew_min_nor, timevar="back", idvar=c("sID", "model_name"), direction="wide")
 rew_min_nor$n2_min_n1 = with(rew_min_nor, sig_Estimate.2 - sig_Estimate.1)
-rew_min_nor = merge(rew_min_nor, ages)
-rew_min_nor = add_age_group_yrs(rew_min_nor)
-ggplot(rew_min_nor, aes(PreciseYrs, n2_min_n1, color=model_name)) +
-  # geom_point(aes(color=Gender)) +
-  stat_summary(aes(age_group_)) +
-  stat_summary(aes(age_group_), geom="line")
+
+if (data_name != "PCsim") {
+  rew_min_nor = merge(rew_min_nor, ages)
+  rew_min_nor = add_age_group_yrs(rew_min_nor)
+  
+  ggplot(rew_min_nor, aes(PreciseYrs, n2_min_n1, color=model_name)) +
+    # geom_point(aes(color=Gender)) +
+    stat_summary(aes(age_group_)) +
+    stat_summary(aes(age_group_), geom="line")
+}
 
 # Empirical p_switch
 c_age_pswitch_validation =
@@ -812,7 +821,9 @@ b_age_pswitch$data = ACCs
 # Save plots
 ggsave(file.path(plot_dir, "b_age_stayappswitch.png"), b_age_stayappswitch, width=6, height=3)
 ggsave(file.path(plot_dir, "b_age_asymptbeh.png"), b_age_asymptbeh, width=6, height=3)
-ggsave(file.path(plot_dir, "b_age_logregr.png"), b_age_logregr, width=5, height=9)
+if (!data_name == "PCsim") {
+  ggsave(file.path(plot_dir, "b_age_logregr.png"), b_age_logregr, width=5, height=9)
+}
 ggsave(file.path(plot_dir, "b_age_pswitch.png"), b_age_pswitch, width=4, height=4)
 
 ggsave(file.path(plot_dir, "c_age_stayappswitch_validation.png"), c_age_stayappswitch_validation, width=5, height=3)
@@ -833,6 +844,7 @@ param_dat = param_dat[,c("sID", "Gender", "age_group", "PreciseYrs", "alpha", "b
 param_dat = add_age_group_yrs(param_dat)
 param_dat_l = melt(param_dat, id.vars=c("sID", "Gender", "age_group", "age_group_", "PreciseYrs"), variable.name="param_name", value.name="param_value")
 ```
+
 ```{r Plot model parameters}
 (f_age_param =
   ggplot(param_dat_l, aes(age_group, param_value, group=1)) +
