@@ -63,15 +63,16 @@ get_ages = function(ages_file_dir) {
   return(ages)
 }
 ```
+
 ```{r Read in data}
 get_data = function(data_dir, data_name, patt) {
   all_files = data.frame()
-  
+
   filenames = list.files(data_dir, pattern = patt)
   print(paste(length(filenames), "filenames on the list."))
-  
+
   for(filename in filenames) {
-    
+
     if (data_name == "human_mat") {
       mat_file = readMat(file.path(data_dir, filename))$exp[,,1]$PROBSWITCHdata[,,1]
       subj_file = data.frame(RT = t(mat_file$RT))
@@ -86,6 +87,23 @@ get_data = function(data_dir, data_name, patt) {
       subj_file = read.csv(file.path(data_dir, filename))
     }
     
+    if (data_name == "sim") {
+      
+      # Fill in arbitrary data
+      for (col_name in c("T_group", "PDS_group", "Columbia_cat")) {
+        if (!col_name %in% colnames(all_files)) {
+          all_files[,col_name] = 1
+        }
+      }
+      for (col_name in c("PDS", "meanT", "PreciseYrs", "log_T")) {
+        if (!col_name %in% colnames(all_files)) {
+          all_files[,col_name] = runif(1, 8, 30)
+        }
+      }
+      all_files$age_group = "50%"
+      all_files$Gender = "Male"
+    }
+
     # Make sure all files have the same columns
     ## Remove unwanted columns
     for (col_name in colnames(subj_file)) {
@@ -99,27 +117,18 @@ get_data = function(data_dir, data_name, patt) {
         subj_file[,col_name] = NA
       }
     }
-    if (is.na(subj_file$model_name[1])) {
-      subj_file$model_name = subj_file$learning_style
-    }
-    if (is.na(subj_file$model_name[1])) {
-      subj_file$model_name = "no_model"
-    }
-    if (is.na(subj_file$version[1])) {
-      subj_file$version = "no_version"
-    }
-    
+
     # Add columns
     subj_file$TrialID = 1:nrow(subj_file)
     subj_file$rewardversion = subj_file$sID %% 4
     subj_file$ACC = with(subj_file, selected_box == correct_box)
-    
+
     # Get switch_trial, block, and trialssinceswitch
     this_trial = subj_file$correct_box[2:nrow(subj_file)]
     prev_trial = subj_file$correct_box[1:(nrow(subj_file) - 1)]
     subj_file$switch_trial = c(F, this_trial != prev_trial)
     subj_file$block = cumsum(subj_file$switch_trial)
-    
+
     subj_file$trialsinceswitch = NA
     for (blocki in subj_file$block) {
       n_rows = nrow(subset(subj_file, block == blocki))
@@ -128,33 +137,36 @@ get_data = function(data_dir, data_name, patt) {
         subj_file$trialsinceswitch[subj_file$block == blocki][(n_rows - 3):n_rows] = -4:-1
       }
     }
-    
+
     subj_file$outcome_1_back = c(NA, subj_file$reward[1:(nrow(subj_file) - 1)])
     subj_file$outcome_2_back = c(NA, NA, subj_file$reward[1:(nrow(subj_file) - 2)])
-    
+
     subj_file$choice_left = subj_file$selected_box == 0  # left: 0; right: 1
     subj_file$choice_1_back = c(NA, subj_file$choice_left[1:(nrow(subj_file) - 1)])
     subj_file$choice_2_back = c(NA, NA, subj_file$choice_left[1:(nrow(subj_file) - 2)])
-    
+
     if (data_name == "human_mat") {
       write.csv(subj_file, paste(data_dir, "/PS_", sID, ".csv", sep = ""), row.names = F)
     }
-    
+
     all_files = as.data.frame(rbind(all_files, subj_file))
   }
-  
+
   reward_versions = ddply(all_files, .(sID), summarize, rewardversion = rewardversion[1])
   write.csv(reward_versions, paste0(data_dir, "_rewardversions.csv"))
   print(paste("Read in data from", length(unique(all_files$sID)), "unique subjects (might be more simulations)."))
   summary(all_files)
   summary(subj_file)
   colnames(all_files)
-  
+
   return(all_files)
 }
 ```
+
 ```{r Remaining fixes for all_filess}
-finish_all_files = function(all_files, ages) {
+finish_all_files = function(all_files) {
+  
+  all_files = subset(all_files, !is.na(reward))
   
   all_files$outcome_21_back = paste(all_files$outcome_2_back, all_files$outcome_1_back)
   all_files$outcome_21_back = factor(all_files$outcome_21_back,
@@ -165,13 +177,10 @@ finish_all_files = function(all_files, ages) {
   all_files$choice_12_back = ifelse(all_files$choice_1_back, "left", "right")
   all_files$choice_12_back[!all_files$same_choice_12_back | is.na(all_files$same_choice_12_back)] = NA
   all_files$reward_port = factor(all_files$correct_box, levels = c(0, 1), labels = c("Left", "Right"))
-  all_files$learning_style = factor(all_files$learning_style)
-  summary(all_files$PDS)
-  ages
-  
+  # all_files$learning_style = factor(all_files$learning_style)
+
   old_nrows = nrow(all_files)
-  all_files = merge(all_files, ages, all.x = T)
-  all_files$PDS = as.numeric(all_files$PDS)
+  # all_files$PDS = as.numeric(all_files$PDS)
   assertthat::assert_that(nrow(all_files) == old_nrows)
   
   xyz = ddply(all_files, .(sID, Gender, age_group), x = NA, summarize)
@@ -192,6 +201,7 @@ finish_all_files = function(all_files, ages) {
   return(all_files)
 }
 ```
+
 ```{r get_ACC_reward_subj}
 add_age_group_yrs = function(data) {
   
@@ -235,6 +245,7 @@ get_ACC_reward_subj = function(all_files) {
                mean_reward = mean(reward, na.rm=T),
                mean_stay = mean(stay, na.rm=T),
                n_switches=sum(switch_trial, na.rm=T),
+               p_switch=mean(switch_trial, na.rm=T),
                n_fast_RTs=sum(RT<100, na.rm=T),
                # median_RT=median(RT, na.rm=T),
                n_trials=length(RT))
@@ -308,13 +319,13 @@ plot_indivduals_for_exclusion = function(all_files, exclude_UCB) {
   all_excluded = unique(c(gender_excl, n_trials_excl, switch_excl, ACC_excl, above30_excl, special_excl))  # , PDS_excl, T_excl
   
   # Save plots
-  ggsave(file.path(plot_dir, "/gg_0excl_ACC.eps"), gg_0excl_ACC)
-  ggsave(file.path(plot_dir, "/gg_0excl_switch.eps"), gg_0excl_switch)
-  ggsave(file.path(plot_dir, "/gg_0excl_fast.eps"), gg_0excl_fast)
+  ggsave(file.path(plot_dir, "/gg_0excl_ACC.png"), gg_0excl_ACC)
+  ggsave(file.path(plot_dir, "/gg_0excl_switch.png"), gg_0excl_switch)
+  ggsave(file.path(plot_dir, "/gg_0excl_fast.png"), gg_0excl_fast)
   
-  ggsave(file.path(plot_dir, "/gg_0excl_ACC.eps"), gg_0excl_ACC)
-  ggsave(file.path(plot_dir, "/gg_0excl_switch.eps"), gg_0excl_switch)
-  ggsave(file.path(plot_dir, "/gg_0excl_fast.eps"), gg_0excl_fast)
+  ggsave(file.path(plot_dir, "/gg_0excl_ACC.png"), gg_0excl_ACC)
+  ggsave(file.path(plot_dir, "/gg_0excl_switch.png"), gg_0excl_switch)
+  ggsave(file.path(plot_dir, "/gg_0excl_fast.png"), gg_0excl_fast)
   
   return(all_excluded)
 }
@@ -361,6 +372,7 @@ get_regression_dat = function(all_files) {
   return(all_files_regr)
 }
 ```
+
 ```{r old}
 run_regressions = function(all_files_regr) {
     
@@ -419,18 +431,25 @@ run_regressions = function(all_files_regr) {
     }
   }
   # Beautify
-  nback_regr_dat = merge(nback_regr_dat, ages, all.x = T)
   nback_regr_dat$predictor = gsub("back.", "", nback_regr_dat$predictor)
   nback_regr_dat$predictor = gsub("[0-99]", "", nback_regr_dat$predictor)
-  z = (nback_regr_dat$Estimate - mean(nback_regr_dat$Estimate, na.rm=T)) / sd(nback_regr_dat$Estimate, na.rm=T)
-  nback_regr_dat$sig_Estimate = 2 * (1 / (1 + exp(-z))) - 1  # transform so that I can see all
   
+  nback_regr_dat$sig_Estimate = NA
+  for (pred in unique(nback_regr_dat$predictor)) {
+    for (ba in unique(nback_regr_dat$back)) {
+      sub = subset(nback_regr_dat, predictor==pred & back==ba)
+      z = (sub$Estimate - mean(sub$Estimate, na.rm=T)) / sd(sub$Estimate, na.rm=T)
+      nback_regr_dat[nback_regr_dat$predictor==pred & nback_regr_dat$back==ba, "sig_Estimate"] = 2 * (1 / (1 + exp(-z))) - 1  # transform so that I can see all
+    }
+  }
+  # z = (nback_regr_dat$Estimate - mean(nback_regr_dat$Estimate, na.rm=T)) / sd(nback_regr_dat$Estimate, na.rm=T)
+  # nback_regr_dat$sig_Estimate = 2 * (1 / (1 + exp(-z))) - 1  # transform so that I can see all
+      
   # Summarize over versions (for simulated_humans)
   nback_regr_dat = ddply(nback_regr_dat,
                          colnames(nback_regr_dat)[colnames(nback_regr_dat) != "version"],
                          summarize,
                          X = sID[1])
-  nback_regr_dat = add_age_group_yrs(nback_regr_dat)
   
   return(nback_regr_dat)
 }
@@ -452,21 +471,71 @@ run_regressions = function(all_files_regr) {
 # Main script
 
 ```{r Load packages, set parameters}
-library("ggplot2"); theme_set(theme_classic()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo"); library(lmerTest); library("ggfortify")#; library("corrplot")#; library("Hmisc")
+library("ggplot2"); theme_set(theme_classic()); library("plyr"); library("reshape2"); library("R.matlab"); library("zoo"); library(lmerTest); library("ggfortify"); library("RColorBrewer")#; library("corrplot")#; library("Hmisc")
+# display.brewer.all(n=NULL, type="all", select=NULL, exact.n=TRUE, colorblindFriendly=T)
 
 exclude_UCB = F
 colors_3and1 = c("#00D000", "#00C055", "#00B0AA", "#00A0FF", "gray60", "grey50")
+colors_validation = brewer.pal(n=3, name="Set2")
+colors_validation[2] = "black"
 parameter_names = c('alpha', 'beta', 'nalpha', 'calpha', 'cnalpha', 'p_switch', 'p_reward', 'persev')
-desired_columns = c("sID", "version", "selected_box", "p_right", "reward", "RT", "correct", "correct_box", "learning_style", "model_name", "NLL", parameter_names, paste0(parameter_names, "_rec"))
+desired_columns = c("sID", "selected_box", "p_right", "reward", "RT", "correct", "correct_box", "model_name")
 
 # Directories of all the stuff
 ages_file_dir = "C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv"
 human_data_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch"
 param_file_dir = "C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/new_ML_models/MCMC/clustermodels/"
 dir_to_all_simulations = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/new_ML_models/MCMC/clustermodels/simulate/simulations'
+```
 
-# Notes
-# ggsave(..., useDingbats=FALSE) is supposed to help with illustrator problems
+```{r get simulated data}
+sim_data_dir = "C:/Users/maria/MEGAsync/SLCNdata/ProbSwitch/PC_sim_dat"
+patt = "PC1plus"
+plot_dir = file.path(sim_data_dir, "Plots")
+all_files = get_data(sim_data_dir, "sim", patt)
+
+## Add NA columns for wanted columns
+for (col_name in c("T_group", "PDS_group", "Columbia_cat")) {
+  if (!col_name %in% colnames(all_files)) {
+    all_files[,col_name] = 1
+  }
+}
+for (col_name in c("PDS", "meanT", "PreciseYrs", "log_T")) {
+  if (!col_name %in% colnames(all_files)) {
+    all_files[,col_name] = runif(nrow(all_files), 8, 30)
+  }
+}
+# for (col_name in c("age_group", "Gender")) {
+#   if (!col_name %in% colnames(all_files)) {
+#     all_files[,col_name] = "A"
+#   }
+# }
+all_files$age_group = "50%"
+all_files$Gender = "Male"
+# all_files$PreciseYrs = runif(nrow(all_files), 8, 30)
+
+# half1 = round(nrow(all_files) / 2)
+# half2 = nrow(all_files) - half1
+# all_files$age_group = c(rep("A", half1), rep("B", half2))
+# all_files$Gender = c(rep("A", half1), rep("B", half2))
+
+all_files = finish_all_files(all_files)
+excl_subj = plot_indivduals_for_exclusion(all_files, exclude_UCB)
+# all_files = subset(all_files, !sID %in% excl_subj)
+stuff = get_ACC_reward_subj(all_files)
+ACC_subj = stuff[[1]]
+reward_subj = stuff[[3]]
+ACCs = stuff[[5]]
+all_files_regr = get_regression_dat(all_files)
+nback_regr_dat = run_regressions(all_files_regr)
+nback_regr_dat$age_group = "A"
+
+all_files$model_name = patt
+all_files_regr$model_name = patt
+nback_regr_dat$model_name = patt
+reward_subj$model_name = patt
+ACC_subj$model_name = patt
+ACCs$model_name = patt
 ```
 
 ```{r Read in human and simulated data}
@@ -474,7 +543,8 @@ dir_to_all_simulations = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/new_M
 plot_dir = file.path(human_data_dir, "Plots")
 ages = get_ages(ages_file_dir)
 all_files = get_data(human_data_dir, "human", ".*csv")  # ".*mat")
-all_files = finish_all_files(all_files, ages)
+all_files = merge(all_files, ages, all.x = T)
+all_files = finish_all_files(all_files)
 excl_subj = plot_indivduals_for_exclusion(all_files, exclude_UCB)
 all_files = subset(all_files, !sID %in% excl_subj)
 stuff = get_ACC_reward_subj(all_files)
@@ -483,7 +553,10 @@ reward_subj = stuff[[3]]
 ACCs = stuff[[5]]
 all_files_regr = get_regression_dat(all_files)
 nback_regr_dat = run_regressions(all_files_regr)
+nback_regr_dat = merge(nback_regr_dat, ages, all.x = T)
+nback_regr_dat = add_age_group_yrs(nback_regr_dat)
 
+all_files$model_name = "Human"
 all_files_regr$model_name = "Human"
 nback_regr_dat$model_name = "Human"
 reward_subj$model_name = "Human"
@@ -503,7 +576,8 @@ for (data_dir in data_dirs) {
   # Get data
   ages = get_ages(ages_file_dir)
   sim_all_files = get_data(data_dir, "simulated_human", ".*csv")
-  sim_all_files = finish_all_files(sim_all_files, ages)
+  sim_all_files = merge(sim_all_files, ages, all.x = T)
+  sim_all_files = finish_all_files(sim_all_files)
   
   # Exclude subjects
   sim_excl_subj = plot_indivduals_for_exclusion(sim_all_files, exclude_UCB)
@@ -516,7 +590,10 @@ for (data_dir in data_dirs) {
   sim_ACCs = sim_stuff[[5]]
   sim_all_files_regr = get_regression_dat(sim_all_files)
   sim_nback_regr_dat = run_regressions(sim_all_files_regr)
+  sim_nback_regr_dat = merge(sim_nback_regr_dat, ages, all.x = T)
+  sim_nback_regr_dat = add_age_group_yrs(sim_nback_regr_dat)
   
+  sim_all_files$model_name = model_name
   sim_all_files_regr$model_name = model_name
   sim_nback_regr_dat$model_name = model_name
   sim_reward_subj$model_name = model_name
@@ -524,16 +601,16 @@ for (data_dir in data_dirs) {
   sim_ACCs$model_name = model_name
 
   all_files = rbind(all_files, sim_all_files)
+  nback_regr_dat = rbind(nback_regr_dat, sim_nback_regr_dat)
   reward_subj = rbind(reward_subj, sim_reward_subj)
   ACC_subj = rbind(ACC_subj, sim_ACC_subj)
-  nback_regr_dat = rbind(nback_regr_dat, sim_nback_regr_dat)
   ACCs = rbind(ACCs, sim_ACCs)
 }
 ```
 
 ```{r Basic Performance}
 # Adjust to task switches
-a_trialsinceswitch_ACC =
+(a_trialsinceswitch_ACC =
   ggplot(ACC_subj, aes(trialsinceswitch, 100 * ACC)) + 
   geom_vline(xintercept = 0, linetype = "dotted") +
   stat_summary(fun.data = mean_cl_normal, fun.args = list(mult = 1), geom = "errorbar", width=0, color='grey') +
@@ -542,7 +619,7 @@ a_trialsinceswitch_ACC =
   coord_cartesian(x = c(-3, 7), y = c(0, 100)) +
   scale_x_continuous(breaks = seq(-3, 7, 2)) +
   labs(x = "Trials since switch", y = "% correct", color = "Age", shape = "Age") +
-  facet_grid(~ model_name)
+  facet_grid(~ model_name))
 
 s_trialsinceswitch_ACC_agegroup = a_trialsinceswitch_ACC +
   aes(color=age_group) +
@@ -550,19 +627,19 @@ s_trialsinceswitch_ACC_agegroup = a_trialsinceswitch_ACC +
   theme(legend.position="none")
 
 # 2-trial reward history
-a_outcome12back_stay =
+(a_outcome12back_stay =
   ggplot(reward_subj, aes(outcome_21_back, 100 * stay)) +
   stat_summary(fun.data = mean_cl_normal, geom = "bar", fun.args = list(mult = 1), position = "dodge") +
   stat_summary(fun.data = mean_cl_normal, geom = "errorbar", fun.args = list(mult = 1), position = position_dodge(0.9), width=0) +  # or "pointrante" with size=.02
   theme(axis.text.x = element_text(angle = -30, hjust = 0.2)) +
   coord_cartesian(ylim = c(0, 100)) +
   labs(x = "Previous outcomes", y = "% stay", fill = "Age") +
-  facet_grid( ~ model_name)
+  facet_grid( ~ model_name))
 
 s_outcome12back_stay_agegroup = a_outcome12back_stay +
   aes(fill=age_group) +
   scale_fill_manual(values=colors_3and1)
-
+  
 # Save plots
 ggsave(file.path(plot_dir, "a_trialsinceswitch_ACC.png"), a_trialsinceswitch_ACC, width=5, height=2)
 ggsave(file.path(plot_dir, "a_outcome12back_stay.png"), a_outcome12back_stay, width=3, height=2)
@@ -570,92 +647,178 @@ ggsave(file.path(plot_dir, "a_outcome12back_stay.png"), a_outcome12back_stay, wi
 ggsave(file.path(plot_dir, "s_trialsinceswitch_ACC_agegroup.png"), s_trialsinceswitch_ACC_agegroup, width=5, height=2)
 ggsave(file.path(plot_dir, "s_outcome12back_stay_agegroup.png"), s_outcome12back_stay_agegroup, width=5, height=2)
 ```
+
 ```{r Basic measures - Age differences and Model validation}
+# logit2prob = function(logit) {
+#   odds = exp(logit)
+#   prob = odds / (1 + odds)
+#   return(prob)
+# }
+# 
+# # Prepare data
+# ACCs$stay_fit = logit2prob(-0.577233 + 0.169091 * ACCs$PreciseYrs -0.004066 * ACCs$PreciseYrs ^ 2)  # results from summary(glmer(same_choice_01_back ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), all_files, binomial)); 10/08/2019; run on all subjects, IDs 12-448, ages 7.77-30
+# # ACCs$stay_fit[ACCs$Gender == "Female"] = NA  # hack to get rid of double lines
+# ACCs$stay_fit_low = logit2prob(-0.577233 + (0.169091 - 0.037734) * ACCs$PreciseYrs -(0.004066 - 0.001014) * ACCs$PreciseYrs ^ 2)
+# ACCs$stay_fit_hig = logit2prob(-0.577233 + (0.169091 + 0.037734) * ACCs$PreciseYrs -(0.004066 + 0.001014) * ACCs$PreciseYrs ^ 2)
+# 
+# 
+# ACCs$ACC_fit = logit2prob(0.5734135 + 0.0538203 * ACCs$PreciseYrs -0.0013972 * ACCs$PreciseYrs ^ 2)  # summary(glmer(ACC ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), subset(all_files, model_name == "Human"), binomial)); 03/03/2020
+# ACCs$ACC_fit_low = logit2prob(0.5734135 + (0.0538203 - 0.0171031) * ACCs$PreciseYrs -(0.0013972 - 0.0004589) * ACCs$PreciseYrs ^ 2)
+# ACCs$ACC_fit_hig = logit2prob(0.5734135 + (0.0538203 + 0.0171031) * ACCs$PreciseYrs -(0.0013972 + 0.0004589) * ACCs$PreciseYrs ^ 2)
+# 
+# ACCs$reward_fit = 120 * logit2prob((-0.0725144 + 0.0420249 * ACCs$PreciseYrs -0.0011834 * ACCs$PreciseYrs ^ 2))  # summary(glmer(reward ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), all_files, binomial))
+# # ACCs$reward_fit[ACCs$Gender == "Female"] = NA  # hack to get rid of double lines
+# ACCs$reward_fit_low = 120 * logit2prob((-0.0725144 + (0.0420249 - 0.0125284) * ACCs$PreciseYrs -(0.0011834 - 0.0003356) * ACCs$PreciseYrs ^ 2))
+# ACCs$reward_fit_hig = 120 * logit2prob((-0.0725144 + (0.0420249 + 0.0125284) * ACCs$PreciseYrs -(0.0011834 + 0.0003356) * ACCs$PreciseYrs ^ 2))
+# 
+# ACCs$RT_fit_mf = exp(7.384062 -0.165437 * ACCs$PreciseYrs + 0.003889 * ACCs$PreciseYrs ^ 2)  # summary(lmer(log(RT) ~ PreciseYrs + PreciseYrs2 + (1 | sID), subset(all_files, ACC==T)))
+# ACCs$RT_fit = exp(7.330e+00 -1.594e-01 * ACCs$PreciseYrs + 3.737e-03 * ACCs$PreciseYrs ^ 2)  # summary(lmer(log(RT) ~ PreciseYrs + PreciseYrs2 + (1 | sID), subset(all_files, ACC==T & Gender=="Female")))
+# ACCs$RT_fit_hig = exp(7.330e+00 -(1.594e-01 + 2.305e-02) * ACCs$PreciseYrs + (3.737e-03 + 6.216e-04) * ACCs$PreciseYrs ^ 2)
+# ACCs$RT_fit_low = exp(7.330e+00 -(1.594e-01 - 2.305e-02) * ACCs$PreciseYrs + (3.737e-03 - 6.216e-04) * ACCs$PreciseYrs ^ 2)
+# 
+# ACCs$RT_fit[ACCs$Gender == "Male"] = exp(7.263e+00 -1.731e-01 * ACCs$PreciseYrs + 4.080e-03 * ACCs$PreciseYrs ^ 2)[ACCs$Gender == "Male"]  # summary(lmer(log(RT) ~ PreciseYrs + PreciseYrs2 + (1 | sID), subset(all_files, ACC==T & Gender=="Male")))
+# ACCs$RT_fit_hig[ACCs$Gender == "Male"] = exp(7.263e+00 -(1.731e-01 + 3.317e-02) * ACCs$PreciseYrs + (4.080e-03 + 8.816e-04) * ACCs$PreciseYrs ^ 2)[ACCs$Gender == "Male"]
+# ACCs$RT_fit_low[ACCs$Gender == "Male"] = exp(7.263e+00 -(1.731e-01 - 3.317e-02) * ACCs$PreciseYrs + (4.080e-03 - 8.816e-04) * ACCs$PreciseYrs ^ 2)[ACCs$Gender == "Male"]
+
 # Correct over age
 c_age_ACC_validation =
-  ggplot(ACCs, aes(age_group, mean_ACC, group=model_name, color=model_name)) +
+  ggplot(ACCs, aes(age_group, mean_ACC, group=model_name, color=model_name, linetype=model_name!="Human")) +  # 
   stat_summary() +
+  scale_color_manual(values=colors_validation) +
   stat_summary(geom='line')
-b_age_ACC =
-  ggplot(ACCs, aes(x=age_group_, mean_ACC, color=Gender, group=1)) +
-  geom_point(aes(x=PreciseYrs)) +
+
+# b_basic = 
+#   ggplot(ACCs, aes(x=PreciseYrs, y=ACC_fit, ymin=ACC_fit_low, ymax=ACC_fit_hig, color=Gender)) +
+#   geom_ribbon(linetype=0, fill='black', alpha=0.05) +
+#   geom_line(color="black") +
+#   facet_wrap(~ model_name)
+# (b_age_ACC =
+#   b_basic + geom_point(aes(y=mean_ACC)))
+(b_age_ACC =
+  ggplot(ACCs, aes(x=PreciseYrs, y=mean_ACC, color=Gender, group=1)) +
+  geom_point(size=0.3) +
+  geom_smooth(method="lm", formula=y ~ x + I(x^2), color="black", size=0.5, alpha=0.3) +
+  facet_wrap(~ model_name))
+
+b_age_ACC_old =
+  ggplot(ACCs, aes(x=age_group_, 100 * mean_ACC, color=Gender, group=1)) +
   stat_summary() +
   stat_summary(geom='line') +
+  geom_point(aes(x=PreciseYrs)) +
   facet_wrap(~ model_name)
 
 # Stay over age
-b_age_stay =
-  b_age_ACC + aes(y=mean_stay)
+# (b_age_stay =
+#   b_basic + aes(ymin=stay_fit_low, ymax=stay_fit_hig, y=stay_fit) +
+#   geom_point(aes(y=mean_stay)))
+(b_age_stay =
+    b_age_ACC + aes(y=100 * mean_stay))
 c_age_stay_validation =
   c_age_ACC_validation + aes(y=mean_stay)
 
 # Rewards across age
-b_age_reward = 
-  b_age_ACC + aes(y=mean_reward * 120)
+# (b_age_reward = 
+#   b_basic + aes(ymin=reward_fit_low, ymax=reward_fit_hig, y=reward_fit) +
+#   geom_point(aes(y=mean_reward * 120)))
+(b_age_reward =
+    b_age_ACC + aes(y=mean_reward * 120))
 c_age_reward_validation =
   c_age_ACC_validation + aes(y=mean_reward * 120)
 
 # RTs across age
-b_age_RT =
-  b_age_ACC + aes(y=median_cor_RT, group=Gender) +
-    # stat_summary(geom="line", color="black") +
-    stat_summary(color="black", size=0.2)
-
+# (b_age_RT =
+#     ggplot(ACCs, aes(PreciseYrs, median_cor_RT, color=Gender, fill=Gender)) +
+#     geom_point() +
+#     geom_ribbon(aes(ymin=RT_fit_low, ymax=RT_fit_hig), linetype=0, alpha=0.1) +
+#     geom_line(aes(y=RT_fit)) +
+#     coord_cartesian(ylim=c(0, 800)))
+(b_age_RT = 
+    b_age_ACC + aes(y=median_cor_RT, group=Gender) +
+    geom_smooth(method="lm", formula=y ~ x + I(x^2), size=0.5, alpha=0.1))
+  
 # Save plots
 ggsave(file.path(plot_dir, "b_age_ACC.png"), b_age_ACC, width=6, height=3)
 ggsave(file.path(plot_dir, "b_age_stay.png"), b_age_stay, width=6, height=3)
 ggsave(file.path(plot_dir, "b_age_reward.png"), b_age_reward, width=6, height=3)
 ggsave(file.path(plot_dir, "b_age_RT.png"), b_age_RT, width=6, height=3)
 
-ggsave(file.path(plot_dir, "c_age_ACC_validation.png"), c_age_ACC_validation, width=4, height=3)
-ggsave(file.path(plot_dir, "c_age_stay_validation.png"), c_age_stay_validation, width=4, height=3)
-ggsave(file.path(plot_dir, "c_age_reward_validation.png"), c_age_reward_validation, width=4, height=3)
+ggsave(file.path(plot_dir, "c_age_ACC_validation.png"), c_age_ACC_validation, width=5, height=3)
+ggsave(file.path(plot_dir, "c_age_stay_validation.png"), c_age_stay_validation, width=5, height=3)
+ggsave(file.path(plot_dir, "c_age_reward_validation.png"), c_age_reward_validation, width=5, height=3)
 ```
+
 ```{r Specific measures - Age differences and Model validation}
-# "Apparent switch trials" (3rd bar of stay_plot)
-e_age_stayappswitch_validation =
-  ggplot(subset(reward_subj, outcome_21_back=="reward, no reward"), aes(age_group, 100 * stay, group=model_name, color=model_name)) +
-  stat_summary() +
-  stat_summary(geom="line")
-d_age_stayappswitch =
-  ggplot(subset(reward_subj, outcome_21_back=="reward, no reward"), aes(age_group_, 100 * stay, group=1, color=Gender)) +
-  geom_point(aes(x=PreciseYrs)) +
-  stat_summary() +
-  stat_summary(geom="line") +
-  facet_wrap(~ model_name)
+c_age_stayappswitch_validation =
+  c_age_ACC_validation + aes(y=100 * stay)
+c_age_stayappswitch_validation$data = subset(reward_subj, outcome_21_back=="reward, no reward")
+
+# d_age_stayappswitch =
+#   ggplot(subset(reward_subj, outcome_21_back=="reward, no reward"), aes(age_group_, 100 * stay, group=1, color=Gender)) +
+#   geom_point(aes(x=PreciseYrs)) +
+#   stat_summary() +
+#   stat_summary(geom="line") +
+#   facet_wrap(~ model_name)
+
+b_age_stayappswitch =
+    b_age_ACC + aes(y=100 * stay)
+b_age_stayappswitch$data = subset(reward_subj, outcome_21_back=="reward, no reward")
+b_age_stayappswitch
   
 # Asymptotic behavior (non-switch trials in gg_ACC_blocks)
 asymp_trials = c(-3:-2, 3:20)
-dat = ddply(subset(ACC_subj, trialsinceswitch %in% asymp_trials), .(sID, Gender, age_group_, age_group, PreciseYrs, model_name), summarize, ACC=mean(ACC))
+asypmt_dat = ddply(subset(ACC_subj, trialsinceswitch %in% asymp_trials), .(sID, Gender, age_group_, age_group, PreciseYrs, model_name), summarize, ACC=mean(ACC))
 
-e_age_asymptbeh_validation =
-  e_age_stayappswitch_validation + aes(y=100 * ACC)
-e_age_asymptbeh_validation$data = dat
+c_age_asymptbeh_validation =
+  c_age_ACC_validation + aes(y=100 * ACC)
+c_age_asymptbeh_validation$data = asypmt_dat
 
-d_age_asymptbeh =
-  d_age_stayappswitch + aes(y=100 * ACC)
-d_age_asymptbeh$data = dat
+b_age_asymptbeh =
+  b_age_ACC + aes(y=100 * ACC)
+b_age_asymptbeh$data = asypmt_dat
 
 # Effect of positive and negative outcomes (rewnorew_regr)
-dat = subset(nback_regr_dat, model == "rewardNoReward" & back %in% 1:3 & predictor != "(Intercept)" & !is.na(age_group))
-e_age_logregr_validation =
-  e_age_stayappswitch_validation + aes(y=sig_Estimate) +
+pn_regr_dat = subset(nback_regr_dat, model == "rewardNoReward" & back %in% 1:3 & predictor != "(Intercept)" & !is.na(age_group))
+c_age_logregr_validation =
+  c_age_ACC_validation + aes(y=sig_Estimate) +
+  geom_hline(yintercept=0, linetype="dotted") +
   facet_wrap(back ~ predictor, scales="free", nrow=3)
-e_age_logregr_validation$data = dat
+c_age_logregr_validation$data = pn_regr_dat
 
-d_age_logregr = 
-  d_age_stayappswitch + aes(y=sig_Estimate) +
+b_age_logregr = 
+  b_age_ACC + aes(y=sig_Estimate) +
+  geom_hline(yintercept=0, linetype="dotted") +
   facet_wrap(back ~ predictor, scales="free", nrow=3)
-d_age_logregr$data = subset(dat, model_name=="Human")
+b_age_logregr$data = subset(pn_regr_dat, model_name=="Human")
+
+rew_min_nor = subset(pn_regr_dat, back %in% c(1, 2) & predictor=="noReward", select=c(sID, back, sig_Estimate, model_name))
+rew_min_nor = reshape(rew_min_nor, timevar="back", idvar=c("sID", "model_name"), direction="wide")
+rew_min_nor$n2_min_n1 = with(rew_min_nor, sig_Estimate.2 - sig_Estimate.1)
+rew_min_nor = merge(rew_min_nor, ages)
+rew_min_nor = add_age_group_yrs(rew_min_nor)
+ggplot(rew_min_nor, aes(PreciseYrs, n2_min_n1, color=model_name)) +
+  # geom_point(aes(color=Gender)) +
+  stat_summary(aes(age_group_)) +
+  stat_summary(aes(age_group_), geom="line")
+
+# Empirical p_switch
+c_age_pswitch_validation =
+  c_age_ACC_validation + aes(y=p_switch)
+c_age_pswitch_validation$data = ACCs
+
+b_age_pswitch =
+  b_age_ACC + aes(y=p_switch)
+b_age_pswitch$data = ACCs
 
 # Save plots
-ggsave(file.path(plot_dir, "d_age_stayappswitch.png"), d_age_stayappswitch, width=6, height=3)
-ggsave(file.path(plot_dir, "d_age_asymptbeh.png"), d_age_asymptbeh, width=6, height=3)
-ggsave(file.path(plot_dir, "d_age_logregr.png"), d_age_logregr, width=6, height=7)
+ggsave(file.path(plot_dir, "b_age_stayappswitch.png"), b_age_stayappswitch, width=6, height=3)
+ggsave(file.path(plot_dir, "b_age_asymptbeh.png"), b_age_asymptbeh, width=6, height=3)
+ggsave(file.path(plot_dir, "b_age_logregr.png"), b_age_logregr, width=5, height=9)
+ggsave(file.path(plot_dir, "b_age_pswitch.png"), b_age_pswitch, width=4, height=4)
 
-ggsave(file.path(plot_dir, "e_age_stayappswitch_validation.png"), e_age_stayappswitch_validation, width=4, height=3)
-ggsave(file.path(plot_dir, "e_age_asymptbeh_validation.png"), e_age_asymptbeh_validation, width=4, height=3)
-ggsave(file.path(plot_dir, "e_age_logregr_validation.png"), e_age_logregr_validation, width=6, height=7)
+ggsave(file.path(plot_dir, "c_age_stayappswitch_validation.png"), c_age_stayappswitch_validation, width=5, height=3)
+ggsave(file.path(plot_dir, "c_age_asymptbeh_validation.png"), c_age_asymptbeh_validation, width=5, height=3)
+ggsave(file.path(plot_dir, "c_age_logregr_validation.eps"), c_age_logregr_validation, width=7.5, height=9)
+ggsave(file.path(plot_dir, "c_age_pswitch_validation.png"), c_age_pswitch_validation, width=5, height=4)
 ```
 
 ```{r Read in model parameters}
@@ -669,31 +832,56 @@ param_dat = merge(param_dat, ages)
 param_dat = param_dat[,c("sID", "Gender", "age_group", "PreciseYrs", "alpha", "beta_RL", "beta_BF", "nalpha", "persev_RL", "persev_BF", "p_switch", "p_reward")]
 param_dat = add_age_group_yrs(param_dat)
 param_dat_l = melt(param_dat, id.vars=c("sID", "Gender", "age_group", "age_group_", "PreciseYrs"), variable.name="param_name", value.name="param_value")
-param_dat_l
 ```
 ```{r Plot model parameters}
-f_age_param =
-  ggplot(param_dat_l, aes(age_group_, param_value, group=1)) +
-  geom_point(aes(x=PreciseYrs, color=Gender)) +
+(f_age_param =
+  ggplot(param_dat_l, aes(age_group, param_value, group=1)) +
+  # geom_point(aes(x=PreciseYrs, color=Gender)) +
   stat_summary() +
   stat_summary(geom="line") +
-  facet_wrap(~ param_name, scales="free")
+  facet_wrap(~ param_name, scales="free"))
+
+# (f_age_alpha = ggplot(subset(param_dat_l, param_name=="alpha"), aes(age_group, param_value, group=1)) +
+#   stat_summary() +
+#   stat_summary(geom="line") +
+#   coord_cartesian(ylim=c(0.55, 0.85)))
+# f_age_nalpha = f_age_alpha
+# f_age_nalpha$data = subset(param_dat_l, param_name=="nalpha")
+# 
+# f_age_betaRL = f_age_alpha + coord_cartesian(ylim=c(2.5, 4.25))
+# f_age_betaRL$data = subset(param_dat_l, param_name=="beta_RL")
+# f_age_betaBF = f_age_betaRL
+# f_age_betaBF$data = subset(param_dat_l, param_name=="beta_BF")
+# 
+# f_age_persevRL = f_age_alpha + coord_cartesian(ylim=c(2.5, 4.25))
+# f_age_betaRL$data = subset(param_dat_l, param_name=="beta_RL")
 
 # Save plot
 ggsave(file.path(plot_dir, "f_age_param.png"), f_age_param, width=8, height=8)
 ```
 
-```{r Model parameter regression}
-# Across models
-summary(lm(beta_RL ~ (beta_BF + persev_BF + p_switch + p_reward) ^ 2, data=param_dat))  # R^2 = 0.97
-summary(lm(persev_RL ~ (beta_BF + persev_BF + p_switch + p_reward) ^ 2, data=param_dat))  # R^2 = 0.97
-summary(lm(nalpha ~ (beta_BF + persev_BF + p_switch + p_reward) ^ 2, data=param_dat))  # R^2 = 0.93
-summary(lm(alpha ~ (beta_BF + persev_BF + p_switch + p_reward) ^ 2, data=param_dat))  # R^2 = 0.25
+```{r t-tests on model parameters}
+# t.test(nalpha ~ age_group, data=subset(param_dat, age_group %in% c("25%", "75%")))
+# t.test(nalpha ~ age_group, data=subset(param_dat, age_group %in% c("Adult", "75%")))
+# 
+# t.test(p_reward ~ age_group, data=subset(param_dat, age_group %in% c("25%", "75%")))
+# t.test(p_reward ~ age_group, data=subset(param_dat, age_group %in% c("Adult", "75%")))
+# 
+# t.test(p_switch ~ age_group, data=subset(param_dat, age_group %in% c("25%", "75%")))
+# t.test(p_switch ~ age_group, data=subset(param_dat, age_group %in% c("Adult", "75%")))
+```
 
-summary(lm(beta_BF ~ (beta_RL + persev_RL + alpha + nalpha) ^ 2, data=param_dat))  # R^2 = 0.97
-summary(lm(persev_BF ~ (beta_RL + persev_RL + alpha + nalpha) ^ 2, data=param_dat))  # R^2 = 0.97
-summary(lm(p_reward ~ (beta_RL + persev_RL + alpha + nalpha) ^ 2, data=param_dat))  # R^2 = 0.91
-summary(lm(p_switch ~ (beta_RL + persev_RL + alpha + nalpha) ^ 2, data=param_dat))  # R^2 = 0.79
+```{r Model parameter regression R2}
+# Across models
+beta_RL_mod = summary(lm(beta_RL ~ (beta_BF + persev_BF + p_switch + p_reward) ^ 2, data=param_dat))  # R^2 = 0.97
+persev_RL_mod = summary(lm(persev_RL ~ (beta_BF + persev_BF + p_switch + p_reward) ^ 2, data=param_dat))  # R^2 = 0.97
+nalpha_mod = summary(lm(nalpha ~ (beta_BF + persev_BF + p_switch + p_reward) ^ 2, data=param_dat))  # R^2 = 0.93
+alpha_mod = summary(lm(alpha ~ (beta_BF + persev_BF + p_switch + p_reward) ^ 2, data=param_dat))  # R^2 = 0.25
+
+beta_BF_mod = summary(lm(beta_BF ~ (beta_RL + persev_RL + alpha + nalpha) ^ 2, data=param_dat))  # R^2 = 0.97
+persev_BF_mod = summary(lm(persev_BF ~ (beta_RL + persev_RL + alpha + nalpha) ^ 2, data=param_dat))  # R^2 = 0.97
+p_reward_mod = summary(lm(p_reward ~ (beta_RL + persev_RL + alpha + nalpha) ^ 2, data=param_dat))  # R^2 = 0.91
+p_switch_mod = summary(lm(p_switch ~ (beta_RL + persev_RL + alpha + nalpha) ^ 2, data=param_dat))  # R^2 = 0.79
 
 # Within models
 summary(lm(beta_RL ~ (persev_RL + alpha + nalpha) ^ 2, data=param_dat))  # R^2 = 0.26
@@ -705,83 +893,103 @@ summary(lm(beta_BF ~ (persev_BF + p_switch + p_reward) ^ 2, data=param_dat))  # 
 summary(lm(persev_BF ~ (beta_BF + p_switch + p_reward) ^ 2, data=param_dat))  # R^2 = 0.40
 summary(lm(p_reward ~ (beta_BF + persev_BF + p_switch) ^ 2, data=param_dat))  # R^2 = 0.56
 summary(lm(p_switch ~ (beta_BF + persev_BF + p_reward) ^ 2, data=param_dat))  # R^2 = 0.69
+
+# Make data pretty
+R2_dat = data.frame(
+  "model_name" = c(rep("RL", 4), rep("BF", 4)),
+  "parameter" = c("beta_RL", "p_RL", "nalpha", "alpha", "beta_BF", "p_BF", "p_reward", "p_switch"),
+  "R2" = c(beta_RL_mod$r.squared, persev_RL_mod$r.squared, nalpha_mod$r.squared, alpha_mod$r.squared,
+           beta_BF_mod$r.squared, persev_BF_mod$r.squared, p_reward_mod$r.squared, p_switch_mod$r.squared))
+R2_dat$parameter = factor(R2_dat$parameter, levels=c("p_RL", "beta_RL", "nalpha", "alpha", "p_BF", "beta_BF", "p_reward", "p_switch"))
+R2_dat$uniqueness = 1 - R2_dat$R2
+
+# Plot
+(f_parameter_R2 = ggplot(R2_dat, aes(parameter, R2, fill=model_name)) +
+  geom_bar(stat="identity") +
+  geom_hline(yintercept=1, linetype="dotted") +
+  scale_fill_manual(values=c(colors_validation[1], colors_validation[3])) +
+  theme(axis.text.x=element_text(angle=30, hjust=1)) +
+  coord_cartesian(ylim=c(0, 1)))
+
+# Save plot
+ggsave(file.path(plot_dir, "f_parameter_R2.png"), f_parameter_R2, width=4, height=3)
 ```
 
 ```{r Model parameter PCA}
+# Run PCA
 param_names = c("alpha", "nalpha", "p_switch", "p_reward", "beta_RL", "beta_BF", "persev_RL", "persev_BF")
 param_pca = prcomp(param_dat[param_names], center=T, scale.=T)
-summary(param_pca)
-str(param_pca)
 
-# Entire PCA
-g_paramPC1_paramPC2 =
+# Visualize entire PCA
+(g_paramPC1_paramPC2 =
   autoplot(param_pca, data=param_dat, colour="age_group",
            loadings=T, loadings.label=T, loadings.label.size=3) +
-  scale_color_manual(values=colors_3and1)
+  scale_color_manual(values=colors_3and1))
 
-# Explained variance
-dat = data.frame(summary(param_pca)$importance)
-dat$index = rownames(dat)
-dat_l = melt(dat, id.vars="index")
+# Visualize explained variance
+expl_var = data.frame(summary(param_pca)$importance)
+expl_var$index = rownames(expl_var)
+expl_var_l = melt(expl_var, id.vars="index")
 g_explained_variance =
-  ggplot(dat_l, aes(variable, value, group=1)) +
+  ggplot(expl_var_l, aes(variable, value, group=1)) +
+  geom_hline(yintercept=1, linetype="dotted") +
+  geom_hline(yintercept=0, linetype="dotted") +
   geom_point() +
   geom_line() +
   facet_wrap(~ index)
 
-# PCs over age
-PCs = cbind(data.frame(param_pca$x), param_dat)
+# Visualize PCs over age
+PCs = cbind(data.frame(param_pca$x),  # one valuer per PC per participant
+            param_dat)  # one value per parameter per participant, and age etc.
 PCs_l = melt(PCs, id.vars=c("sID", "Gender", "age_group", "PreciseYrs", "age_group_"))
 
 g_age_PCs =
-  ggplot(subset(PCs_l, variable %in% c("PC1", "PC2", "PC3", "PC4")),
+  ggplot(subset(PCs_l, variable %in% c("PC1", "PC2", "PC3", "PC4", "PC5")),
        aes(PreciseYrs, value, color=variable)) +
   geom_point(alpha=0.2) +
   stat_summary(aes(age_group_, group=variable), geom="line") +
-  stat_summary(aes(age_group_, group=variable), color="black")
+  stat_summary(aes(age_group_, group=variable), color="black") +
+  facet_wrap(~ variable, scales="free")
 
-g_agegroup_PCs =
-  ggplot(subset(PCs_l, variable %in% c("PC1", "PC2", "PC3", "PC4")),
+(g_agegroup_PCs =
+  ggplot(subset(PCs_l, variable %in% c("PC1", "PC2", "PC3", "PC4", "PC5")),
        aes(age_group, value, color=variable, group=variable)) +
   stat_summary(geom="line") +
   stat_summary() +
-  facet_wrap(~ variable, scales="free")
+  facet_wrap(~ variable, scales="free"))
+  
+# Visualize factor loadings
+pca_weights = data.frame(param_pca$rotation)
+pca_weights_complete = cbind(pca_weights, "center"=param_pca$center, "scale"=param_pca$scale)
+write.csv(pca_weights_complete, file.path(plot_dir, "pca_weights.csv"))
+
+pca_weights$model_name = factor(rownames(pca_weights), levels=c("beta_BF", "beta_RL", "persev_BF", "persev_RL", "p_reward", "nalpha", "p_switch", "alpha"))
+pca_weights_l = melt(pca_weights, id.vars="model_name")
+
+(g_pcaweights =
+  ggplot(subset(pca_weights_l, variable %in% c("PC1", "PC2", "PC3", "PC4", "PC5")), aes(model_name, value)) +
+  stat_summary(geom="bar") +
+  theme(axis.text.x=element_text(angle=30, hjust=1)) +
+  facet_wrap(~ variable))
 
 # Save plots
 ggsave(file.path(plot_dir, "g_paramPC1_paramPC2.png"), g_paramPC1_paramPC2, width=4, height=3)
 ggsave(file.path(plot_dir, "g_explained_variance.png"), g_explained_variance, width=6, height=3)
 ggsave(file.path(plot_dir, "g_age_PCs.png"), g_age_PCs, width=5, height=4)
 ggsave(file.path(plot_dir, "g_agegroup_PCs.png"), g_agegroup_PCs, width=5, height=4)
-
-pca_weights = data.frame(param_pca$rotation)
-pca_weights$index = rownames(pca_weights)
-pca_weights
-
-pca_weights_l = melt(pca_weights, id.vars="index")
-
-ggplot(subset(pca_weights_l, variable %in% c("PC1", "PC2", "PC3", "PC4")), aes(index, variable, fill=value)) +
-  geom_tile() +
-  labs(x="", y="")
-
-ggplot(subset(pca_weights_l, variable %in% c("PC1", "PC2", "PC3", "PC4")), aes(index, value)) +
-  stat_summary(geom="bar") +
-  # labs(x="", y="") +
-  facet_wrap(~ variable)
-```
-```{r kmeans}
-autoplot(kmeans(param_dat[param_names], 5), data=param_dat)
-```
-```{r kmeans}
-library("cluster")
-autoplot(clara(param_dat[param_names], 5))
-autoplot(fanny(param_dat[param_names], 5), frame=T)
-autoplot(pam(param_dat[param_names], 5), frame.type="norm")
+ggsave(file.path(plot_dir, "g_pcaweights.png"), g_pcaweights, width=4, height=4)
 ```
 
-```{r lfda}
-library(lfda)
-model = lfda(param_dat[param_names], param_dat["age_group"], r=6, metric="plain")
-autoplot(model, data=param_dat, frame=T, frame.color="age_group")
+```{r t.test PCs}
+PCs$PC2_group = "high"
+PCs$PC2_group[PCs$age_group %in% c("25%", "50%", "75%")] = "low"
+t.test(PC2 ~ PC2_group, data=PCs)
+
+PCs$PC4_group = "high"
+PCs$PC4_group[PCs$age_group %in% c("25%", "50%")] = "low"
+PCs$PC4_group[PCs$age_group %in% c("75%", "100%")] = "med"
+t.test(PC4 ~ PC4_group, data=subset(PCs, PC4_group %in% c("low", "med")))
+t.test(PC4 ~ PC4_group, data=subset(PCs, PC4_group %in% c("med", "high")))
 ```
 
 # Run regression models
@@ -805,6 +1013,8 @@ nback_regr_dat$logTz = NA
 nback_regr_dat$logTz[nback_regr_dat$Gender == "Female"] = (nback_regr_dat$log_T[nback_regr_dat$Gender == "Female"] - mean(nback_regr_dat$log_T[nback_regr_dat$Gender == "Female"], na.rm=T)) / sd(nback_regr_dat$log_T[nback_regr_dat$Gender == "Female"], na.rm=T)
 nback_regr_dat$logTz[nback_regr_dat$Gender == "Male"] = (nback_regr_dat$log_T[nback_regr_dat$Gender == "Male"] - mean(nback_regr_dat$log_T[nback_regr_dat$Gender == "Male"], na.rm=T)) / sd(nback_regr_dat$log_T[nback_regr_dat$Gender == "Male"], na.rm=T)
 
+PCs$PreciseYrs2 = PCs$PreciseYrs ^ 2
+
 # Effect of age on basic behavior (rewards, RTs)
 summary(lmer(log(RT) ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), subset(all_files, ACC==T)))
 summary(glmer(reward ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), all_files, binomial))
@@ -822,7 +1032,7 @@ summary(glmer(ACC ~ PDS + Gender + (1 | sID), subset(all_files, trialsinceswitch
 summary(glmer(ACC ~ logTz + Gender + (1 | sID), subset(all_files, trialsinceswitch==1 & PreciseYrs < 18), binomial))
 
 # Younger participants switched faster than older participants, as revealed by the effect of age on staying in the 'reward, no reward' condition in a mixed-effects regression model in non-adult participants (females: $\beta=3.79\%$, $p<0.001$, males: $\beta=3.61\%$, $p<0.001$
-summary(lmer(same_choice_01_back ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), subset(all_files, outcome_21_back=='reward, no reward')))
+summary(lmer(same_choice_01_back ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), subset(all_files, outcome_21_back=='reward, no reward')))  # Todo: Figure out if I'm using the right subset of data (only trials in which both previous trials were the same choice?)
 summary(lmer(same_choice_01_back ~ PDS + Gender + (1 | sID), subset(all_files, outcome_21_back=='reward, no reward' & PreciseYrs < 18)))
 summary(lmer(same_choice_01_back ~ logTz + Gender + (1 | sID), subset(all_files, outcome_21_back=='reward, no reward' & PreciseYrs < 18)))
 
@@ -832,17 +1042,15 @@ print(summary(glmer(ACC ~ PreciseYrs + PreciseYrs2 + Gender + trialsinceswitch +
 print(summary(glmer(ACC ~ PDS + Gender + (1 | sID), subset(since_dat, PreciseYrs < 18), binomial)))
 print(summary(glmer(ACC ~ logTz + Gender + (1 | sID), subset(since_dat, PreciseYrs < 18), binomial)))
 
-# Indeed, younger children showed greater sensitivity to negative reward in a logistic regression predicting actions on trial $t+i$ from actions and outcomes on trial $t$, as revealed by significant effect of age on the regression coefficients (females: $\beta=0.54$, $p=0.0026$, males: $\beta=0.33$, $p=0.019$, Fig. \ref{figure:BehaviorHuman}).
-dat = subset(nback_regr_dat, model == "rewardNoReward" & back %in% 1:5)
-print(summary(lm(Estimate ~ PreciseYrs + PreciseYrs2 + Gender + back, subset(dat, predictor == "reward"))))
-print(summary(lm(Estimate ~ PreciseYrs + PreciseYrs2 + Gender + back, subset(dat, predictor == "noReward"))))
-
-teen_dat = subset(nback_regr_dat, model == "rewardNoReward" & back %in% 1:5 & PreciseYrs < 18)
-print(summary(lm(Estimate ~ PDS + Gender + back, subset(teen_dat, predictor == "reward"))))
-print(summary(lm(Estimate ~ PDS + Gender + back, subset(teen_dat, predictor == "noReward"))))
-print(summary(lm(Estimate ~ logTz + Gender + back, subset(teen_dat, predictor == "reward"))))
-print(summary(lm(Estimate ~ logTz + Gender + back, subset(teen_dat, predictor == "noReward"))))
-
+# Age changes in PCs
+summary(lm(PC1 ~ PreciseYrs + PreciseYrs2 + Gender, PCs))
+summary(lm(PC2 ~ PreciseYrs + PreciseYrs2 + Gender, PCs))
+summary(lm(PC3 ~ PreciseYrs + PreciseYrs2 + Gender, PCs))
+summary(lm(PC4 ~ PreciseYrs + PreciseYrs2 + Gender, PCs))
+summary(lm(PC5 ~ PreciseYrs + PreciseYrs2 + Gender, PCs))
+summary(lm(PC6 ~ PreciseYrs + PreciseYrs2 + Gender, PCs))
+summary(lm(PC7 ~ PreciseYrs + PreciseYrs2 + Gender, PCs))
+summary(lm(PC8 ~ PreciseYrs + PreciseYrs2 + Gender, PCs))
 ```
 ```{r Run big hierarchical logistic outcome regression model}
 # Run regression models for each subject, for each n in n-back
@@ -913,8 +1121,8 @@ gg_persev_RL_BF = gg_beta_RL_BF +
   aes(persev_RL, persev_BF) +
   coord_cartesian(xlim=c(-1, 1), ylim=c(-1, 1))
 
-ggsave(file.path(plot_dir, "gg_beta_RL_BF.eps"), gg_beta_RL_BF, width=2, height=2)
-ggsave(file.path(plot_dir, "gg_persev_RL_BF.eps"), gg_persev_RL_BF, width=2, height=2)
+ggsave(file.path(plot_dir, "gg_beta_RL_BF.png"), gg_beta_RL_BF, width=2, height=2)
+ggsave(file.path(plot_dir, "gg_persev_RL_BF.png"), gg_persev_RL_BF, width=2, height=2)
 
 library("corrplot")
 cor_matrix = cor(params, use="complete.obs")
@@ -972,8 +1180,8 @@ RL_params =
 gg_genrec_RL = gg_genrec_BF
 gg_genrec_RL$data = RL_params
 
-ggsave(file.path(plot_dir, "gg_genrec_BF.eps"), gg_genrec_BF, width=3.5, height=3.5)
-ggsave(file.path(plot_dir, "gg_genrec_RL.eps"), gg_genrec_RL, width=3.5, height=3.5)
+ggsave(file.path(plot_dir, "gg_genrec_BF.png"), gg_genrec_BF, width=3.5, height=3.5)
+ggsave(file.path(plot_dir, "gg_genrec_RL.png"), gg_genrec_RL, width=3.5, height=3.5)
 ```
 
 ```{r Fit exponential model to regression weights}
@@ -1021,10 +1229,10 @@ gg_exp_coefs_agecat =
   facet_wrap(~ exp_predictor, scale = "free")
 gg_exp_coefs_agecat_sig = gg_exp_coefs_agecat + aes(y = sig_Estimate)
 
-ggsave(file.path(plot_dir, "gg_exp_coefs_age_sig.eps"), gg_exp_coefs_age_sig)
-ggsave(file.path(plot_dir, "gg_exp_coefs_agecat_sig.eps"), gg_exp_coefs_agecat_sig)
-ggsave(file.path(plot_dir, "gg_exp_coefs_age.eps"), gg_exp_coefs_age)
-ggsave(file.path(plot_dir, "gg_exp_coefs_agecat.eps"), gg_exp_coefs_agecat)
+ggsave(file.path(plot_dir, "gg_exp_coefs_age_sig.png"), gg_exp_coefs_age_sig)
+ggsave(file.path(plot_dir, "gg_exp_coefs_agecat_sig.png"), gg_exp_coefs_agecat_sig)
+ggsave(file.path(plot_dir, "gg_exp_coefs_age.png"), gg_exp_coefs_age)
+ggsave(file.path(plot_dir, "gg_exp_coefs_agecat.png"), gg_exp_coefs_agecat)
 ```
 ```{r Relationship with age and puberty: Other measures}
 # Overall ACC
@@ -1096,18 +1304,18 @@ gg_PDS_RT_sd = gg_age_RT_sd + aes(x = PDS)
 
 # Save plots
 if (gg_save) {
-  ggsave(file.path(plot_dir, "gg_age_criterion.eps"), gg_age_criterion)
-  ggsave(file.path(plot_dir, "gg_PDS_criterion.eps"), gg_PDS_criterion)
-  ggsave(file.path(plot_dir, "gg_PDS_ACC.eps"), gg_PDS_ACC)
-  ggsave(file.path(plot_dir, "gg_age_ACC.eps"), gg_age_ACC)
-  ggsave(file.path(plot_dir, "gg_age_wsls.eps"), gg_age_wsls)
-  ggsave(file.path(plot_dir, "gg_PDS_wsls.eps"), gg_PDS_wsls)
-  ggsave(file.path(plot_dir, "gg_age_rewhist.eps"), gg_age_rewhist)
-  ggsave(file.path(plot_dir, "gg_PDS_rewhist.eps"), gg_PDS_rewhist)
-  ggsave(file.path(plot_dir, "gg_age_n_blocks.eps"), gg_age_n_blocks)
-  ggsave(file.path(plot_dir, "gg_PDS_n_blocks.eps"), gg_PDS_n_blocks)
-  ggsave(file.path(plot_dir, "gg_age_overall_stay.eps"), gg_age_overall_stay)
-  ggsave(file.path(plot_dir, "gg_PDS_overall_stay.eps"), gg_PDS_overall_stay)
+  ggsave(file.path(plot_dir, "gg_age_criterion.png"), gg_age_criterion)
+  ggsave(file.path(plot_dir, "gg_PDS_criterion.png"), gg_PDS_criterion)
+  ggsave(file.path(plot_dir, "gg_PDS_ACC.png"), gg_PDS_ACC)
+  ggsave(file.path(plot_dir, "gg_age_ACC.png"), gg_age_ACC)
+  ggsave(file.path(plot_dir, "gg_age_wsls.png"), gg_age_wsls)
+  ggsave(file.path(plot_dir, "gg_PDS_wsls.png"), gg_PDS_wsls)
+  ggsave(file.path(plot_dir, "gg_age_rewhist.png"), gg_age_rewhist)
+  ggsave(file.path(plot_dir, "gg_PDS_rewhist.png"), gg_PDS_rewhist)
+  ggsave(file.path(plot_dir, "gg_age_n_blocks.png"), gg_age_n_blocks)
+  ggsave(file.path(plot_dir, "gg_PDS_n_blocks.png"), gg_PDS_n_blocks)
+  ggsave(file.path(plot_dir, "gg_age_overall_stay.png"), gg_age_overall_stay)
+  ggsave(file.path(plot_dir, "gg_PDS_overall_stay.png"), gg_PDS_overall_stay)
 }
 
 if (data_name != "simulated_human") {
@@ -1129,11 +1337,11 @@ if (data_name != "simulated_human") {
 
   # Save plots
   if (gg_save) {
-    ggsave(file.path(plot_dir, "gg_age_RT.eps"), gg_age_RT)
-    ggsave(file.path(plot_dir, "gg_PDS_RT.eps"), gg_PDS_RT)
-    ggsave(file.path(plot_dir, "gg_age_RT_sd.eps"), gg_age_RT_sd)
-    ggsave(file.path(plot_dir, "gg_PDS_RT_sd.eps"), gg_PDS_RT_sd)
-    ggsave(file.path(plot_dir, "gg_age_RT_slope.eps"), gg_age_RT_slope)
+    ggsave(file.path(plot_dir, "gg_age_RT.png"), gg_age_RT)
+    ggsave(file.path(plot_dir, "gg_PDS_RT.png"), gg_PDS_RT)
+    ggsave(file.path(plot_dir, "gg_age_RT_sd.png"), gg_age_RT_sd)
+    ggsave(file.path(plot_dir, "gg_PDS_RT_sd.png"), gg_PDS_RT_sd)
+    ggsave(file.path(plot_dir, "gg_age_RT_slope.png"), gg_age_RT_slope)
   }
 }
 ```
