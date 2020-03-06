@@ -542,12 +542,12 @@ class AnalyzePSModels:
 # Main script
 data = {
     # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/new_ML_models/MCMC/clustermodels/genrec/new/',  #/genrec/simBbspr/',
-    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/',#new_ML_models/MCMC/clustermodels/',
-    'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv',
-    'n_trials': 120,
-    # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/',
-    # 'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv',
-    # 'n_trials': 780,
+    # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/',#new_ML_models/MCMC/clustermodels/',
+    # 'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv',
+    # 'n_trials': 120,
+    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/',
+    'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv',
+    'n_trials': 780,
     'make_csvs_from_pickle': True,
     'make_analyses': True,
     'make_traceplot': False,

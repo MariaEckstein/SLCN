@@ -3,10 +3,8 @@ save_dir_appx = ''  # 'mice/'
 
 # GET LIST OF MODELS TO RUN
 model_names = [
-    # 'RLab', 'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd',
-    'RLabcpnxd', 'RLabnp2d',
-    'RLabcpnxde', 'RLabnp2de',
-    # 'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
+    'RLab', 'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd', 'RLabnp2', 'RLabnp2d', 'RLabcpnxd',
+    'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
     # 'WSLSy', 'WSLSSy', 'WSLSdfy', 'WSLSSdfy',
 ]
 
@@ -26,7 +24,7 @@ model_names = [
 # 's' -> p_switch; 'w' -> slope
 # 'r' -> p_reward; 'v' -> slope
 
-run_on = 'humans'  # 'humans', 'mice'
+run_on = 'mice'  # 'humans', 'mice'
 
 print("Getting ready to run {} {} models: {}".format(len(model_names), run_on, model_names))
 
