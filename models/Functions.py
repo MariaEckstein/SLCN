@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 
 def replace_nans(data):
@@ -40,3 +41,17 @@ def get_info_from_fullID(fullID, length=1):
 
 # # Example use
 # get_info_from_fullID(fullIDs[0], length=5)
+
+
+def add_meta_column(dat):
+    dat['meta'] = np.nan
+    dat.loc[dat.session <= 2, 'meta'] = '0-2'
+    dat.loc[(dat.session >= 3) * (dat.session <= 9), 'meta'] = '3-9'
+    dat.loc[(dat.session >= 10) * (dat.session <= 12), 'meta'] = '10-12'
+    dat = dat.dropna(subset=['meta'])
+    dat['meta'] = pd.Categorical(dat['meta'], ordered=True, categories=('0-2', '3-9', '10-12'))
+
+    return dat
+
+# # Example use
+# add_meta_column(true_dat)
