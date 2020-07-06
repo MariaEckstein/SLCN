@@ -6,10 +6,8 @@ import numpy as np
 import pandas as pd
 # import theano.tensor as T
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-
 from PSModelFunctions2 import get_paths
+from Functions import load_real_mouse_data, get_info_from_fullID
 # from shared_aliens import get_alien_paths
 
 
@@ -97,32 +95,11 @@ def load_mouse_data(fitted_data_name, first_session_only, fit_sessions_individua
 
     if fitted_data_name == 'mice':
 
-        # Data directory
-        data_dir = 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/'
-
-        # Load mouse data
-        rewards_j = pd.read_csv(os.path.join(data_dir, 'Juvi_Reward.csv')).T.values
-        choices_j = pd.read_csv(os.path.join(data_dir, 'Juvi_Choice.csv')).T.values
-        rewards_a = pd.read_csv(os.path.join(data_dir, 'Adult_Reward.csv')).T.values
-        choices_a = pd.read_csv(os.path.join(data_dir, 'Adult_Choice.csv')).T.values
-        fullID_j = pd.read_csv(os.path.join(data_dir, 'Juvi_AnimalID.csv')).T.values.flatten()
-        fullID_a = pd.read_csv(os.path.join(data_dir, 'Adult_AnimalID.csv')).T.values.flatten()
-
-        # Clean mouse data
-        n_trials_per_animal = np.sum(np.invert(np.isnan(rewards_j)), axis=0)
-        sns.distplot(n_trials_per_animal)
-        n_trials = np.round(np.percentile(n_trials_per_animal, 0.8)).astype('int')
-        rewards_j = replace_nans(rewards_j, n_trials).astype('int')
-        choices_j = replace_nans(choices_j, n_trials).astype('int')
-        rewards_a = replace_nans(rewards_a, n_trials).astype('int')
-        choices_a = replace_nans(choices_a, n_trials).astype('int')
-
-        # Combine juvenile and adult data
+        data = load_real_mouse_data()
+        rewards = data['rewards']
+        choices = data['actions']
         age = pd.DataFrame()
-        age['fullID'] = np.concatenate([fullID_j, fullID_a])
-        rewards = np.hstack([rewards_j, rewards_a])  # rows: trials; cols: sessions & animals
-        choices = np.hstack([choices_j, choices_a])
-        assert np.shape(rewards) == np.shape(choices)
+        age['fullID'] = data['fullIDs']
 
     elif fitted_data_name == 'simulations':
 
@@ -144,23 +121,28 @@ def load_mouse_data(fitted_data_name, first_session_only, fit_sessions_individua
         age['fullID'] = matrix_fullIDs[0]
 
     # Pull out age, gender, etc.
-    # formula: session_ID=[session_ID;animal_idn*100000 + age*100 + (strcmp(animal_gender,'F')+1)*10 + strcmp(animal_treatment,'Juvenile')+1];
-    age['animal'] = [int(str(row)[:-5]) for row in age['fullID']]
-    age['PreciseYrs'] = [int(str(row)[-5:-2]) for row in age['fullID']]
-    age['Gender'] = [int(str(row)[-2:-1]) for row in age['fullID']]
-    age['treatment'] = [int(str(row)[-1:]) for row in age['fullID']]
+    fullID_columns = ['agegroup', 'sex', 'age', 'animal']
+    for col in fullID_columns:
+        age[col] = age.fullID.apply(get_info_from_fullID, column_name=col)
 
     # Add more stuff
     age['session'] = 0
     for animal in np.unique(age['animal']):
         n = np.sum(age['animal'] == animal)
         age.loc[age['animal'] == animal, 'session'] = range(n)
-    age['age_z'] = (age['PreciseYrs'] - np.mean(age['PreciseYrs'])) / np.std(age['PreciseYrs'])
+    age['age_z'] = (age['age'] - np.mean(age['age'])) / np.std(age['age'])
     age['T1'] = 0
     age['PDS'] = 0
 
+    # Remove sessions >= 11
+    session_mask = age.session < 11
+    age = age[age.session < 11]
+    rewards = rewards.loc[:, session_mask]
+    choices = choices.loc[:, session_mask]
+
     # Get groups
-    group = np.zeros(age.shape[0])
+    # group = np.zeros(age.shape[0])
+    group = (age.agegroup == "Adult").astype(int)  # 0 for juvenile; 1 for adult
     n_groups = len(np.unique(group))
 
     # Subset data?
@@ -175,13 +157,6 @@ def load_mouse_data(fitted_data_name, first_session_only, fit_sessions_individua
     else:
         age['sID'] = age['animal']
 
-    # Temporary solution to remove double entry of animal 2304312
-    if temp_hack:
-        idx = age['fullID'] != 2304312
-        age = age.loc[idx]
-        rewards = rewards.T[idx].T
-        choices = choices.T[idx].T
-        group = group[idx]
     n_subj = len(np.unique(age['sID']))
 
     return n_subj, rewards, choices, group, n_groups, age

@@ -1,10 +1,11 @@
 run_on_cluster = False
-save_dir_appx = ''  # 'mice/'
+save_dir_appx = 'mice/'  # ''
 
 # GET LIST OF MODELS TO RUN
 model_names = [
-    'RLab', 'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd', 'RLabnp2', 'RLabnp2d', 'RLabcpnxd',
-    'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
+    'RLabnp2dlyqt', 'Bbsprywtv'
+    # 'RLab', 'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd', 'RLabnp2', 'RLabnp2d', 'RLabcpnxd',
+    # 'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
     # 'WSLSy', 'WSLSSy', 'WSLSdfy', 'WSLSSdfy',
 ]
 
@@ -86,7 +87,7 @@ def create_model(choices, rewards, group, age,
     print("Compiling models for {} {} with {} samples and {} tuning steps...\n".format(n_subj, fitted_data_name, n_samples, n_tune))
 
     with pm.Model() as model:
-        if not fit_individuals:
+        if not fit_individuals:  # fit_MCMC == True
 
             # RL, Bayes, and WSLS
             if ('b' in model_name) or ('WSLS' in model_name):
@@ -396,30 +397,27 @@ def get_slope_variables(model_name, kids_and_teens_only, adults_only):
 
 
 # Determine the basics
-contrast = 'quadratic'
+contrast = 'linear'
 n_groups = 1  # 'gender'  # 1
 kids_and_teens_only = False
 adults_only = False
 if not run_on_cluster:
-    fit_mcmc = False
-    fit_map = True
-    n_tune = 20
-    n_samples = 20
+    fit_mcmc = True  # True  # False
+    fit_individuals = False  # True
+    fit_map = False  # False  # True
+    n_tune = 20  # 100  # 20
+    n_samples = 20  # 300  # 20
     n_cores = 2
     n_chains = 1
 else:
     fit_mcmc = True
+    fit_individuals = False
     fit_map = False
     n_tune = 1000
     n_samples = 5000
     n_cores = 1  # 2
     n_chains = 2
 target_accept = 0.8
-
-if fit_mcmc:
-    fit_individuals = False
-else:
-    fit_individuals = True
 
 
 # Load behavioral data on which to run the model(s)
@@ -448,14 +446,14 @@ for model_name in model_names:
             first_session_only=False,
             fit_sessions_individually=True,
             # simulation_name='simulated_mice_WSLSSd_nagents10.csv',
-            temp_hack=False)
+            )
 
     # Saving as csv
     # ages_dir = 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv'
     # print("Saving ages to " + ages_dir)
     # age.to_csv(ages_dir, index=False)
 
-    slope_variables = ['age_z']  # ['PDS_z', 'meanT_log_z']  # get_slope_variables(model_name, kids_and_teens_only, adults_only)
+    slope_variables = ['session']  # ['age_z', 'PDS_z', 'meanT_log_z']  # get_slope_variables(model_name, kids_and_teens_only, adults_only)
     for slope_variable in slope_variables:
 
         # Create model

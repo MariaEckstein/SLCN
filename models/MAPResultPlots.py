@@ -83,8 +83,9 @@ class AnalyzePSModels:
                 waic = data['WAIC']
                 trace = data['trace']
                 samples_0 = data['trace']._straces[0].samples  # chain 0
-                samples_1 = data['trace']._straces[1].samples  # chain 1
-                samples_all = {key: list(samples_0[key]) + list(samples_1[key]) for key in samples_0.keys()}
+                # samples_1 = data['trace']._straces[1].samples  # chain 1
+                # samples_all = {key: list(samples_0[key]) + list(samples_1[key]) for key in samples_0.keys()}
+                samples_all = samples_0  # {key: list(samples_0[key]) + list(samples_1[key]) for key in samples_0.keys()}
                 nll = 0
             else:
                 self.summary = data['map']
@@ -110,11 +111,11 @@ class AnalyzePSModels:
                 if self.indiv_param_names[0] + '_2_slope' in samples_all.keys():
                     slope_params += [name + '_2_slope' for name in self.indiv_param_names]
 
-            p_values = pd.DataFrame()
-            for slope_param in slope_params:
-                row = pd.DataFrame(data=[np.mean(np.array(samples_all[slope_param]) > 0)], index=[slope_param], columns=['p'])
-                p_values = p_values.append(row)
-            p_values.to_csv(self.get_file_name('p_values'))
+            # p_values = pd.DataFrame()
+            # for slope_param in slope_params:
+            #     row = pd.DataFrame(data=[np.mean(np.array(samples_all[slope_param]) > 0)], index=[slope_param], columns=['p'])
+            #     p_values = p_values.append(row)
+            # p_values.to_csv(self.get_file_name('p_values'))
 
             # Add model WAIC score
             self.modelwise_LLs.append([self.model_name, self.slope_variable, self.n_subj, waic, nll])
@@ -212,7 +213,7 @@ class AnalyzePSModels:
         elif file_name == 'traceplot':
             return "{0}plots/traceplot_{1}_{2}_{3}.svg".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj)
         elif file_name == 'AIC_plot':
-            return "{0}plots/modelwise_AICs.svg".format(self.save_dir)
+            return "{0}plots/modelwise_AICs.png".format(self.save_dir)
         elif file_name == 'trialwise_LLs':
             return "{0}plots/trialwise_LLs_{1}_{2}_{3}_{4}.csv".format(self.save_dir, self.model_name, self.slope_variable, self.n_subj, file_name)
         elif file_name == 'trialwise_LLs_heatmap':
@@ -370,18 +371,18 @@ class AnalyzePSModels:
         self.fitted_params[qcol] = np.nan
 
         # Set adult quantile to 2
-        self.fitted_params.loc[self.fitted_params['PreciseYrs'] > 20, qcol] = 2
+        self.fitted_params.loc[self.fitted_params['PreciseYrs'] > 18, qcol] = 2
 
         # Determine quantiles, separately for both genders
         for gender in np.unique(self.fitted_params['Gender']):
 
             # Get 4 quantiles
             cut_off_values = np.nanquantile(
-                self.fitted_params.loc[(self.fitted_params.PreciseYrs < 20) & (self.fitted_params.Gender == gender), col],
+                self.fitted_params.loc[(self.fitted_params.PreciseYrs < 18) & (self.fitted_params.Gender == gender), col],
                 [0, 1/4, 2/4, 3/4])
             for cut_off_value, quantile in zip(cut_off_values, np.round([1/4, 2/4, 3/4, 1], 2)):
                 self.fitted_params.loc[
-                    (self.fitted_params.PreciseYrs < 20) & (self.fitted_params[col] >= cut_off_value) & (self.fitted_params.Gender == gender),
+                    (self.fitted_params.PreciseYrs < 18) & (self.fitted_params[col] >= cut_off_value) & (self.fitted_params.Gender == gender),
                     qcol] = quantile
 
     def get_param_names_from_summary(self):
@@ -545,16 +546,16 @@ data = {
     # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/',#new_ML_models/MCMC/clustermodels/',
     # 'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv',
     # 'n_trials': 120,
-    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/',
+    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/slopes/',
     'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv',
-    'n_trials': 780,
+    'n_trials': 440,
     'make_csvs_from_pickle': True,
     'make_analyses': True,
     'make_traceplot': False,
     'make_plots': True,
     'waic_criterion_for_analysis': 1e6,
-    'fit_mcmc': False,
-    'run_on_humans': True,
+    'fit_mcmc': True,
+    'run_on_humans': True,  # Set to true for real data of humans and mice (not simulations)
 }
 
 apm = AnalyzePSModels(data)
