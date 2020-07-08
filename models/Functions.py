@@ -163,7 +163,7 @@ def get_ages_cols():
 
 
 def get_category_cols():
-    return ['minus', 'delta', 'stay', 'ACC', 'RT', 'lrn', 'miss']
+    return ['minus', 'delta', 'stay', 'ACC', 'RT', 'lrn', 'miss', 'WS', 'LS']
 
 
 def get_param_names():
