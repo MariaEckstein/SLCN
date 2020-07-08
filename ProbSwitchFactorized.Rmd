@@ -683,6 +683,8 @@ if (data_name == "HumAndSim") {
 # - DONE Percent missed trials (too slow, no button press)
 # - DONE RTs early, middle, late (same)
 # - DONE Accuracy early, middle, late (first third, second third, last third of trials)
+# - DONE lose-win-stay & win-lose-stay
+# - DONE Number of switches
 
 # Missing trials
 missed_trials = read.csv(paste0(human_data_dir, "/missed_trials.csv"))
@@ -694,7 +696,7 @@ dim(sum_missed)
 
 # Overall ACC, stay, win_stay, lose_shift, RTs
 sum_ACC = ddply(all_files, .(sID), summarize,
-                ACC=mean(ACC, na.rm=T), stay=mean(stay, na.rm=T), win_stay=mean(win_stay, na.rm=T), lose_shift=mean(lose_shift, na.rm=T))
+                ACC=mean(ACC, na.rm=T), stay=mean(stay, na.rm=T), WS=mean(win_stay, na.rm=T), LS=mean(lose_shift, na.rm=T))
 sum_RT = ddply(subset(all_files, ACC==1), .(sID), summarize, RTsd=sd(RT, na.rm=T), RT=mean(RT, na.rm=T))
 sum_switches = ddply(all_files, .(sID), summarize, n_switches=sum(switch_trial))
 
@@ -708,9 +710,23 @@ dim(sum_dat)  # should be 1 row per subject (291 total)
 # g + aes(y=win_stay)
 # g + aes(y=lose_shift)
 
+# Overall win-lose-stay and lose-win-stay
+win_lose_stay =
+  ddply(subset(all_files, (outcome_21_back=="reward, no reward") & (same_choice_12_back==T)),
+      .(sID), summarize,
+      WLS=mean(stay))
+lose_win_stay =
+  ddply(subset(all_files, (outcome_21_back=="no reward, reward") & (same_choice_12_back==T)),
+      .(sID), summarize,
+      LWS=mean(stay))
+wsls = merge(win_lose_stay, lose_win_stay, all=T, by="sID")
+
+# Check
+dim(wsls)
+
 # By parts: ACC, stay, win_stay, lose_shift, RTs
 part_sum = ddply(all_files, .(sID, part), summarize,
-                 ACC=mean(ACC, na.rm=T), stay=mean(stay, na.rm=T), win_stay=mean(win_stay, na.rm=T), lose_shift=mean(lose_shift, na.rm=T))
+                 ACC=mean(ACC, na.rm=T), stay=mean(stay, na.rm=T), WS=mean(win_stay, na.rm=T), LS=mean(lose_shift, na.rm=T))
 part_RTs = ddply(subset(all_files, ACC==1), .(sID, part), summarize, RTsd=sd(RT, na.rm=T), RT=mean(RT, na.rm=T))
 
 parts = merge(part_sum, part_RTs)
@@ -722,8 +738,8 @@ dim(parts)  # Should have 3 parts per person, i.e., 3 * 291 = 873 rows
   stat_summary(geom="bar") +
   geom_point(position="jitter"))
 g + aes(y=RT)
-g + aes(y=win_stay)
-g + aes(y=lose_shift)
+g + aes(y=WS)
+g + aes(y=LS)
 
 # Combine everything
 parts_wide = reshape(parts, timevar="part", idvar=c("sID"), direction="wide")
@@ -734,6 +750,11 @@ dim(ps_params)
 sum_dat = merge(merge(ps_params, sum_dat), parts_wide)
 sum_dat = merge(sum_dat, sum_missed, all.x = T)
 sum_dat$percent_missed[is.na(sum_dat$percent_missed)] = 0  # Replace NA rows (no missed trials) with 0 (0 missed trials)
+
+sum_dat = merge(sum_dat, wsls, all.x=T)
+
+# Add criterion trial (need to run chunk 16 before!)
+sum_dat = merge(sum_dat, subset(crit_sum, select=c("sID", "criterion_trial")), all.x=T)
 
 # Check
 dim(sum_dat)

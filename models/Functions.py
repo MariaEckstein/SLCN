@@ -158,6 +158,18 @@ def name_from_index(index, names=param_names):
             return name
 
 
+def get_ages_cols():
+    return ['ID', 'PreciseYrs', 'BMI', 'Gender', 'meanT', 'PDS']
+
+
+def get_category_cols():
+    return ['minus', 'delta', 'stay', 'ACC', 'RT', 'lrn', 'miss']
+
+
+def get_param_names():
+    return ['alpha', 'beta', 'persev', 'forget', 'epsilon', 'rho', 'p_switch', 'p_reward', 'K']
+
+
 def bool_from_index(index, names=param_names):
     contains_name = False
     for param_name in param_names:

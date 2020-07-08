@@ -26,8 +26,8 @@ def get_sd(param_name, sd_testval, n_groups, sd=10):
 
 def get_int(param_name, distribution, upper, int_testval, n_groups, sd=10):
 
-    if (distribution == 'Beta') or (  # alpha, nalpha, calpha_sc, cnalpha_sc, p_switch, p_reward
-            distribution == 'Gamma'):  # beta
+    if (distribution == 'Beta') or (  # parameters alpha, nalpha, calpha_sc, cnalpha_sc, p_switch, p_reward
+            distribution == 'Gamma'):  # parameters beta
 
         if n_groups > 1:
             param_int_a = pm.Uniform(param_name + '_int_a', lower=0, upper=upper)
