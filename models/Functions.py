@@ -13,74 +13,80 @@ import matplotlib.pyplot as plt
 # # Example use
 # replace_nans(np.full(10, np.nan))
 
-def load_real_mouse_data(data_dir='C:/Users/maria/MEGAsync/SLCN/PSMouseData/', exclusion_percentile_ntrials=0):
-    """
-    :param data_dir: Where is the data stored?
-    :param exclusion_percentile_ntrials: What percentage of mouse-sessions are allowed to have fewer trials than others?
-    When it is 0, all sessions will be shortened to the shorted occurence; when it is 1, all data will be kept, and
-    shorter ones will be filled up with np.nan.
-    :return:
-    """
-
-    # Load mouse data
-    rewards_j = pd.read_csv(os.path.join(data_dir, 'Juvi_Reward.csv')).T.values  # after reading in: [trials x animals]
-    rewards_a = pd.read_csv(os.path.join(data_dir, 'Adult_Reward.csv')).T.values
-    rewards = np.hstack([rewards_j, rewards_a])
-
-    actions_j = pd.read_csv(os.path.join(data_dir, 'Juvi_Choice.csv')).T.values
-    actions_a = pd.read_csv(os.path.join(data_dir, 'Adult_Choice.csv')).T.values
-    actions = np.hstack([actions_j, actions_a])
-
-    correct_actions_j = pd.read_csv(os.path.join(data_dir, 'Juvi_TaskData.csv')).T.values
-    correct_actions_a = pd.read_csv(os.path.join(data_dir, 'Adult_TaskData.csv')).T.values
-    correct_actions = np.hstack([correct_actions_j, correct_actions_a])  # Which action was the correct one on each trial?
-
-    corrects = (actions == correct_actions).astype('int')  # When did mice choose the right action?
-
-    fullID_j = pd.read_csv(os.path.join(data_dir, 'Juvi_AnimalID.csv')).T.values.flatten()
-    fullID_a = pd.read_csv(os.path.join(data_dir, 'Adult_AnimalID.csv')).T.values.flatten()
-    fullIDs = np.concatenate([fullID_j, fullID_a])
-
-    # Determine number of trials
-    n_trials_per_animal = np.sum(np.invert(np.isnan(actions)), axis=0)
-    sns.distplot(n_trials_per_animal[:len(fullID_j)], label='juv')
-    sns.distplot(n_trials_per_animal[len(fullID_j):], label='ad')
-    plt.legend()
-    n_trials = np.round(np.percentile(n_trials_per_animal, exclusion_percentile_ntrials)).astype('int')
-
-    # Remove interleaved na trials by shifting up later trials
-    missed_trials = np.isnan(actions)
-    rewards[missed_trials] = np.nan
-
-    rewards = pd.DataFrame(rewards)
-    rewards = rewards.apply(lambda x: pd.Series(x.dropna().values))
-
-    corrects = pd.DataFrame(corrects)
-    corrects = corrects.apply(lambda x: pd.Series(x.dropna().values))
-
-    correct_actions = pd.DataFrame(correct_actions)
-    correct_actions = correct_actions.apply(lambda x: pd.Series(x.dropna().values))
-
-    actions = pd.DataFrame(actions)
-    actions = actions.apply(lambda x: pd.Series(x.dropna().values))
-
-    # Cut at n_trials
-    rewards = rewards[:n_trials]
-    actions = actions[:n_trials]
-    corrects = corrects[:n_trials]
-    correct_actions = correct_actions[:n_trials]
-
-    assert np.shape(rewards) == np.shape(actions)
-
-    return {
-        'rewards': rewards,
-        'actions': actions,
-        'corrects': corrects,
-        'correct_actions': correct_actions,
-        'fullIDs': fullIDs,
-        'n_trials_per_animal': n_trials_per_animal,
-        'n_trials': n_trials
-    }
+# def load_real_mouse_data(data_dir='C:/Users/maria/MEGAsync/SLCN/PSMouseData/', n_trials=782):
+#     """
+#     :param data_dir: Where is the data stored?
+#     :param exclusion_percentile_ntrials: What percentage of mouse-sessions are allowed to have fewer trials than others?
+#     When it is 0, all sessions will be shortened to the shorted occurence; when it is 1, all data will be kept, and
+#     shorter ones will be filled up with np.nan.
+#     :return:
+#     """
+#
+#     # Load mouse data
+#     rewards_j = pd.read_csv(os.path.join(data_dir, 'Juvi_Reward.csv')).T.values  # after reading in: [trials x animals]
+#     rewards_a = pd.read_csv(os.path.join(data_dir, 'Adult_Reward.csv')).T.values
+#     rewards = np.hstack([rewards_j, rewards_a])
+#
+#     actions_j = pd.read_csv(os.path.join(data_dir, 'Juvi_Choice.csv')).T.values
+#     actions_a = pd.read_csv(os.path.join(data_dir, 'Adult_Choice.csv')).T.values
+#     actions = np.hstack([actions_j, actions_a])
+#
+#     correct_actions_j = pd.read_csv(os.path.join(data_dir, 'Juvi_TaskData.csv')).T.values
+#     correct_actions_a = pd.read_csv(os.path.join(data_dir, 'Adult_TaskData.csv')).T.values
+#     correct_actions = np.hstack([correct_actions_j, correct_actions_a])  # Which action was the correct one on each trial?
+#
+#     corrects = (actions == correct_actions).astype('int')  # When did mice choose the right action?
+#
+#     fullID_j = pd.read_csv(os.path.join(data_dir, 'Juvi_AnimalID.csv')).T.values.flatten()
+#     fullID_a = pd.read_csv(os.path.join(data_dir, 'Adult_AnimalID.csv')).T.values.flatten()
+#     fullIDs = np.concatenate([fullID_j, fullID_a])
+#
+#     # Determine number of trials
+#     n_trials_per_animal = np.sum(np.invert(np.isnan(actions)), axis=0)
+#     sns.distplot(n_trials_per_animal[:len(fullID_j)], label='juv')
+#     sns.distplot(n_trials_per_animal[len(fullID_j):], label='ad')
+#     plt.legend()
+#
+#     # if type(exclusion_percentile_ntrials) == int:
+#     #     n_trials = np.round(np.percentile(n_trials_per_animal, exclusion_percentile_ntrials)).astype('int')
+#     # elif n_trials:
+#     #     pass
+#     # else:
+#     #     raise(ValueError, 'You must either provide "exclusion_percentile_ntrials" or "n_trials" to this function.')
+#
+#     # Remove interleaved na trials by shifting up later trials
+#     missed_trials = np.isnan(actions)
+#     rewards[missed_trials] = np.nan
+#
+#     rewards = pd.DataFrame(rewards)
+#     rewards = rewards.apply(lambda x: pd.Series(x.dropna().values))
+#
+#     corrects = pd.DataFrame(corrects)
+#     corrects = corrects.apply(lambda x: pd.Series(x.dropna().values))
+#
+#     correct_actions = pd.DataFrame(correct_actions)
+#     correct_actions = correct_actions.apply(lambda x: pd.Series(x.dropna().values))
+#
+#     actions = pd.DataFrame(actions)
+#     actions = actions.apply(lambda x: pd.Series(x.dropna().values))
+#
+#     # Cut at n_trials
+#     rewards = rewards[:n_trials]
+#     actions = actions[:n_trials]
+#     corrects = corrects[:n_trials]
+#     correct_actions = correct_actions[:n_trials]
+#
+#     assert np.shape(rewards) == np.shape(actions)
+#
+#     return {
+#         'rewards': rewards,
+#         'actions': actions,
+#         'corrects': corrects,
+#         'correct_actions': correct_actions,
+#         'fullIDs': fullIDs,
+#         'n_trials_per_animal': n_trials_per_animal,
+#         # 'n_trials': n_trials
+#     }
 
 
 def get_info_from_fullID(fullID, column_name):
