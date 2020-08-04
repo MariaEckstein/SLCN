@@ -3,7 +3,8 @@ save_dir_appx = 'mice/'  # ''
 
 # GET LIST OF MODELS TO RUN
 model_names = [
-    'RLabnp2dlyqt', 'Bbsprywtv'
+    'RLabnp2', 'Bbspr'
+    # 'RLabnp2dlyqt', 'Bbsprywtv'
     # 'RLab', 'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd', 'RLabnp2', 'RLabnp2d', 'RLabcpnxd',
     # 'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
     # 'WSLSy', 'WSLSSy', 'WSLSdfy', 'WSLSSdfy',
@@ -39,7 +40,7 @@ import theano
 import theano.tensor as T
 from PSModelFunctions import create_parameter, get_slope_variables
 from PSModelFunctions2 import get_n_params, update_Q, get_likelihoods, post_from_lik, p_from_Q, p_from_prev_WSLS, p_from_prev_WSLSS
-from PSModelFunctions3 import load_data, load_mouse_data, get_save_dir_and_save_id, print_logp_info
+from PSModelFunctions3 import load_data, load_mouse_data_for_modeling, get_save_dir_and_save_id, print_logp_info
 
 floatX = 'float32'
 theano.config.floatX = 'float32'
@@ -402,9 +403,9 @@ n_groups = 1  # 'gender'  # 1
 kids_and_teens_only = False
 adults_only = False
 if not run_on_cluster:
-    fit_mcmc = True  # True  # False
-    fit_individuals = False  # True
-    fit_map = False  # False  # True
+    fit_mcmc = False  # False
+    fit_individuals = True  # True
+    fit_map = True
     n_tune = 20  # 100  # 20
     n_samples = 20  # 300  # 20
     n_cores = 2
@@ -441,7 +442,7 @@ for model_name in model_names:
     elif run_on == 'mice':
 
         # Load mouse data
-        n_subj, rewards, choices, group, n_groups, age = load_mouse_data(
+        n_subj, rewards, choices, group, n_groups, age = load_mouse_data_for_modeling(
             'mice',  # 'simulations'
             first_session_only=False,
             fit_sessions_individually=True,
@@ -449,11 +450,11 @@ for model_name in model_names:
             )
 
     # Saving as csv
-    # ages_dir = 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv'
-    # print("Saving ages to " + ages_dir)
-    # age.to_csv(ages_dir, index=False)
+    ages_dir = 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv'
+    print("Saving ages to " + ages_dir)
+    age.to_csv(ages_dir, index=False)
 
-    slope_variables = ['session']  # ['age_z', 'PDS_z', 'meanT_log_z']  # get_slope_variables(model_name, kids_and_teens_only, adults_only)
+    slope_variables = ['session']  # For mice: Include sloep letters to use the slope variable; will be ignore otherwise # ['age_z', 'PDS_z', 'meanT_log_z']  # get_slope_variables(model_name, kids_and_teens_only, adults_only)
     for slope_variable in slope_variables:
 
         # Create model

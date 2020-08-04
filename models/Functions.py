@@ -89,6 +89,69 @@ import matplotlib.pyplot as plt
 #     }
 
 
+def load_one_measure(name, data_dir):
+    measure_j = pd.read_csv(
+        os.path.join(data_dir, 'Juvi_{}.csv'.format(name))).T.values  # after reading in: [trials x animals]
+    measure_a = pd.read_csv(os.path.join(data_dir, 'Adult_{}.csv'.format(name))).T.values
+    measure_dat = np.hstack([measure_j, measure_a])
+
+    return measure_dat
+
+# # Example use
+# load_one_measure('Reward', mouse_data_dir)
+
+
+def remove_na_trials(measure_dat, missed_trials):
+    measure_dat = pd.DataFrame(measure_dat)
+    measure_dat[missed_trials] = np.nan
+    measure_dat = measure_dat.apply(lambda x: pd.Series(x.dropna().values))
+
+    return measure_dat
+
+# # Example use
+# remove_na_trials(load_one_measure('Reward', mouse_data_dir))
+
+
+def load_mouse_data(data_dir):
+
+    # Load mouse data
+    rewards = load_one_measure('Reward', data_dir)
+    rts = load_one_measure('ITI', data_dir)  # Lung-Hao: ITI is the time of last nose poke event (in or out) of previous trial to center poke of current trial. So it's the ITI proceeding the current trial. The first trial has ITI because we removed the trials before first switch.
+    actions = load_one_measure('Choice', data_dir)
+    correct_actions = load_one_measure('TaskData', data_dir)
+    corrects = (actions == correct_actions).astype('int')  # When did mice choose the right action?
+
+    fullID_j = pd.read_csv(os.path.join(data_dir, 'Juvi_AnimalID.csv')).T.values.flatten()
+    fullID_a = pd.read_csv(os.path.join(data_dir, 'Adult_AnimalID.csv')).T.values.flatten()
+    fullIDs = np.concatenate([fullID_j, fullID_a])
+
+    # Remove interleaved na trials by shifting up later trials
+    missed_trials = np.isnan(actions)
+    actions = remove_na_trials(actions, missed_trials)
+    rewards = remove_na_trials(rewards, missed_trials)
+    rts = remove_na_trials(rts, missed_trials)
+    corrects = remove_na_trials(corrects, missed_trials)
+    correct_actions = remove_na_trials(correct_actions, missed_trials)
+
+    # Make sure all dataframes have the same shape
+    assert np.shape(rewards) == np.shape(actions)
+    assert np.shape(corrects) == np.shape(correct_actions)
+    assert np.shape(rewards) == np.shape(correct_actions)
+
+    return {
+        'actions': actions,
+        'rewards': rewards,
+        'corrects': corrects,
+        'rts': rts,
+        'correct_actions': correct_actions,
+        'fullIDs': fullIDs,
+    }
+
+# # Example use
+# raw_dat = load_mouse_data(mouse_data_dir)
+# raw_dat
+
+
 def get_info_from_fullID(fullID, column_name):
     """formula: session_ID=[session_ID;animal_idn*100000 + age*100 + (strcmp(animal_gender,'F')+1)*10 + strcmp(animal_treatment,'Juvenile')+1];
     """
@@ -131,6 +194,17 @@ def add_meta_column(data):
 
 # # Example use
 # add_meta_column(true_dat)
+
+
+def get_session(ani_dat):
+
+    return np.append([0], np.cumsum((np.diff(ani_dat.age)).astype(bool).astype(int)))
+
+# # Example use
+# ani_dat = true_dat.loc[true_dat.animal == 14]
+# sessions = get_session(ani_dat)
+# print(np.unique(sessions), len(sessions), ani_dat.shape[0])
+
 
 # MetaSLCN
 def sigmoid(vector):

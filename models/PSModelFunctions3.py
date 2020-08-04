@@ -7,7 +7,7 @@ import pandas as pd
 # import theano.tensor as T
 
 from PSModelFunctions2 import get_paths
-from Functions import load_real_mouse_data, get_info_from_fullID
+from Functions import load_mouse_data, get_info_from_fullID, get_session
 # from shared_aliens import get_alien_paths
 
 
@@ -83,62 +83,78 @@ from Functions import load_real_mouse_data, get_info_from_fullID
 #     return [n_subj, n_trials, seasons, aliens, actions, rewards, true_params]
 
 
-def replace_nans(data, n_trials):
+# def replace_nans(data, n_trials):
+#
+#     data = data[:n_trials]
+#     data[np.isnan(data)] = np.random.binomial(1, 0.5, np.sum(np.isnan(data)))
+#
+#     return data
 
-    data = data[:n_trials]
-    data[np.isnan(data)] = np.random.binomial(1, 0.5, np.sum(np.isnan(data)))
 
-    return data
-
-
-def load_mouse_data(fitted_data_name, first_session_only, fit_sessions_individually, simulation_name='', temp_hack=False):
+def load_mouse_data_for_modeling(fitted_data_name, first_session_only, fit_sessions_individually, simulation_name=''):
 
     if fitted_data_name == 'mice':
 
-        data = load_real_mouse_data()
-        rewards = data['rewards']
-        choices = data['actions']
-        age = pd.DataFrame()
-        age['fullID'] = data['fullIDs']
+        # data = load_mouse_data(data_dir='C:/Users/maria/MEGAsync/SLCN/PSMouseData')
+        # rewards = data['rewards']
+        # choices = data['actions']
+        # age = pd.DataFrame()
+        # age['fullID'] = data['fullIDs']
+
+        # Load the exact data I'm using for plotting
+        # This has all the pre-processing already done (excluded trials > 500; excluded mice with fewer trials; excluded sessions > 10; removed na trials)
+        data_dir = 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/true_dat.csv'
+        dat = pd.read_csv(data_dir)
+        # age = pd.DataFrame()
+        # age['fullID'] = matrix_fullIDs[0]
+        # stop = True
 
     elif fitted_data_name == 'simulations':
 
-        # Data directory
         data_dir = 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/simulations/'
-
-        # Load and reshape simulated data
         dat = pd.read_csv(os.path.join(data_dir, simulation_name))
 
-        flat_choices = dat.actionall.apply(lambda x: int(x[1]))  # [int(dat.actionall[i][1]) for i in range(dat.shape[0])]
-        flat_rewards = dat.rewardall.apply(lambda x: int(x[1]))  # [int(dat.rewardall[i][1]) for i in range(dat.shape[0])]
+        dat['action'] = dat.actionall.apply(lambda x: int(x[1]))  # [int(dat.actionall[i][1]) for i in range(dat.shape[0])]
+        dat['reward'] = dat.rewardall.apply(lambda x: int(x[1]))  # [int(dat.rewardall[i][1]) for i in range(dat.shape[0])]
 
-        matrix_shape = (int(dat.shape[0] / 725), 725)
-        matrix_fullIDs = np.array([dat.fullID]).reshape(matrix_shape).T
-        choices = np.array([flat_choices]).reshape(matrix_shape).T
-        rewards = np.array([flat_rewards]).reshape(matrix_shape).T
+        # n_trials = 725
+        # matrix_shape = (int(dat.shape[0] / n_trials), n_trials)
+        # matrix_fullIDs = np.array([dat.fullID]).reshape(matrix_shape).T
+        # choices = np.array([flat_choices]).reshape(matrix_shape).T
+        # rewards = np.array([flat_rewards]).reshape(matrix_shape).T
 
-        age = pd.DataFrame()
-        age['fullID'] = matrix_fullIDs[0]
+    n_fullIDs = len(np.unique(dat.fullID))
+    n_trials = int(dat.shape[0] / n_fullIDs)
+    assert n_trials == 500
+
+    matrix_shape = (n_fullIDs, n_trials)
+    matrix_fullIDs = np.array([dat.fullID]).reshape(matrix_shape).T
+    choices = np.array([dat.action]).reshape(matrix_shape).T  # mouse shape: [500, 388]
+    rewards = np.array([dat.reward]).reshape(matrix_shape).T
+
+    age = pd.DataFrame()
+    age['fullID'] = matrix_fullIDs[0]
 
     # Pull out age, gender, etc.
-    fullID_columns = ['agegroup', 'sex', 'age', 'animal']
-    for col in fullID_columns:
+    for col in ['agegroup', 'sex', 'age', 'animal']:
         age[col] = age.fullID.apply(get_info_from_fullID, column_name=col)
 
     # Add more stuff
-    age['session'] = 0
-    for animal in np.unique(age['animal']):
-        n = np.sum(age['animal'] == animal)
-        age.loc[age['animal'] == animal, 'session'] = range(n)
+    for animal in np.unique(age.animal):
+        age.loc[age.animal == animal, 'session'] = get_session(age.loc[age.animal == animal])
+    # age['session'] = 0
+    # for animal in np.unique(age['animal']):
+    #     n = np.sum(age['animal'] == animal)
+    #     age.loc[age['animal'] == animal, 'session'] = range(n)
     age['age_z'] = (age['age'] - np.mean(age['age'])) / np.std(age['age'])
     age['T1'] = 0
     age['PDS'] = 0
 
-    # Remove sessions >= 11
-    session_mask = age.session < 11
-    age = age[age.session < 11]
-    rewards = rewards.loc[:, session_mask]
-    choices = choices.loc[:, session_mask]
+    # # Remove sessions >= 11
+    # session_mask = age.session < 11
+    # age = age[age.session < 11]
+    # rewards = rewards.loc[:, session_mask]
+    # choices = choices.loc[:, session_mask]
 
     # Get groups
     # group = np.zeros(age.shape[0])
@@ -152,8 +168,10 @@ def load_mouse_data(fitted_data_name, first_session_only, fit_sessions_individua
         rewards = rewards.T[idx].T
         choices = choices.T[idx].T
         group = group[idx]
+
     if fit_sessions_individually:
         age['sID'] = age['fullID']
+
     else:
         age['sID'] = age['animal']
 

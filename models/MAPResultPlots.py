@@ -155,16 +155,17 @@ class AnalyzePSModels:
             # Add remaining info (PDS, T1, PreciseYrs, etc.)
             if self.run_on_humans:
                 self.fitted_params = self.fitted_params.merge(self.SLCN_info, on='sID')  # columns only added for rows that already exist
-                self.fitted_params.loc[self.fitted_params['Gender'] == 1, 'Gender'] = 'Male'
-                self.fitted_params.loc[self.fitted_params['Gender'] == 2, 'Gender'] = 'Female'
+                self.fitted_params.loc[self.fitted_params['sex'] == 1, 'sex'] = 'Male'
+                self.fitted_params.loc[self.fitted_params['sex'] == 2, 'sex'] = 'Female'
 
                 # Add '_quant' columns for age, PDS, T1
-                if np.any(self.fitted_params['PreciseYrs'] < 18):
-                    self.get_quantile_groups('PreciseYrs')
-                    self.get_quantile_groups('PDS')
-                    self.get_quantile_groups('T1')
+                if 'PreciseYrs' in self.fitted_params:
+                    if np.any(self.fitted_params['PreciseYrs'] < 18):
+                        self.get_quantile_groups('PreciseYrs')
+                        self.get_quantile_groups('PDS')
+                        self.get_quantile_groups('T1')
             else:
-                for col in ['Gender', 'PreciseYrs', 'PDS', 'T1', 'age_quant', 'PDS_quant', 'T1_quant']:
+                for col in ['sex', 'PreciseYrs', 'PDS', 'T1', 'age_quant', 'PDS_quant', 'T1_quant']:
                     self.fitted_params[col] = 0
 
             # Add missing (non-fitted) parameters and save
@@ -273,7 +274,8 @@ class AnalyzePSModels:
             print("Analyzing file {0} in {1}".format(file_name, self.save_dir))
 
             self.fitted_params = pd.read_csv(self.save_dir + file_name)
-            self.fitted_params['age'] = self.fitted_params['PreciseYrs']
+            if 'PreciseYrs' in self.fitted_params:
+                self.fitted_params['age'] = self.fitted_params['PreciseYrs']
             self.fitted_params['age_z'] = self.z_score(self.fitted_params['age'])
             self.fitted_params['PDS_z'] = self.z_score(self.fitted_params['PDS'])
             self.fitted_params['T1_log'] = np.log(self.fitted_params['T1'])
@@ -324,7 +326,7 @@ class AnalyzePSModels:
                         cols=[col + '_quant' for col in cols], file_name_apx='quant', type='line')
 
                 # Plot correlations between and distributions of parameters
-                sns.pairplot(self.fitted_params, hue='Gender', vars=self.indiv_param_names, plot_kws={'s': 10})
+                sns.pairplot(self.fitted_params, hue='sex', vars=self.indiv_param_names, plot_kws={'s': 10})
                 plt.savefig(self.get_file_name('param_pairplot'))
 
                 # Plot trialwise LLs
@@ -374,15 +376,15 @@ class AnalyzePSModels:
         self.fitted_params.loc[self.fitted_params['PreciseYrs'] > 18, qcol] = 2
 
         # Determine quantiles, separately for both genders
-        for gender in np.unique(self.fitted_params['Gender']):
+        for gender in np.unique(self.fitted_params['sex']):
 
             # Get 4 quantiles
             cut_off_values = np.nanquantile(
-                self.fitted_params.loc[(self.fitted_params.PreciseYrs < 18) & (self.fitted_params.Gender == gender), col],
+                self.fitted_params.loc[(self.fitted_params.PreciseYrs < 18) & (self.fitted_params.sex == gender), col],
                 [0, 1/4, 2/4, 3/4])
             for cut_off_value, quantile in zip(cut_off_values, np.round([1/4, 2/4, 3/4, 1], 2)):
                 self.fitted_params.loc[
-                    (self.fitted_params.PreciseYrs < 18) & (self.fitted_params[col] >= cut_off_value) & (self.fitted_params.Gender == gender),
+                    (self.fitted_params.PreciseYrs < 18) & (self.fitted_params[col] >= cut_off_value) & (self.fitted_params.sex == gender),
                     qcol] = quantile
 
     def get_param_names_from_summary(self):
@@ -482,7 +484,7 @@ class AnalyzePSModels:
                 if type == 'scatter':
 
                     axes[row, col].scatter(self.fitted_params[pred], self.fitted_params[param_name], s=1,
-                                           c=['tomato' if g == 'Female' else 'lightseagreen' for g in self.fitted_params['Gender']])
+                                           c=['tomato' if g == 'Female' else 'lightseagreen' for g in self.fitted_params['sex']])
 
                     # If this model has a fitted slope, add it to the plot
                     right_param = self.get_slope_letter_for_param_name(param_name) in self.model_name
@@ -501,7 +503,7 @@ class AnalyzePSModels:
                         axes[row, col].plot(x_vals, y_vals - sd, '--', c='grey')
 
                 elif type == 'line':
-                    sns.lineplot(pred, param_name, hue='Gender', data=self.fitted_params, legend=False, ax=axes[row, col], palette={'Female': 'tomato', 'Male': 'lightseagreen'})
+                    sns.lineplot(pred, param_name, hue='sex', data=self.fitted_params, legend=False, ax=axes[row, col], palette={'Female': 'tomato', 'Male': 'lightseagreen'})
 
                 # Make y-axis [0, 1] for all alphas
                 if ('alpha' in param_name) and ('minus' not in param_name):
@@ -518,8 +520,8 @@ class AnalyzePSModels:
                     axes[row, col].set_ylabel(param_name)
 
                 # Calculate correlations
-                for gen in np.unique(self.fitted_params['Gender']):
-                    gen_idx = self.fitted_params['Gender'] == gen
+                for gen in np.unique(self.fitted_params['sex']):
+                    gen_idx = self.fitted_params['sex'] == gen
 
                     clean_idx = 1 - np.isnan(self.fitted_params[pred]) | np.isnan(self.fitted_params[param_name])
                     corr, p = stats.pearsonr(
@@ -546,15 +548,15 @@ data = {
     # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/',#new_ML_models/MCMC/clustermodels/',
     # 'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv',
     # 'n_trials': 120,
-    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/slopes/',
+    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/',
     'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv',
-    'n_trials': 440,
+    'n_trials': 500,
     'make_csvs_from_pickle': True,
     'make_analyses': True,
     'make_traceplot': False,
     'make_plots': True,
     'waic_criterion_for_analysis': 1e6,
-    'fit_mcmc': True,
+    'fit_mcmc': False,
     'run_on_humans': True,  # Set to true for real data of humans and mice (not simulations)
 }
 
@@ -565,6 +567,6 @@ if apm.make_csvs_from_pickle:
     file_names = [f for f in os.listdir(apm.save_dir) if '.pickle' in f]
     apm.pickle2csv(file_names)
 
-# Create files, save files, make plots, save plots
-if apm.make_analyses:
-    apm.analyze()
+# # Create files, save files, make plots, save plots
+# if apm.make_analyses:
+#     apm.analyze()
