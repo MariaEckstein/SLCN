@@ -2,29 +2,40 @@ run_on_cluster = False
 save_dir_appx = 'mice/'  # ''
 
 # GET LIST OF MODELS TO RUN
+model_names_pre = ['RLab' + end for end in ['', 'd', 'cd', 'cpd', 'cpnd', 'cpnxd']]
+model_names_all = [model_name + end for model_name in model_names_pre for end in ['', 'i', 'j', 'h', 'hj']]
+
 model_names = [
-    'RLabnp2', 'Bbspr'
+    'B',  # simplest models
+    'RLabnp2', 'Bbspr',  # previous winning models
     # 'RLabnp2dlyqt', 'Bbsprywtv'
     # 'RLab', 'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd', 'RLabnp2', 'RLabnp2d', 'RLabcpnxd',
     # 'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
     # 'WSLSy', 'WSLSSy', 'WSLSdfy', 'WSLSSdfy',
-]
+] + model_names_all
 
 # Legend for letters -> parameters
 ## All models
-# 'b' -> beta; 'y' -> slope
-# 'p' -> choice perseverance / sticky choice; 't' -> slope
+# b, y -> beta & slope
+# p, t -> choice perseverance / sticky choice & slope
 ## RL models
-# 'a' -> alpha; 'l' -> slope
-# 'c' -> counterfactual alpha; 'o' -> slope
-# 'n' -> negative alpha; 'q' -> slope
-# 'x' -> counterfactual negative alpha; 'u' -> slope
-# 'd' -> left-bias; 'f' -> slope
-# 'e' -> counterfactual update for negative outcomes; 'g' -> slope
-# 'm' -> ???; 'z' -> slope
+# a, l -> alpha & slope
+# c, o -> counterfactual alpha (calpha) & slope
+# n, q -> negative alpha (nalpha) & slope
+# x, u -> counterfactual negative alpha (cnalpha) & slope
+# e, g -> counterfactual update for negative outcomes (cnalpha_rew) & slope
+# i    -> RT parameter for alpha (rta, nrta, crta, cnrta)
+# j    -> two separate RT parameter for nalpha (nrta, cnrta)
+# h    -> RT parameter for beta (rtb)
+# k    -> two separate RT parameter for beta (rtb, nrtb)
+# d, f -> left-bias & slope
+# m, z -> ??? & slope
 ## Bayesian models
-# 's' -> p_switch; 'w' -> slope
-# 'r' -> p_reward; 'v' -> slope
+# s, w -> p_switch & slope
+# r, v -> p_reward & slope
+
+# letters taken: a, b, c, d, e, f, g, h, i, j, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z
+# letters available: K
 
 run_on = 'mice'  # 'humans', 'mice'
 
@@ -39,7 +50,7 @@ import pymc3 as pm
 import theano
 import theano.tensor as T
 from PSModelFunctions import create_parameter, get_slope_variables
-from PSModelFunctions2 import get_n_params, update_Q, get_likelihoods, post_from_lik, p_from_Q, p_from_prev_WSLS, p_from_prev_WSLSS
+from PSModelFunctions2 import get_n_params, update_Q, get_likelihoods, post_from_lik, p_from_Q  #, p_from_prev_WSLS, p_from_prev_WSLSS
 from PSModelFunctions3 import load_data, load_mouse_data_for_modeling, get_save_dir_and_save_id, print_logp_info
 
 floatX = 'float32'
@@ -47,7 +58,7 @@ theano.config.floatX = 'float32'
 theano.config.warn_float64 = 'warn'
 
 
-def create_model(choices, rewards, group, age,
+def create_model(choices, rewards, rts, group, age,
                  n_subj='all', n_trials='all',  # 'all' or int
                  model_name='ab',  # ab, abc, abn, abcn, abcnx, abcnS, abcnSS, WSLS, WSLSS, etc. etc.
                  slope_variable='age_z', contrast='linear',
@@ -63,6 +74,7 @@ def create_model(choices, rewards, group, age,
     else:
         choices = choices[:n_trials]
         rewards = rewards[:n_trials]
+        rts = rts[:n_trials]
 
     # Create choices_both (first trial is persev_bonus for second trial = where Qs starts)
     if 'B' in model_name:
@@ -72,6 +84,7 @@ def create_model(choices, rewards, group, age,
     # Transform everything into theano.shared variables
     rewards = theano.shared(np.asarray(rewards, dtype='int16'))
     choices = theano.shared(np.asarray(choices, dtype='int16'))
+    rts = theano.shared(np.asarray(rts, dtype='float32'))
     group = theano.shared(np.asarray(group, dtype='int16'))
     slope_variable = theano.shared(np.asarray(age[slope_variable], dtype='float32'))
 
@@ -89,6 +102,7 @@ def create_model(choices, rewards, group, age,
 
     with pm.Model() as model:
         if not fit_individuals:  # fit_MCMC == True
+            print('not fit_individuals')
 
             # RL, Bayes, and WSLS
             if ('b' in model_name) or ('WSLS' in model_name):
@@ -173,6 +187,7 @@ def create_model(choices, rewards, group, age,
                     print("Setting p_reward to 0.75.")
 
         else:  # if fit_individuals == True:
+            print('fit_individuals')
 
             beta = pm.Uniform('beta', lower=0, upper=15, shape=n_subj, testval=2 * T.ones(n_subj, dtype='float32'))
             print("Adding free parameter beta (Uniform 0 15).")
@@ -236,6 +251,44 @@ def create_model(choices, rewards, group, age,
                     cnalpha_rew = pm.Deterministic('cnalpha_rew', T.ones(n_subj, dtype='float32'))
                     print("Setting cnalpha_rew = 1.")
 
+                if 'j' in model_name:
+                    rta = pm.Normal('rta', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter rta (Normal 0 1).")
+                    crta = pm.Deterministic('crta', 1 * rta)
+                    print("Adding parameter crta = rta.")
+                    nrta = pm.Normal('nrta', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter nrta (Normal 0 1).")
+                    cnrta = pm.Deterministic('cnrta', 1 * nrta)
+                    print("Adding parameter cnrta = nrta.")
+
+                elif 'i' in model_name:
+                    rta = pm.Normal('rta', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter rta (Normal 0 1).")
+                    crta = pm.Deterministic('crta', 1 * rta)
+                    print("Adding parameter crta = rta.")
+                    nrta = pm.Deterministic('nrta', 1 * rta)
+                    print("Adding parameter nrta = rta.")
+                    cnrta = pm.Deterministic('cnrta', 1 * rta)
+                    print("Adding parameter cnrta = rta.")
+
+                else:
+                    rta = pm.Deterministic('rta', T.zeros(n_subj, dtype='float32'))
+                    nrta = pm.Deterministic('nrta', T.zeros(n_subj, dtype='float32'))
+                    crta = pm.Deterministic('crta', T.zeros(n_subj, dtype='float32'))
+                    cnrta = pm.Deterministic('cnrta', T.zeros(n_subj, dtype='float32'))
+                    print('Setting rta, nrta, crta, cnrat = 0 (neutral).')
+
+                if 'h' in model_name:
+                    rtb = pm.Normal('rtb', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter rtb (Normal 0 1).")
+                    # nrtb = pm.Deterministic('nrtb', 1 * rtb)
+                    # print("Adding parameter nrtb = rtb.")
+                else:
+                    rtb = pm.Deterministic('rtb', T.zeros(n_subj, dtype='float32'))
+                    print("Setting rtb = 0 (neutral).")
+                    # nrtb = pm.Deterministic('nrtb', T.zeros(n_subj, dtype='float32'))
+                    # print("Setting parameters rtb, nrtb = 0.")
+
             elif 'B' in model_name:  # only BF models
                 p_noisy = pm.Deterministic('p_noisy', 1e-5 * T.ones(n_subj, dtype='float32'))
                 if 's' in model_name:
@@ -264,9 +317,9 @@ def create_model(choices, rewards, group, age,
                 sequences=[
                     # choices[0:-2], rewards[0:-2],
                     # choices[1:-1], rewards[1:-1],
-                    choices[2:], rewards[2:]],
+                    choices[2:], rewards[2:], rts[2:]],
                 outputs_info=[Qs, _],
-                non_sequences=[alpha, nalpha, calpha, cnalpha, cnalpha_rew, n_subj])
+                non_sequences=[alpha, nalpha, calpha, cnalpha, cnalpha_rew, rta, nrta, crta, cnrta, n_subj])
 
             # Initialize p_right for first trial
             p_right = 0.5 * T.ones(n_subj, dtype='float32')  # shape: (n_subj)
@@ -276,30 +329,30 @@ def create_model(choices, rewards, group, age,
                 fn=p_from_Q,
                 sequences=[Qs,
                            # choices[1:-1], rewards[1:-1],
-                           choices[2:], #rewards[2:]
+                           choices[2:], rts[2:] #rewards[2:]
                            ],
                 outputs_info=[p_right],
-                non_sequences=[n_subj, beta, persev, bias])
+                non_sequences=[n_subj, beta, persev, bias, rtb])
 
-        elif 'WSLS' in model_name:
-
-            p_right = 0.5 * T.ones(n_subj, dtype='float32')  # shape: (n_subj)
-            p_right, _ = theano.scan(
-                fn=p_from_prev_WSLS,
-                sequences=[choices[2:], rewards[2:],],
-                outputs_info=[p_right],
-                non_sequences=[beta, bias]
-            )
-
-        elif 'WSLSS' in model_name:
-
-            p_right = 0.5 * T.ones(n_subj, dtype='float32')  # shape: (n_subj)
-            p_right, _ = theano.scan(
-                fn=p_from_prev_WSLSS,
-                sequences=[choices[1:-1], rewards[1:-1], choices[2:], rewards[2:],],
-                outputs_info=[p_right],
-                non_sequences=[beta, bias]
-            )
+        # elif 'WSLS' in model_name:
+        #
+        #     p_right = 0.5 * T.ones(n_subj, dtype='float32')  # shape: (n_subj)
+        #     p_right, _ = theano.scan(
+        #         fn=p_from_prev_WSLS,
+        #         sequences=[choices[2:], rewards[2:],],
+        #         outputs_info=[p_right],
+        #         non_sequences=[beta, bias]
+        #     )
+        #
+        # elif 'WSLSS' in model_name:
+        #
+        #     p_right = 0.5 * T.ones(n_subj, dtype='float32')  # shape: (n_subj)
+        #     p_right, _ = theano.scan(
+        #         fn=p_from_prev_WSLSS,
+        #         sequences=[choices[1:-1], rewards[1:-1], choices[2:], rewards[2:],],
+        #         outputs_info=[p_right],
+        #         non_sequences=[beta, bias]
+        #     )
 
         elif 'B' in model_name:
 
@@ -326,6 +379,24 @@ def create_model(choices, rewards, group, age,
         # subjwise_LLs = pm.Deterministic('subjwise_LLs', T.sum(trialwise_LLs, axis=0))
 
         # Check model logp and RV logps (will crash if they are nan or -inf)
+        # theano.printing.Print('rta')(rta)
+        # theano.printing.Print('rtb')(rtb)
+        # theano.printing.Print('beta')(beta)
+        # theano.printing.Print('persev')(persev)
+        # theano.printing.Print('p_switch')(p_switch)
+        # theano.printing.Print('p_reward')(p_reward)
+        # theano.printing.Print('alpha')(alpha)
+        # theano.printing.Print('nalpha')(nalpha)
+        # theano.printing.Print('calpha')(calpha)
+        # theano.printing.Print('cnalpha')(cnalpha)
+        # theano.printing.Print('Qs')(Qs)
+        # theano.printing.Print('choices')(choices)
+        # theano.printing.Print('rewards')(rewards)
+        # theano.printing.Print('p_right')(p_right)
+        # theano.printing.Print('trialwise_LLs')(trialwise_LLs)
+        # theano.printing.Print('T.sum(trialwise_LLs, axis=0)')(T.sum(trialwise_LLs, axis=0))
+        # theano.printing.Print('T.sum(trialwise_LLs)')(T.sum(trialwise_LLs))
+
         if verbose or print_logps:
             print_logp_info(model)
             theano.printing.Print('all choices')(choices)
@@ -442,7 +513,7 @@ for model_name in model_names:
     elif run_on == 'mice':
 
         # Load mouse data
-        n_subj, rewards, choices, group, n_groups, age = load_mouse_data_for_modeling(
+        n_subj, rewards, choices, rts, group, n_groups, age = load_mouse_data_for_modeling(
             'mice',  # 'simulations'
             first_session_only=False,
             fit_sessions_individually=True,
@@ -458,8 +529,11 @@ for model_name in model_names:
     for slope_variable in slope_variables:
 
         # Create model
+        rts = (rts - np.nanmin(rts)) / np.nanmax(rts)  # "normalize" to get [0, 1] for multiplication with alpha...
+        # ... then subtract 1 because I'll add 1 later to make sure I'm multiplying 1 * alpha in the neutral case.
+
         model, n_params, n_trials, save_dir, save_id = create_model(
-            choices=choices, rewards=rewards, group=group, age=age, n_groups=n_groups,
+            choices=choices, rewards=rewards, rts=rts, group=group, age=age, n_groups=n_groups,
             model_name=model_name, slope_variable=slope_variable, contrast=contrast, fit_individuals=fit_individuals,
             n_subj=n_subj, n_trials='all', verbose=False, print_logps=False)
 

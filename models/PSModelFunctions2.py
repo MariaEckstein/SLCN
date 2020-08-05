@@ -80,51 +80,51 @@ def get_paths(run_on_cluster):
 #     return Qs
 
 
-def p_from_prev_WSLS(prev_choice, prev_reward, p_right, beta, bias):
-
-    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan
-
-    r1 = prev_choice * prev_reward  # r1: right, reward
-    r0 = prev_choice * (one - prev_reward)  # r0: right, no reward
-    l1 = (one - prev_choice) * prev_reward  # l1: left, reward
-    l0 = (one - prev_choice) * (one - prev_reward)  # l0: left, no reward
-
-    p_right = one / (one + np.exp(beta * (l1 + r0 - r1 - l0 + bias)))
-
-    return p_right
-
-
-def p_from_prev_WSLSS(prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, p_right, beta, bias):
-
-    one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan
-
-    # Makes you choose left
-    l1 = (one - prev_choice) * prev_reward
-    r0r0 = prev_prev_choice * (one - prev_prev_reward) * prev_choice * (one - prev_reward)
-    l1r0 = (one - prev_prev_choice) * prev_prev_reward * prev_choice * (one - prev_reward)
-    l0r0 = (one - prev_prev_choice) * (one - prev_prev_reward) * prev_choice * (one - prev_choice)
-    l1l0 = (one - prev_prev_choice) * prev_prev_reward * (one - prev_choice) * (one - prev_reward)
-
-    # Makes you choose right
-    r1 = prev_choice * prev_reward
-    l0l0 = (one - prev_prev_choice) * (one - prev_prev_reward) * (one - prev_choice) * (one - prev_reward)
-    r1l0 = prev_prev_choice * prev_prev_reward * (one - prev_choice) * (one - prev_reward)
-    r0l0 = prev_prev_choice * (one - prev_prev_reward) * (one - prev_choice) * (one - prev_reward)
-    r1r0 = prev_prev_choice * prev_prev_reward * prev_choice * (one - prev_reward)
-
-    theano.printing.Print('all')(l1 + r0r0 + l1r0 + l0r0 + l1l0 + r1 + l0l0 + r1l0 + r0l0 + r1r0)
-
-    p_right = one / (one + np.exp(beta * (l1 + r0r0 + l1r0 + l0r0 + l1l0 - r1 - l0l0 - r1l0 - r0l0 - r1r0 + bias)))
-
-    return p_right
+# def p_from_prev_WSLS(prev_choice, prev_reward, p_right, beta, bias):
+#
+#     one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan
+#
+#     r1 = prev_choice * prev_reward  # r1: right, reward
+#     r0 = prev_choice * (one - prev_reward)  # r0: right, no reward
+#     l1 = (one - prev_choice) * prev_reward  # l1: left, reward
+#     l0 = (one - prev_choice) * (one - prev_reward)  # l0: left, no reward
+#
+#     p_right = one / (one + np.exp(beta * (l1 + r0 - r1 - l0 + bias)))
+#
+#     return p_right
+#
+#
+# def p_from_prev_WSLSS(prev_prev_choice, prev_prev_reward, prev_choice, prev_reward, p_right, beta, bias):
+#
+#     one = T.ones(1, dtype='int16')  # to avoid upcasting, which crashes theano.scan
+#
+#     # Makes you choose left
+#     l1 = (one - prev_choice) * prev_reward
+#     r0r0 = prev_prev_choice * (one - prev_prev_reward) * prev_choice * (one - prev_reward)
+#     l1r0 = (one - prev_prev_choice) * prev_prev_reward * prev_choice * (one - prev_reward)
+#     l0r0 = (one - prev_prev_choice) * (one - prev_prev_reward) * prev_choice * (one - prev_choice)
+#     l1l0 = (one - prev_prev_choice) * prev_prev_reward * (one - prev_choice) * (one - prev_reward)
+#
+#     # Makes you choose right
+#     r1 = prev_choice * prev_reward
+#     l0l0 = (one - prev_prev_choice) * (one - prev_prev_reward) * (one - prev_choice) * (one - prev_reward)
+#     r1l0 = prev_prev_choice * prev_prev_reward * (one - prev_choice) * (one - prev_reward)
+#     r0l0 = prev_prev_choice * (one - prev_prev_reward) * (one - prev_choice) * (one - prev_reward)
+#     r1r0 = prev_prev_choice * prev_prev_reward * prev_choice * (one - prev_reward)
+#
+#     theano.printing.Print('all')(l1 + r0r0 + l1r0 + l0r0 + l1l0 + r1 + l0l0 + r1l0 + r0l0 + r1r0)
+#
+#     p_right = one / (one + np.exp(beta * (l1 + r0r0 + l1r0 + l0r0 + l1l0 - r1 - l0l0 - r1l0 - r0l0 - r1r0 + bias)))
+#
+#     return p_right
 
 
 def p_from_Q(
         Qs,
         # prev_prev_choice, prev_prev_reward,
-        prev_choice, #prev_reward,
+        prev_choice, prev_rt, #prev_reward,
         init_p, n_subj,
-        beta, persev, bias):
+        beta, persev, bias, rtb):
 
     # index0 = T.arange(n_subj, dtype='int32'), 0
     # index1 = T.arange(n_subj, dtype='int32'), 1
@@ -138,8 +138,14 @@ def p_from_Q(
     Qs1 = Qs1 + prev_choice * persev
     Qs0 = Qs0 + (one - prev_choice) * persev
 
+    # Add RT effect
+    rtb_ = rtb * (prev_rt - 1) + 1  # when rtb == 0, then rtb_ == 1, for neutral multiplication rtb_ * beta
+    # theano.printing.Print('rtb')(rtb)
+    # theano.printing.Print('rt')(prev_rt)
+    # theano.printing.Print('rtb_')(rtb_)
+
     # softmax-transform Q-values into probabilities
-    p_right = one / (one + np.exp(beta * (Qs0 - Qs1 + bias)))  # 0 = left action; 1 = right action
+    p_right = one / (one + np.exp(rtb_ * beta * (Qs0 - Qs1 + bias)))  # 0 = left action; 1 = right action
     p_right = 0.0001 + 0.9998 * p_right  # make 0.0001 < p_right < 0.9999
 
     return p_right
@@ -148,9 +154,10 @@ def p_from_Q(
 def update_Q(
         # prev_prev_choice, prev_prev_reward,
         # prev_choice, prev_reward,
-        choice, reward,
+        choice, reward, rt,
         Qs, _,
-        alpha, nalpha, calpha, cnalpha, cnalpha_rew, n_subj):
+        alpha, nalpha, calpha, cnalpha, cnalpha_rew, rta, nrta, crta, cnrta,
+        n_subj):
 
     # Comment in for update_Q_0 (letter models)
     index = T.arange(n_subj), choice
@@ -166,13 +173,22 @@ def update_Q(
     # cRPE = (0 - Qs[cindex])  # would have gotten 0 for the other action
     # cnRPE = cRPE
 
+    # Get RT effect (rts have 1 subtracted beforehand; by adding 1 here, when parameter == 0, we get neutral 1 * alpha)
+    rta_ = rta * (rt - 1) + 1
+    # theano.printing.Print('rta')(rta)
+    # theano.printing.Print('rt')(rt)
+    # theano.printing.Print('rta_')(rta_)
+    nrta_ = nrta * (rt - 1) + 1
+    crta_ = crta * (rt - 1) + 1
+    cnrta_ = cnrta * (rt - 1) + 1
+
     # Update action taken
     Qs = T.set_subtensor(Qs[index],
-                         Qs[index] + alpha * RPE + nalpha * nRPE)  # add RPE for pos. & nRPE for neg. outcomes
+                         Qs[index] + rta_ * alpha * RPE + nrta_ * nalpha * nRPE)  # add RPE for pos. & nRPE for neg. outcomes
 
     # Update counterfactual action
     Qs = T.set_subtensor(Qs[cindex],
-                         Qs[cindex] + calpha * cRPE + cnalpha * cnRPE)  # add cRPE for pos. & cnRPE for neg. outcomes
+                         Qs[cindex] + crta_ * calpha * cRPE + cnrta_ * cnalpha * cnRPE)  # add cRPE for pos. & cnRPE for neg. outcomes
 
     return Qs, _
 

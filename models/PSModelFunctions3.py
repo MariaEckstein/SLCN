@@ -131,6 +131,7 @@ def load_mouse_data_for_modeling(fitted_data_name, first_session_only, fit_sessi
     matrix_fullIDs = np.array([dat.fullID]).reshape(matrix_shape).T
     choices = np.array([dat.action]).reshape(matrix_shape).T  # mouse shape: [500, 388]
     rewards = np.array([dat.reward]).reshape(matrix_shape).T
+    rts = np.array([dat.rt]).reshape(matrix_shape).T
 
     age = pd.DataFrame()
     age['fullID'] = matrix_fullIDs[0]
@@ -177,7 +178,7 @@ def load_mouse_data_for_modeling(fitted_data_name, first_session_only, fit_sessi
 
     n_subj = len(np.unique(age['sID']))
 
-    return n_subj, rewards, choices, group, n_groups, age
+    return n_subj, rewards, choices, rts, group, n_groups, age
 
 
 def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids_and_teens_only=False, adults_only=False,
