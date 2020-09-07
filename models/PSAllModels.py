@@ -2,12 +2,12 @@ run_on_cluster = False
 save_dir_appx = 'mice/'  # ''
 
 # GET LIST OF MODELS TO RUN
-model_names_pre = ['RLab' + end for end in ['', 'd', 'cd', 'cpd', 'cpnd', 'cpnxd']]
-model_names_all = [model_name + end for model_name in model_names_pre for end in ['', 'i', 'j', 'h', 'hj']]
+# model_names_pre = ['RLab' + end for end in ['',  'd', 'cd', 'cpd', 'cpnd', 'cpnxd', 'np2']]
+model_names_pre = ['RLabcpnxd', 'RLabnp2', 'RLab']
+model_names_all = [model_name + end for model_name in model_names_pre for end in ['', 'k', 'i', 'j', '4', 'h', 'hi', 'hj', 'h4']]
 
 model_names = [
-    'B',  # simplest models
-    'RLabnp2', 'Bbspr',  # previous winning models
+    'Bbspr',
     # 'RLabnp2dlyqt', 'Bbsprywtv'
     # 'RLab', 'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd', 'RLabnp2', 'RLabnp2d', 'RLabcpnxd',
     # 'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
@@ -24,10 +24,11 @@ model_names = [
 # n, q -> negative alpha (nalpha) & slope
 # x, u -> counterfactual negative alpha (cnalpha) & slope
 # e, g -> counterfactual update for negative outcomes (cnalpha_rew) & slope
-# i    -> RT parameter for alpha (rta, nrta, crta, cnrta)
-# j    -> two separate RT parameter for nalpha (nrta, cnrta)
+# k    -> RT parameter for alpha (just 1: rta == nrta; crta == ncrta == 0) (OLD: 1 shared: rta == nrta == crta == cnrta)
+# i    -> RT parameter for alpha (pos vs neg: rta; nrta; crta == cnrta == 0)
+# j    -> RT parameter for alpha (adding counterfactual: rta == crta; nrta == cnrta)
+# 4    -> RT parameter for alpha (4 separate ones: rta, nrta, crta, cnrta)
 # h    -> RT parameter for beta (rtb)
-# k    -> two separate RT parameter for beta (rtb, nrtb)
 # d, f -> left-bias & slope
 # m, z -> ??? & slope
 ## Bayesian models
@@ -223,11 +224,9 @@ def create_model(choices, rewards, rts, group, age,
                 if 'c' in model_name:
                     calpha = pm.Beta('calpha', alpha=1, beta=1, shape=n_subj, testval=0.5 * T.ones(n_subj, dtype='float32'))
                     print("Adding free parameter calpha (Beta 1 1).")
-
                 elif '2' in model_name:
                     calpha = pm.Deterministic('calpha', 1 * alpha)
                     print("Setting calpha = alpha")
-
                 else:
                     calpha = 0
                     print("Setting calpha = 0.")
@@ -235,11 +234,9 @@ def create_model(choices, rewards, rts, group, age,
                 if 'x' in model_name:
                     cnalpha = pm.Beta('cnalpha', alpha=1, beta=1, shape=n_subj, testval=0.5 * T.ones(n_subj, dtype='float32'))
                     print("Adding free parameter cnalpha (Beta 1 1).")
-
                 elif '2' in model_name:
                     cnalpha = pm.Deterministic('cnalpha', 1 * nalpha)
                     print("Setting cnalpha = nalpha")
-
                 else:
                     cnalpha = 0
                     print("Setting cnalpha = 0.")
@@ -251,7 +248,29 @@ def create_model(choices, rewards, rts, group, age,
                     cnalpha_rew = pm.Deterministic('cnalpha_rew', T.ones(n_subj, dtype='float32'))
                     print("Setting cnalpha_rew = 1.")
 
-                if 'j' in model_name:
+                if 'k' in model_name:  # One rta (bad)
+                    rta = pm.Normal('rta', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter rta (Normal 0 1).")
+                    nrta = pm.Deterministic('nrta', 1 * rta)
+                    print("Setting nrta = rta.")
+                    crta = pm.Deterministic('crta', T.zeros(n_subj, dtype='float32'))
+                    cnrta = pm.Deterministic('cnrta', T.zeros(n_subj, dtype='float32'))
+                    print('Setting crta, cnrta = 0 (neutral).')
+                elif 'i' in model_name:  # Pos vs neg rta (better)
+                    rta = pm.Normal('rta', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter rta (Normal 0 1).")
+                    nrta = pm.Normal('nrta', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter nrta (Normal 0 1).")
+                    crta = pm.Deterministic('crta', T.zeros(n_subj, dtype='float32'))
+                    cnrta = pm.Deterministic('cnrta', T.zeros(n_subj, dtype='float32'))
+                    print('Setting crta, cnrta = 0 (neutral).')
+                    # crta = pm.Deterministic('crta', 1 * rta)
+                    # print("Adding parameter crta = rta.")
+                    # nrta = pm.Deterministic('nrta', 1 * rta)
+                    # print("Adding parameter nrta = rta.")
+                    # cnrta = pm.Deterministic('cnrta', 1 * rta)
+                    # print("Adding parameter cnrta = rta.")
+                elif 'j' in model_name:  # Add counterfactual rta (better)
                     rta = pm.Normal('rta', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
                     print("Adding free parameter rta (Normal 0 1).")
                     crta = pm.Deterministic('crta', 1 * rta)
@@ -260,34 +279,28 @@ def create_model(choices, rewards, rts, group, age,
                     print("Adding free parameter nrta (Normal 0 1).")
                     cnrta = pm.Deterministic('cnrta', 1 * nrta)
                     print("Adding parameter cnrta = nrta.")
-
-                elif 'i' in model_name:
+                elif '4' in model_name:
                     rta = pm.Normal('rta', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
                     print("Adding free parameter rta (Normal 0 1).")
-                    crta = pm.Deterministic('crta', 1 * rta)
-                    print("Adding parameter crta = rta.")
-                    nrta = pm.Deterministic('nrta', 1 * rta)
-                    print("Adding parameter nrta = rta.")
-                    cnrta = pm.Deterministic('cnrta', 1 * rta)
-                    print("Adding parameter cnrta = rta.")
-
+                    crta = pm.Normal('crta', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter crta (Normal 0 1).")
+                    nrta = pm.Normal('nrta', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter nrta (Normal 0 1).")
+                    cnrta = pm.Normal('cnrta', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
+                    print("Adding free parameter cnrta (Normal 0 1).")
                 else:
                     rta = pm.Deterministic('rta', T.zeros(n_subj, dtype='float32'))
                     nrta = pm.Deterministic('nrta', T.zeros(n_subj, dtype='float32'))
                     crta = pm.Deterministic('crta', T.zeros(n_subj, dtype='float32'))
                     cnrta = pm.Deterministic('cnrta', T.zeros(n_subj, dtype='float32'))
-                    print('Setting rta, nrta, crta, cnrat = 0 (neutral).')
+                    print('Setting rta, nrta, crta, cnrta = 0 (neutral).')
 
                 if 'h' in model_name:
                     rtb = pm.Normal('rtb', shape=n_subj, testval=0.1 * T.ones(n_subj, dtype='float32'))
                     print("Adding free parameter rtb (Normal 0 1).")
-                    # nrtb = pm.Deterministic('nrtb', 1 * rtb)
-                    # print("Adding parameter nrtb = rtb.")
                 else:
                     rtb = pm.Deterministic('rtb', T.zeros(n_subj, dtype='float32'))
                     print("Setting rtb = 0 (neutral).")
-                    # nrtb = pm.Deterministic('nrtb', T.zeros(n_subj, dtype='float32'))
-                    # print("Setting parameters rtb, nrtb = 0.")
 
             elif 'B' in model_name:  # only BF models
                 p_noisy = pm.Deterministic('p_noisy', 1e-5 * T.ones(n_subj, dtype='float32'))

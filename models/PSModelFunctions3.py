@@ -7,7 +7,7 @@ import pandas as pd
 # import theano.tensor as T
 
 from PSModelFunctions2 import get_paths
-from Functions import load_mouse_data, get_info_from_fullID, get_session
+from Functions import get_info_from_fullID, get_session  # load_mouse_data,
 # from shared_aliens import get_alien_paths
 
 
