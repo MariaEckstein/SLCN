@@ -254,29 +254,23 @@ def get_category_dict():
 
         # Performance
         'miss': ['{}_miss'.format(t) for t in tasks],
-        'RT': ['{}_RT'.format(t) for t in tasks] + ['{}_RTsd'.format(t) for t in tasks],
+        'RT': ['{}_RT'.format(t) for t in tasks],
+        'RTsd': ['{}_RTsd'.format(t) for t in tasks],
         'ACC': ['{}_ACC'.format(t) for t in tasks],
-        'ACC2': ['ps_n_switches', 'ps_criterion_trial', 'bf_ACC_first3trials', 'bf_asymptote', 'bf_intercept'],
+        'ACC2': ['bf_ACC_first3trials', 'bf_asymptote', 'bf_intercept', 'ps_n_switches', 'ps_criterion_trial',],
 
         # Stay
-        'Stay': ['rl_stay_choice', 'bf_stay_choice', 'ps_stay', 'ps_persev', 'rl_stay_motor', 'bf_stay_motor'],
+        'Stay': ['rl_stay_choice', 'bf_stay_choice', 'ps_stay', 'rl_stay_motor', 'bf_stay_motor'],
+        'Persev': ['ps_persev'],
 
         # WSLS (win-stay & lose-STAY)
-        'WS': ['{}_WS'.format(t) for t in tasks] + ['ps_LWS', 'bf_prew'],
+        'WS': ['{}_WS'.format(t) for t in tasks],
+        'WS2': ['ps_WLS', 'bf_prew'],
         'LS': ['{}_LS'.format(t) for t in tasks],
 
-        # WM stuff
-        'WM': ['rl_rho', 'rl_K', 'rl_lrn_ns_sig', 'rl_ACC_ns_slope', 'rl_RT_ns_slope'],
-
-        # Learning / performance improvement
-        'Learn': ['{}_ACC_delta'.format(t) for t in tasks]
-               + ['{}_RT_delta'.format(t) for t in tasks]
-               + ['bf_learning_slope', 'rl_RT_ns_slope_delta', 'rl_ACC_ns_slope_delta', ]
-               + ['rl_lrn_pcor_sig', 'rl_lrn_pinc_sig'],
-
         # Forgetting / effects of time
-        'Forget': ['bf_forget', 'rl_forget'],
         'Delay': ['bf_delay', 'rl_lrn_delay_sig'],
+        'Forget': ['bf_forget', 'rl_forget'],
 
         # Interesting parameters
         'Beta': ['rl_epsilon_1_over_beta', 'bf_1_over_beta', 'ps_1_over_beta'],
@@ -285,6 +279,16 @@ def get_category_dict():
 
         # Other parameters
         'Bayes': ['ps_p_switch', 'ps_p_reward'],
+
+        # WM stuff
+        'WM': ['rl_rho', 'rl_K', 'rl_lrn_ns_sig', 'rl_ACC_ns_slope', 'rl_RT_ns_slope'],
+
+        # Learning / performance improvement
+        'Learn':
+            # ['{}_ACC_delta'.format(t) for t in tasks]
+            # + ['{}_RT_delta'.format(t) for t in tasks]
+            # + ['rl_RT_ns_slope_delta', 'rl_ACC_ns_slope_delta', ]
+            ['rl_lrn_pcor_sig', 'rl_lrn_pinc_sig', 'bf_learning_slope', 'ps_ACC_delta'],
     }
 # # Example use
 # category_dict = get_category_dict()
