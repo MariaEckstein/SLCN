@@ -1,8 +1,8 @@
 import numpy as np
 import os
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
+# import seaborn as sns
+# import matplotlib.pyplot as plt
 from sklearn.model_selection import GridSearchCV, RepeatedKFold
 
 
@@ -275,7 +275,7 @@ def get_category_dict():
         # Interesting parameters
         'Beta': ['rl_epsilon_1_over_beta', 'bf_1_over_beta', 'ps_1_over_beta'],
         'Alpha': ['rl_log_alpha', 'bf_alpha', 'ps_alpha'],
-        'Nalpha': ['rl_log_nalpha', 'ps_nalpha'],
+        'Nalpha': ['rl_log_nalpha', 'bf_nalpha', 'ps_nalpha'],
 
         # Other parameters
         'Bayes': ['ps_p_switch', 'ps_p_reward'],

@@ -191,7 +191,7 @@ def load_data(run_on_cluster, fitted_data_name='humans', n_groups='gender', kids
         file_name_pattern = 'PS*.csv'
     elif fitted_data_name == 'RL_simulations':
         data_dir = paths['RL_simulations']
-        file_name_pattern = 'PS*0.csv'  # Only one simulation per subject
+        file_name_pattern = 'PS*.csv'  # Only one simulation per subject
     elif fitted_data_name == 'BF_simulations':
         data_dir = paths['BF_simulations']
         file_name_pattern = 'PS*0.csv'  # Only one simulation per subject

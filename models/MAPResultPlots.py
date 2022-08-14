@@ -547,17 +547,18 @@ data = {
     # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/new_ML_models/MCMC/clustermodels/genrec/new/',  #/genrec/simBbspr/',
     # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/',#new_ML_models/MCMC/clustermodels/',
     # 'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCNdata/SLCNinfo2.csv',
-    # 'n_trials': 120,
-    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/',
+    'n_trials': 120,
+    # 'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/mice/',
+    'save_dir': 'C:/Users/maria/MEGAsync/SLCN/PShumanData/fitting/',
     'SLCN_info_file_dir': 'C:/Users/maria/MEGAsync/SLCN/PSMouseData/age.csv',
-    'n_trials': 500,
+    # 'n_trials': 500,
     'make_csvs_from_pickle': True,
     'make_analyses': True,
     'make_traceplot': False,
     'make_plots': True,
     'waic_criterion_for_analysis': 1e6,
-    'fit_mcmc': False,
-    'run_on_humans': True,  # Set to true for real data of humans and mice (not simulations)
+    'fit_mcmc': True,  #False,
+    'run_on_humans': False  # True,  # Set to true for real data of humans and mice (not simulations)
 }
 
 apm = AnalyzePSModels(data)

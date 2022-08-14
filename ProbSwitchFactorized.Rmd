@@ -7,6 +7,7 @@ output: html_notebook
 ## Read in and clean data
 
 ```{r Read in ages}
+
 get_ages = function(ages_file_dir) {
   
   ages = read.csv(ages_file_dir)
@@ -20,7 +21,7 @@ get_ages = function(ages_file_dir) {
   
   ages$Columbia_cat[ages$sID >= 300] = 10  # community adults (25-30)
   ages$Columbia_cat[ages$sID >= 400] = 9  # Berkeley undergrads (ca. 17-25)
-  ages$Columbia_cat = factor(ages$Columbia_cat, labels=c("Pre", "Pub", "Post", "UCB", "Adult", NA))
+  ages$Columbia_cat = factor(ages$Columbia_cat, labels=c("Pre", "Pub", "Post", "18-24", "25-30", NA))
   
   # Add testost. group
   ages$log_T = log(ages$meanT)
@@ -36,24 +37,30 @@ get_ages = function(ages_file_dir) {
       groups[ages$Gender=="Female" & ages[,colname] <= quantiles_f[i]] = paste0(round(100*probs[i], digits=0), "%")
       groups[ages$Gender=="Male" & ages[,colname] <= quantiles_m[i]] = paste0(round(100*probs[i], digits=0), "%")
     }
-    groups[ages$sID >= 300] = "Adult"
-    groups[ages$sID >= 400] = "UCB"
+    
+    # Split adults by recruitment
+    groups[ages$sID >= 300] = "25-30"
+    groups[ages$sID >= 400] = "18-24"
+    
+    # Split adults by age
+    groups[ages$PreciseYrs > 17] = "18-24"
+    groups[ages$PreciseYrs > 25] = "25-30"
     
     return(groups)
   }
   
   ages$T_group = make_groups(ages, "meanT")
-  ages$T_group = factor(ages$T_group, levels=c("25%", "50%", "75%", "100%", "UCB", "Adult"))
+  ages$T_group = factor(ages$T_group, levels=c("25%", "50%", "75%", "100%", "18-24", "25-30"))
   ages$age_group = make_groups(ages, "PreciseYrs")
-  ages$age_group = factor(ages$age_group, levels=c("25%", "50%", "75%", "100%", "UCB", "Adult"))
+  ages$age_group = factor(ages$age_group, levels=c("25%", "50%", "75%", "100%", "18-24", "25-30"))
   
-  ages$PDS[ages$age_group == 'UCB'] = 9
-  ages$PDS[ages$age_group == 'Adult'] = 10
+  ages$PDS[ages$age_group == "18-24"] = 9
+  ages$PDS[ages$age_group == "25-30"] = 10
   ages$PDS = as.numeric(ages$PDS)
   ages$PDS_group[ages$PDS == 1] = "pre"
   PDS_sub = (ages$PDS > 1) & !(is.na(ages$PDS))
   ages$PDS_group[PDS_sub] = make_groups(ages[PDS_sub,], "PDS", probs=c(1, 2/3, 1/3))
-  ages$PDS_group = factor(ages$PDS_group, levels=c("pre", "33%", "67%", "100%", "UCB", "Adult"))
+  ages$PDS_group = factor(ages$PDS_group, levels=c("pre", "33%", "67%", "100%", "18-24", "25-30"))
   
   ddply(ages, .(T_group, Gender), T=min(meanT, na.rm=T), summarize)  # check that assignment was right (min matches up with quantiles)
   
@@ -188,6 +195,7 @@ get_data = function(data_dir, data_name, patt) {
 ```
 
 ```{r Remaining fixes for all_filess}
+
 finish_all_files = function(all_files) {
   
   # Sort all_files
@@ -232,6 +240,7 @@ finish_all_files = function(all_files) {
 ```
 
 ```{r get_ACC_reward_subj}
+
 add_age_group_yrs = function(data) {
   
   data$age_group_ = as.character(data$age_group)
@@ -239,8 +248,8 @@ add_age_group_yrs = function(data) {
   data$age_group_[data$age_group_ == "50%"] = 11.5
   data$age_group_[data$age_group_ == "75%"] = 14
   data$age_group_[data$age_group_ == "100%"] = 16.5
-  data$age_group_[data$age_group_ == "UCB"] = 21.5
-  data$age_group_[data$age_group_ == "Adult"] = 27.5
+  data$age_group_[data$age_group_ == "18-24"] = 21.5
+  data$age_group_[data$age_group_ == "25-30"] = 27.5
   data$age_group_ = as.numeric(data$age_group_)
   
   return(data)
@@ -289,6 +298,7 @@ get_ACC_reward_subj = function(all_files) {
 ## Analyzing behavior
 
 ```{r Exclusion}
+
 plot_indivduals_for_exclusion = function(all_files, exclude_UCB) {
   
   # Overall behavior for each participant
@@ -429,12 +439,17 @@ run_regressions = function(all_files_regr) {
   sel_rew_predictors = c("selected", "reward")
   choice_predictors = c("left_rew", "right_rew")
   
+  # subj = all_files_regr$sID[1]
   for (subj in unique(all_files_regr$sID)) {
     subj_dat = subset(all_files_regr, sID == subj & !is.na(selected_box))
+    
     if (nrow(subj_dat) > 0) {
       
       ## Add nback columns
+      # n = 1
       for (n in 1:12) {
+        # cond = choice_predictors[1]
+        
         for (cond in c(choice_predictors, reward_predictors, sel_rew_predictors)) {
         # for (cond in c(reward_predictors)) {
           col_name = paste0("back", n, cond)
@@ -1047,8 +1062,6 @@ ggsave(file.path(plot_dir, paste0(model_class, "b_age_stay.eps")), b_age_stay, w
 ggsave(file.path(plot_dir, paste0(model_class, "b_PDS_stay.eps")), b_PDS_stay, width=6, height=3)
 ggsave(file.path(plot_dir, paste0(model_class, "b_T_stay.eps")), b_T_stay, width=6, height=3)
 
-ggsave(file.path(plot_dir, paste0(model_class, "b_age_reward.eps")), b_age_reward, width=6, height=3)
-
 ggsave(file.path(plot_dir, paste0(model_class, "b_age_RT.eps")), b_age_RT, width=6, height=3)
 ggsave(file.path(plot_dir, paste0(model_class, "b_PDS_RT.eps")), b_PDS_RT, width=6, height=3)
 ggsave(file.path(plot_dir, paste0(model_class, "b_T_RT.eps")), b_T_RT, width=6, height=3)
@@ -1064,7 +1077,7 @@ ggsave(file.path(plot_dir, paste0(model_class, "c_age_stay_validation.eps")), c_
 ggsave(file.path(plot_dir, paste0(model_class, "s_PDS_stay_validation.eps")), s_PDS_stay_validation, width=5, height=3)
 ggsave(file.path(plot_dir, paste0(model_class, "s_T_stay_validation.eps")), s_PDS_stay_validation, width=5, height=3)
 
-ggsave(file.path(plot_dir, paste0(model_class, "c_age_reward_validation.eps")), c_age_reward_validation, width=5, height=3)
+ggsave(file.path(plot_dir, paste0(model_class, "c_age_points_validation.eps")), c_age_points_validation, width=5, height=3)
 
 ggsave(file.path(plot_dir, paste0(model_class, "c_age_RT_validation.eps")), c_age_RT_validation, width=5, height=3)
 ggsave(file.path(plot_dir, paste0(model_class, "s_PDS_RT_validation.eps")), s_PDS_RT_validation, width=5, height=3)
@@ -1290,9 +1303,9 @@ if (data_name != "PCsim") {
   rew_min_nor = merge(rew_min_nor, ages)
   rew_min_nor = add_age_group_yrs(rew_min_nor)
   
-  ggplot(rew_min_nor, aes(PreciseYrs, n2_min_n1, color=model_name)) +
+  print(ggplot(rew_min_nor, aes(PreciseYrs, n2_min_n1, color=model_name)) +
     stat_summary(aes(age_group_)) +
-    stat_summary(aes(age_group_), geom="line")
+    stat_summary(aes(age_group_), geom="line"))
 }
 
 # Empirical p_switch
@@ -1365,6 +1378,7 @@ rolling_window_k = 50
 ACC_hum = subset(ACCs, model_name == "Human")
 reward_hum = subset(reward_subj, model_name == "Human")
 asypmt_dat_dum = subset(asypmt_dat, model_name == "Human")
+crit_sum_hum = subset(crit_sum, model_name == "Human")
 
 # Overall accuracy
 
@@ -1377,6 +1391,23 @@ ACCs_sorted$roll_ACC_SD = rollapply(ACCs_sorted$mean_ACC, width=rolling_window_k
     geom_point(aes(y=mean_ACC, color=Gender), size=0.3) + 
     geom_line(aes(y=roll_ACC)) +
     geom_ribbon(aes(ymin=roll_ACC - 0.5 * roll_ACC_SD, ymax=roll_ACC + 0.5 * roll_ACC_SD), fill="grey", alpha=0.5) +
+    theme(legend.position="none") +
+    facet_wrap(~ model_name)
+)
+
+# Response times
+
+# ACCs_sorted = ACC_hum[order(ACC_hum$PreciseYrs),]
+ACCs_sorted$roll_RT = NA
+ACCs_sorted[ACCs_sorted$Gender=="Female",]$roll_RT = rollapply(subset(ACCs_sorted, Gender=="Female")$median_cor_RT, width=rolling_window_k / 2, FUN=mean, fill=NA, align="c")
+ACCs_sorted[ACCs_sorted$Gender=="Male",]$roll_RT = rollapply(subset(ACCs_sorted, Gender=="Male")$median_cor_RT, width=rolling_window_k / 2, FUN=mean, fill=NA, align="c")
+ACCs_sorted$roll_RT_SD = rollapply(ACCs_sorted$median_cor_RT, width=rolling_window_k, FUN=sd, fill=NA, align="c")
+
+# Plot
+(g_rollingAverage_RT = ggplot(ACCs_sorted, aes(x=PreciseYrs)) + 
+    geom_point(aes(y=median_cor_RT, color=Gender), size=0.3) + 
+    geom_line(aes(y=roll_RT, color=Gender)) +
+    geom_ribbon(aes(ymin=roll_RT - 0.5 * roll_RT_SD, ymax=roll_RT + 0.5 * roll_RT_SD, fill=Gender), alpha=0.2) +
     theme(legend.position="none") +
     facet_wrap(~ model_name)
 )
@@ -1401,7 +1432,7 @@ ACCs_sorted$roll_nswitch = rollapply(ACCs_sorted$n_switches, width=rolling_windo
 ACCs_sorted$roll_nswitch_SD = rollapply(ACCs_sorted$n_switches, width=rolling_window_k, FUN=sd, fill=NA, align="c")
 
 # Plot
-(g_rollingNSwitch_ACC = ggplot(ACCs_sorted, aes(x=PreciseYrs)) + 
+(g_rollingAverage_NSwitch = ggplot(ACCs_sorted, aes(x=PreciseYrs)) + 
     geom_point(aes(y=n_switches, color=Gender), size=0.3) + 
     geom_line(aes(y=roll_nswitch)) +
     geom_ribbon(aes(ymin=roll_nswitch - 0.5 * roll_nswitch_SD, ymax=roll_nswitch + 0.5 * roll_nswitch_SD), fill="grey", alpha=0.5) +
@@ -1431,8 +1462,6 @@ asypmt_dat_sorted = asypmt_dat_dum[order(asypmt_dat_dum$PreciseYrs),]
 asypmt_dat_sorted$roll_ACC = rollapply(asypmt_dat_sorted$ACC, width=rolling_window_k, FUN=mean, fill=NA, align="c")
 asypmt_dat_sorted$roll_SD = rollapply(asypmt_dat_sorted$ACC, width=rolling_window_k, FUN=sd, fill=NA, align="c")
 
-# rollmean(asypmt_dat_sorted$ACC, k=rolling_window_k, fill=NA)
-
 (g_rollingAverage_asympt =
   ggplot(asypmt_dat_sorted, aes(x=PreciseYrs)) +
     geom_point(aes(y=ACC, color=Gender), size=0.3) +
@@ -1442,12 +1471,50 @@ asypmt_dat_sorted$roll_SD = rollapply(asypmt_dat_sorted$ACC, width=rolling_windo
     facet_wrap(~ model_name)
 )
 
+# Switch speed
+
+crit_sum_sorted = crit_sum_hum[order(crit_sum_hum$PreciseYrs),]
+crit_sum_sorted$roll_speed = rollapply(crit_sum_sorted$criterion_trial, width=rolling_window_k, FUN=mean, fill=NA, align="c")
+crit_sum_sorted$roll_speed_SD = rollapply(crit_sum_sorted$criterion_trial, width=rolling_window_k, FUN=sd, fill=NA, align="c")
+
+(g_rollingAverage_speed =
+  ggplot(crit_sum_sorted, aes(x=PreciseYrs)) +
+    geom_point(aes(y=criterion_trial, color=Gender), size=0.3) +
+    geom_line(aes(y=roll_speed), color="black") +
+    geom_ribbon(aes(ymin=roll_speed - 0.5 * roll_speed_SD, ymax=roll_speed + 0.5 * roll_speed_SD), fill="grey", alpha=0.5) +
+    theme(legend.position="none") +
+    facet_wrap(~ model_name)
+)
+
+# Regression models
+
+rew_1_dat = subset(nback_regr_dat, predictor %in% c("reward", "noReward") & back == "1" & model_name == "Human")
+rew_1_dat_sorted = rew_1_dat[order(rew_1_dat$PreciseYrs),]
+
+for (pred in levels(factor(rew_1_dat$predictor))) {
+  rew_1_dat_sorted$roll_estimate[rew_1_dat_sorted$predictor == pred] = rollapply(rew_1_dat_sorted$sig_Estimate[rew_1_dat_sorted$predictor == pred], width=rolling_window_k, FUN=mean, fill=NA, align="c")
+  rew_1_dat_sorted$roll_estimate_SD[rew_1_dat_sorted$predictor == pred] = rollapply(rew_1_dat_sorted$sig_Estimate[rew_1_dat_sorted$predictor == pred], width=rolling_window_k, FUN=sd, fill=NA, align="c")
+}
+
+(g_rollingAverage_regr = ggplot(rew_1_dat_sorted, aes(PreciseYrs))
+  + geom_point(aes(y=sig_Estimate, color=Gender), size=0.3)
+  + geom_line(aes(y=roll_estimate))
+  + geom_ribbon(aes(ymin=roll_estimate - 0.5 * roll_estimate_SD, ymax=roll_estimate + 0.5 * roll_estimate_SD), alpha=0.3)
+  + geom_hline(yintercept = 0, linetype="dotted")
+  + theme(legend.position="none")
+  + facet_wrap(~ predictor)
+)
+
 # Save plots
 ggsave(file.path(plot_dir, paste0(model_class, "g_rollingAverage_ACC.png")), g_rollingAverage_ACC, width=3, height=3)
 ggsave(file.path(plot_dir, paste0(model_class, "g_rollingAverage_ACC.svg")), g_rollingAverage_ACC, width=3, height=3)
+ggsave(file.path(plot_dir, paste0(model_class, "g_rollingAverage_RT.svg")), g_rollingAverage_RT, width=3, height=3)
 ggsave(file.path(plot_dir, paste0(model_class, "g_rollingAverage_stay.svg")), g_rollingAverage_stay, width=3, height=3)
 ggsave(file.path(plot_dir, paste0(model_class, "g_rollingAverage_asympt.svg")), g_rollingAverage_asympt, width=3, height=3)
 ggsave(file.path(plot_dir, paste0(model_class, "g_rollingAverage_reward.svg")), g_rollingAverage_reward, width=3, height=3)
+ggsave(file.path(plot_dir, paste0(model_class, "g_rollingAverage_speed.svg")), g_rollingAverage_speed, width=3, height=3)
+ggsave(file.path(plot_dir, paste0(model_class, "g_rollingAverage_NSwitch.svg")), g_rollingAverage_NSwitch, width=3, height=3)
+ggsave(file.path(plot_dir, paste0(model_class, "g_rollingAverage_regr.svg")), g_rollingAverage_regr, width=5.5, height=3)
 ```
 
 ```{r t-tests 13-to-15-year-olds vs rest}
@@ -1457,85 +1524,43 @@ ggsave(file.path(plot_dir, paste0(model_class, "g_rollingAverage_reward.svg")), 
 # t.test(mean_ACC ~ age_group, data=subset(ACCs, age_group %in% c("25%", "75%")))
 # t.test(mean_ACC ~ age_group, data=subset(ACCs, age_group %in% c("50%", "75%")))
 # t.test(mean_ACC ~ age_group, data=subset(ACCs, age_group %in% c("100%", "75%")))
-# t.test(mean_ACC ~ age_group, data=subset(ACCs, age_group %in% c("UCB", "75%")))
-# t.test(mean_ACC ~ age_group, data=subset(ACCs, age_group %in% c("Adult", "75%")))
+# t.test(mean_ACC ~ age_group, data=subset(ACCs, age_group %in% c("18-24", "75%")))
+# t.test(mean_ACC ~ age_group, data=subset(ACCs, age_group %in% c("25-30", "75%")))
 # 
 # Points won
 print("Total points")
 t.test(mean_reward ~ age_group, data=subset(ACCs, age_group %in% c("25%", "75%")))
 t.test(mean_reward ~ age_group, data=subset(ACCs, age_group %in% c("50%", "75%")))
 t.test(mean_reward ~ age_group, data=subset(ACCs, age_group %in% c("100%", "75%")))
-t.test(mean_reward ~ age_group, data=subset(ACCs, age_group %in% c("UCB", "75%")))
-t.test(mean_reward ~ age_group, data=subset(ACCs, age_group %in% c("Adult", "75%")))
+t.test(mean_reward ~ age_group, data=subset(ACCs, age_group %in% c("18-24", "75%")))
+t.test(mean_reward ~ age_group, data=subset(ACCs, age_group %in% c("25-30", "75%")))
 # 
 # # Staying after apparent switch
 # print("Stay after app. switch")
 # t.test(stay ~ age_group, data=subset(app_switch_dat, age_group %in% c("25%", "75%")))
 # t.test(stay ~ age_group, data=subset(app_switch_dat, age_group %in% c("50%", "75%")))
 # t.test(stay ~ age_group, data=subset(app_switch_dat, age_group %in% c("100%", "75%")))
-# t.test(stay ~ age_group, data=subset(app_switch_dat, age_group %in% c("UCB", "75%")))
-# t.test(stay ~ age_group, data=subset(app_switch_dat, age_group %in% c("Adult", "75%")))
+# t.test(stay ~ age_group, data=subset(app_switch_dat, age_group %in% c("18-24", "75%")))
+# t.test(stay ~ age_group, data=subset(app_switch_dat, age_group %in% c("25-30", "75%")))
 # 
 # # Accuracy on asymptotic trials
 # print("Asympt. ACC")
 # t.test(ACC ~ age_group, data=subset(asypmt_dat_sorted, age_group %in% c("25%", "75%")))
 # t.test(ACC ~ age_group, data=subset(asypmt_dat_sorted, age_group %in% c("50%", "75%")))
 # t.test(ACC ~ age_group, data=subset(asypmt_dat_sorted, age_group %in% c("100%", "75%")))
-# t.test(ACC ~ age_group, data=subset(asypmt_dat_sorted, age_group %in% c("UCB", "75%")))
-# t.test(ACC ~ age_group, data=subset(asypmt_dat_sorted, age_group %in% c("Adult", "75%")))
-```
-
-```{r Number of switch trials over age}
-
-switch_dat = ddply(all_files, .(sID, PreciseYrs, Gender, PDS, meanT, age_group), summarize, mean_switches=mean(switch_trial))
-
-(g = ggplot(switch_dat, aes(PreciseYrs, mean_switches, color=Gender))
-  + geom_point()
-  + geom_smooth()
-)
-
-(b_age_nswitches = ggplot(switch_dat, aes(age_group, 120 * mean_switches, group=1)) #, group=Gender, color=Gender))
-  + stat_summary(geom="point")
-  + stat_summary(geom="line")
-  + stat_summary(geom="pointrange")
-  # + coord_cartesian(ylim=c(6, 7))
-)
-
-ggsave(file.path(plot_dir, paste0(model_class, "b_age_nswitches.eps")), b_age_nswitches, width=4, height=2)
-ggsave(file.path(plot_dir, paste0(model_class, "b_age_nswitches.png")), b_age_nswitches, width=4, height=2)
-```
-
-```{r Points won over age}
-
-points_dat = ddply(all_files, .(sID, model_name, PreciseYrs, Gender, PDS, meanT, age_group), summarize,
-                   total_points=sum(reward),
-                   n_trials=max(TrialID))
-
-(g = ggplot(points_dat, aes(PreciseYrs, total_points))
-  + geom_point()
-  + geom_smooth()
-)
-
-(b_age_points = ggplot(points_dat, aes(age_group, total_points, color=model_name, group=model_name))  #, group=Gender, color=Gender))
-  + stat_summary(geom="point")
-  + stat_summary(geom="line")
-  + stat_summary(geom="pointrange")
-  # + facet_grid(~ model_name)
-  # + coord_cartesian(ylim=c(6, 7))
-)
-
-ggsave(file.path(plot_dir, paste0(model_class, "b_age_points.eps")), b_age_points, width=4, height=2)
-ggsave(file.path(plot_dir, paste0(model_class, "b_age_points.png")), b_age_points, width=4, height=2)
+# t.test(ACC ~ age_group, data=subset(asypmt_dat_sorted, age_group %in% c("18-24", "75%")))
+# t.test(ACC ~ age_group, data=subset(asypmt_dat_sorted, age_group %in% c("25-30", "75%")))
 ```
 
 ```{r Debugging logistic regression plots}
+
 # Effect of positive and negative outcomes (rewnorew_regr)
 nback_regr_dat$sig_Estimate = NA
 for (pred in unique(nback_regr_dat$predictor)) {
   for (ba in unique(nback_regr_dat$back)) {
     sub = subset(nback_regr_dat, predictor==pred & back==ba)
     z = (sub$Estimate - mean(sub$Estimate, na.rm=T)) / sd(sub$Estimate, na.rm=T)
-    
+
     nback_regr_dat[nback_regr_dat$predictor==pred & nback_regr_dat$back==ba, "sig_Estimate"] = 2 * (1 / (1 + exp(-sub$Estimate))) - 1  # only tanh transform
     nback_regr_dat[nback_regr_dat$predictor==pred & nback_regr_dat$back==ba, "z_sig_Estimate"] = 2 * (1 / (1 + exp(-z))) - 1  # z-score, then tanh transform
   }
@@ -1559,11 +1584,12 @@ c_age_logregr_validation
 
 
 pn_regr_dat = subset(nback_regr_dat, model == "rewardNoReward" & back == 1 & predictor != "(Intercept)" & !is.na(age_group))
-c_age_logregr_validation =
-  c_age_ACC_validation + aes(y=Estimate) +
-  geom_point() +
-  geom_hline(yintercept=0, linetype="dotted") +
-  facet_wrap(model_name ~ predictor, scales="free", nrow=3)
+(c_age_logregr_validation =
+  c_age_ACC_validation + aes(y=Estimate)
+  + geom_point()
+  + geom_hline(yintercept=0, linetype="dotted")
+  + facet_wrap(model_name ~ predictor, scales="free", nrow=3)
+)
 c_age_logregr_validation$data = pn_regr_dat
 c_age_logregr_validation
 
@@ -1593,9 +1619,29 @@ ggplot(subset(dat, back %in% 1 & predictor != "(Intercept)" & !is.na(age_group))
 hist(subset(nback_regr_dat, Estimate > 18)$`Pr...z..`)
 ggplot(nback_regr_dat, aes(Estimate, `Pr...z..`)) +
   geom_point()
+
+
+
+
+rew_1_dat = subset(nback_regr_dat, predictor %in% c("reward", "noReward") & back == "1" & model_name == "Human")
+rew_1_dat_sorted = rew_1_dat[order(rew_1_dat$PreciseYrs),]
+for (pred in levels(factor(rew_1_dat$predictor))) {
+  rew_1_dat_sorted$roll_estimate[rew_1_dat_sorted$predictor == pred] = rollapply(rew_1_dat_sorted$sig_Estimate[rew_1_dat_sorted$predictor == pred], width=rolling_window_k, FUN=mean, fill=NA, align="c")
+  rew_1_dat_sorted$roll_estimate_SD[rew_1_dat_sorted$predictor == pred] = rollapply(rew_1_dat_sorted$sig_Estimate[rew_1_dat_sorted$predictor == pred], width=rolling_window_k, FUN=sd, fill=NA, align="c")
+
+}
+
+(ggplot(rew_1_dat_sorted, aes(PreciseYrs))
+  + geom_point(aes(y=sig_Estimate, color=Gender))
+  + geom_line(aes(y=roll_estimate))
+  + geom_ribbon(aes(ymin=roll_estimate - 0.5 * roll_estimate_SD, ymax=roll_estimate + 0.5 * roll_estimate_SD), alpha=0.3)
+  + geom_hline(yintercept = 0, linetype="dotted")
+  + facet_wrap(~ predictor)
+)
 ```
 
 ```{r Read in model parameters}
+
 param_names = c("persev_RL", "beta_RL", "nalpha", "alpha", "persev_BF", "beta_BF", "p_reward", "p_switch")
 
 RL_params = read.csv(file.path(param_file_dir, "params_RLabnp2_age_z_291_pymc3.csv"))
@@ -1929,7 +1975,7 @@ ggsave(file.path(plot_dir, "g_PDS_PCs.eps"), g_PDS_PCs, width=4, height=5)
 ggsave(file.path(plot_dir, "g_T_PCs.eps"), g_T_PCs, width=4, height=5)
 ```
 ```{r Same but within age bins}
-PCs_l$age_group = factor(PCs_l$age_group, labels=c("8-10", "10-13", "13-15", "15-17", "Stud.", "Adult"))
+PCs_l$age_group = factor(PCs_l$age_group, labels=c("8-10", "10-13", "13-15", "15-17", "Stud.", "25-30"))
 
 (s_PDSwAge_PCs =
   ggplot(subset(PCs_l, variable %in% c("PC1", "PC2", "PC3", "PC4") & PreciseYrs < 18),
@@ -2004,9 +2050,19 @@ ggsave(file.path(plot_dir, "g_icaweights.png"), g_icaweights, width=4, height=10
 all_files_all = all_files
 all_files = subset(all_files, model_name == "Human")
 
+nback_regr_dat_all = nback_regr_dat
+nback_regr_dat = subset(nback_regr_dat, model_name == "Human")
+
+points_dat_all = points_dat
+points_dat = subset(points_dat, model_name == "Human")
+
 # Add quadratic age columns and within-sex z-scored T columns
-all_files$PreciseYrs2 = all_files$PreciseYrs ^ 2
-all_files$PDS2 = all_files$PDS ^ 2
+all_files$PreciseYrs_z = (all_files$PreciseYrs - mean(all_files$PreciseYrs, na.rm=T)) / sd(all_files$PreciseYrs, na.rm=T)
+all_files$PreciseYrs_z2 = all_files$PreciseYrs_z ^ 2
+
+all_files$PDS_z = (all_files$PDS - mean(all_files$PDS, na.rm=T)) / sd(all_files$PDS, na.rm=T)
+all_files$PDS_z2 = all_files$PDS_z ^ 2
+
 all_files$logTz = NA
 all_files$logTz[all_files$Gender == "Female"] =
   (all_files$log_T[all_files$Gender == "Female"] - mean(all_files$log_T[all_files$Gender == "Female"], na.rm=T)) / sd(all_files$log_T[all_files$Gender == "Female"], na.rm=T)
@@ -2014,49 +2070,59 @@ all_files$logTz[all_files$Gender == "Male"] =
   (all_files$log_T[all_files$Gender == "Male"] - mean(all_files$log_T[all_files$Gender == "Male"], na.rm=T)) / sd(all_files$log_T[all_files$Gender == "Male"], na.rm=T)
 all_files$logTz2 = all_files$logTz ^ 2
 
-nback_regr_dat$PreciseYrs2 = nback_regr_dat$PreciseYrs ^ 2
+nback_regr_dat$PreciseYrs_z = (nback_regr_dat$PreciseYrs - mean(nback_regr_dat$PreciseYrs, na.rm=T)) / sd(nback_regr_dat$PreciseYrs, na.rm=T)
+nback_regr_dat$PreciseYrs_z2 = nback_regr_dat$PreciseYrs_z ^ 2
+
+nback_regr_dat$PDS_z = (nback_regr_dat$PDS - mean(nback_regr_dat$PDS, na.rm=T)) / sd(nback_regr_dat$PDS, na.rm=T)
+nback_regr_dat$PDS_z2 = nback_regr_dat$PDS_z ^ 2
+
 nback_regr_dat$logTz = NA
 nback_regr_dat$logTz[nback_regr_dat$Gender == "Female"] = (nback_regr_dat$log_T[nback_regr_dat$Gender == "Female"] - mean(nback_regr_dat$log_T[nback_regr_dat$Gender == "Female"], na.rm=T)) / sd(nback_regr_dat$log_T[nback_regr_dat$Gender == "Female"], na.rm=T)
 nback_regr_dat$logTz[nback_regr_dat$Gender == "Male"] = (nback_regr_dat$log_T[nback_regr_dat$Gender == "Male"] - mean(nback_regr_dat$log_T[nback_regr_dat$Gender == "Male"], na.rm=T)) / sd(nback_regr_dat$log_T[nback_regr_dat$Gender == "Male"], na.rm=T)
 
-PCs$PreciseYrs2 = PCs$PreciseYrs ^ 2
+# PCs$PreciseYrs2 = PCs$PreciseYrs ^ 2
+# PCs
 
-points_dat$PreciseYrs2 = points_dat$PreciseYrs ^ 2
-points_dat$PDS2 = points_dat$PDS ^ 2
-points_dat$meanT@ = points_dat$meanT ^ 2
+points_dat$PreciseYrs_z = (points_dat$PreciseYrs - mean(points_dat$PreciseYrs, na.rm=T)) / sd(points_dat$PreciseYrs, na.rm=T)
+points_dat$PreciseYrs_z2 = points_dat$PreciseYrs_z ^ 2
+
+points_dat$PDS_z = (points_dat$PDS - mean(points_dat$PDS, na.rm=T)) / sd(points_dat$PDS, na.rm=T)
+points_dat$PDS_z2 = points_dat$PDS_z ^ 2
+# points_dat$meanT2 = points_dat$meanT ^ 2
 ```
 
 ```{r Effects of age / PDS / T on behavior (regression models)}
 # Effect of age on basic behavior (rewards, RTs)
 ## Median correct response times
-summary(lmer(log(RT) ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), subset(all_files, ACC==T)))
+summary(lmer(log(RT) ~ PreciseYrs_z + PreciseYrs_z2 + Gender + (1 | sID), subset(all_files, ACC==T)))
 summary(lmer(log(RT) ~ PDS + Gender + (1 | sID), subset(all_files, ACC==T & PreciseYrs < 18)))
 summary(lmer(log(RT) ~ meanT + Gender + (1 | sID), subset(all_files, ACC==T & PreciseYrs < 18)))
 
 ## Overall accuracy
-summary(glmer(ACC ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), all_files, binomial))
+summary(glmer(ACC ~ PreciseYrs_z + PreciseYrs_z2 + Gender + (1 | sID), all_files, binomial))
 summary(glmer(ACC ~ PDS + Gender + (1 | sID), subset(all_files, PreciseYrs < 18), binomial))
 summary(glmer(ACC ~ meanT + Gender + (1 | sID), subset(all_files, PreciseYrs < 18), binomial))
 
 ## Asymptotic performance
-summary(glmer(ACC ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), subset(all_files, trialsinceswitch %in% c(-3, -2, 3:7)), binomial))
+summary(glmer(ACC ~ PreciseYrs_z + PreciseYrs_z2 + Gender + (1 | sID), subset(all_files, trialsinceswitch %in% c(-3, -2, 3:7)), binomial))
 summary(glmer(ACC ~ PDS + Gender + (1 | sID), subset(all_files, trialsinceswitch %in% c(-3, -2, 3:7) & PreciseYrs < 18), binomial))
 summary(glmer(ACC ~ meanT + Gender + (1 | sID), subset(all_files, trialsinceswitch %in% c(-3, -2, 3:7) & PreciseYrs < 18), binomial))
 
 ## (Apparent) switch trials
-summary(glmer(same_choice_01_back ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), subset(all_files, same_choice_12_back & (outcome_21_back == "reward, no reward")), binomial))
+summary(glmer(same_choice_01_back ~ PreciseYrs_z + PreciseYrs_z2 + Gender + (1 | sID), subset(all_files, same_choice_12_back & (outcome_21_back == "reward, no reward")), binomial))
 summary(glmer(same_choice_01_back ~ PDS + Gender + (1 | sID), subset(all_files, same_choice_12_back & (outcome_21_back == "reward, no reward") & PreciseYrs < 18), binomial))
 summary(glmer(same_choice_01_back ~ meanT + Gender + (1 | sID), subset(all_files, same_choice_12_back & (outcome_21_back == "reward, no reward") & PreciseYrs < 18), binomial))
 
 ## Total points won
-summary(lm(total_points ~ PreciseYrs + PreciseYrs2 + Gender, points_dat))
+summary(lm(total_points ~ PreciseYrs_z + PreciseYrs_z2 + Gender, points_dat))
 summary(lm(total_points ~ PDS + PDS2 + Gender, points_dat))
 summary(lm(total_points ~ meanT + meanT2 + Gender, points_dat))
 
 ## Overall stay
 summary(glmer(same_choice_01_back ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), all_files, binomial))
-## Rewards
-summary(glmer(reward ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), all_files, binomial))
+
+# ## Rewards
+# summary(glmer(reward ~ PreciseYrs + PreciseYrs2 + Gender + (1 | sID), all_files, binomial))
 
 # # Effect of age / PDS / T on switch speed
 # ddply(ddply(subset(all_files, trialsinceswitch==1), .(sID, age_group), summarize, ACC=mean(ACC)), .(age_group), summarize, ACC=mean(ACC))
@@ -2084,36 +2150,36 @@ t.test(mean_ACC ~ age_group, subset(ACCs, model_name == "Human" & age_group %in%
 t.test(mean_ACC ~ PDS_group, subset(ACCs, model_name == "Human" & PDS_group %in% c("100%", "33%")))
 t.test(mean_ACC ~ T_group, subset(ACCs, model_name == "Human" & T_group %in% c("100%", "25%")))
 
-t.test(mean_ACC ~ age_group, subset(ACCs, model_name == "Human" & age_group %in% c("75%", "Adult")))
-t.test(mean_ACC ~ PDS_group, subset(ACCs, model_name == "Human" & PDS_group %in% c("100%", "Adult")))
-t.test(mean_ACC ~ T_group, subset(ACCs, model_name == "Human" & T_group %in% c("100%", "Adult")))
+t.test(mean_ACC ~ age_group, subset(ACCs, model_name == "Human" & age_group %in% c("75%", "25-30")))
+t.test(mean_ACC ~ PDS_group, subset(ACCs, model_name == "Human" & PDS_group %in% c("100%", "25-30")))
+t.test(mean_ACC ~ T_group, subset(ACCs, model_name == "Human" & T_group %in% c("100%", "25-30")))
 
 ## Median correct response times
 t.test(median_cor_RT ~ age_group, subset(ACCs, model_name == "Human" & age_group %in% c("75%", "25%")))
 t.test(median_cor_RT ~ PDS_group, subset(ACCs, model_name == "Human" & PDS_group %in% c("100%", "33%")))
 t.test(median_cor_RT ~ T_group, subset(ACCs, model_name == "Human" & T_group %in% c("100%", "25%")))
 
-t.test(median_cor_RT ~ age_group, subset(ACCs, model_name == "Human" & age_group %in% c("75%", "Adult")))
-t.test(median_cor_RT ~ PDS_group, subset(ACCs, model_name == "Human" & PDS_group %in% c("100%", "Adult")))
-t.test(median_cor_RT ~ T_group, subset(ACCs, model_name == "Human" & T_group %in% c("100%", "Adult")))
+t.test(median_cor_RT ~ age_group, subset(ACCs, model_name == "Human" & age_group %in% c("75%", "25-30")))
+t.test(median_cor_RT ~ PDS_group, subset(ACCs, model_name == "Human" & PDS_group %in% c("100%", "25-30")))
+t.test(median_cor_RT ~ T_group, subset(ACCs, model_name == "Human" & T_group %in% c("100%", "25-30")))
 
 ## (Apparent) switch trials
 t.test(stay ~ age_group, subset(reward_subj, model_name == "Human" & outcome_21_back=="reward, no reward" & age_group %in% c("75%", "25%")))
 t.test(stay ~ PDS_group, subset(reward_subj, model_name == "Human" & outcome_21_back=="reward, no reward" & PDS_group %in% c("100%", "33%")))
 t.test(stay ~ T_group, subset(reward_subj, model_name == "Human" & outcome_21_back=="reward, no reward" & T_group %in% c("100%", "25%")))
 
-t.test(stay ~ age_group, subset(reward_subj, model_name == "Human" & outcome_21_back=="reward, no reward" & age_group %in% c("75%", "Adult")))
-t.test(stay ~ PDS_group, subset(reward_subj, model_name == "Human" & outcome_21_back=="reward, no reward" & PDS_group %in% c("100%", "Adult")))
-t.test(stay ~ T_group, subset(reward_subj, model_name == "Human" & outcome_21_back=="reward, no reward" & T_group %in% c("100%", "Adult")))
+t.test(stay ~ age_group, subset(reward_subj, model_name == "Human" & outcome_21_back=="reward, no reward" & age_group %in% c("75%", "25-30")))
+t.test(stay ~ PDS_group, subset(reward_subj, model_name == "Human" & outcome_21_back=="reward, no reward" & PDS_group %in% c("100%", "25-30")))
+t.test(stay ~ T_group, subset(reward_subj, model_name == "Human" & outcome_21_back=="reward, no reward" & T_group %in% c("100%", "25-30")))
 
 ## Asymptotic performance
 t.test(ACC ~ age_group, subset(asypmt_dat, model_name == "Human" & age_group %in% c("75%", "25%")))
 t.test(ACC ~ PDS_group, subset(asypmt_dat, model_name == "Human" & PDS_group %in% c("100%", "33%")))
 t.test(ACC ~ T_group, subset(asypmt_dat, model_name == "Human" & T_group %in% c("100%", "25%")))
 
-t.test(ACC ~ age_group, subset(asypmt_dat, model_name == "Human" & age_group %in% c("75%", "Adult")))
-t.test(ACC ~ PDS_group, subset(asypmt_dat, model_name == "Human" & PDS_group %in% c("100%", "Adult")))
-t.test(ACC ~ T_group, subset(asypmt_dat, model_name == "Human" & T_group %in% c("100%", "Adult")))
+t.test(ACC ~ age_group, subset(asypmt_dat, model_name == "Human" & age_group %in% c("75%", "25-30")))
+t.test(ACC ~ PDS_group, subset(asypmt_dat, model_name == "Human" & PDS_group %in% c("100%", "25-30")))
+t.test(ACC ~ T_group, subset(asypmt_dat, model_name == "Human" & T_group %in% c("100%", "25-30")))
 ```
 
 ```{r Effects of age on PCs (regression)}

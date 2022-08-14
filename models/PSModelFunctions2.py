@@ -1,5 +1,5 @@
 import numpy as np
-import theano
+# import theano
 import theano.tensor as T
 
 
@@ -38,7 +38,8 @@ def get_paths(run_on_cluster):
                 'ages_cluster': base_path + 'data/ages_cluster.csv',
                 # 'RL_simulations': base_path + '/PShumanData/fitting/map_indiv/new_ML_models/simulate/simulations/RLabcnpx_age_z_271/',
                 # 'BF_simulations': base_path + '/PShumanData/fitting/map_indiv/new_ML_models/simulate/simulations/Bbpr_age_z_271/',
-                'RL_simulations': base_path + '/PShumanData/fitting/map_indiv/new_ML_models/simulate/simulations/RLabnp2_age_z_271/',
+                # 'RL_simulations': base_path + '/PShumanData/fitting/map_indiv/new_ML_models/simulate/simulations/RLabnp2_age_z_271/',
+                'RL_simulations': base_path + '/PShumanData/fitting/eLifeR2RSimulations/',
                 'BF_simulations': base_path + '/PShumanData/fitting/map_indiv/new_ML_models/simulate/simulations/Bbspr_age_z_271/',
                 'old simulations': base_path + '/PSGenRecCluster/fit_par/',
                 'PS task info': base_path + '/ProbabilisticSwitching/Prerandomized sequences/'}

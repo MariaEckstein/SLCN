@@ -1,18 +1,19 @@
 run_on_cluster = False
-save_dir_appx = 'mice/'  # ''
+save_dir_appx = ''  # 'mice/'  # ''
 
 # GET LIST OF MODELS TO RUN
 # model_names_pre = ['RLab' + end for end in ['',  'd', 'cd', 'cpd', 'cpnd', 'cpnxd', 'np2']]
-model_names_pre = ['RLabcpnxd', 'RLabnp2', 'RLab']
-model_names_all = [model_name + end for model_name in model_names_pre for end in ['', 'k', 'i', 'j', '4', 'h', 'hi', 'hj', 'h4']]
+# model_names_pre = ['RLabcpnxd', 'RLabnp2', 'RLab']
+# model_names_all = [model_name + end for model_name in model_names_pre for end in ['', 'k', 'i', 'j', '4', 'h', 'hi', 'hj', 'h4']]
 
 model_names = [
-    'Bbspr',
+    # 'Bbspr',
     # 'RLabnp2dlyqt', 'Bbsprywtv'
     # 'RLab', 'RLabd', 'RLabcd', 'RLabcpd', 'RLabcpnd', 'RLabnp2', 'RLabnp2d', 'RLabcpnxd',
+    'RLabnp2',
     # 'Bbspr', 'Bbpr', 'Bbp', 'Bb', 'B',
     # 'WSLSy', 'WSLSSy', 'WSLSdfy', 'WSLSSdfy',
-] + model_names_all
+] #  + model_names_all
 
 # Legend for letters -> parameters
 ## All models
@@ -38,7 +39,7 @@ model_names = [
 # letters taken: a, b, c, d, e, f, g, h, i, j, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z
 # letters available: K
 
-run_on = 'mice'  # 'humans', 'mice'
+run_on = 'humans'  # 'mice'  # 'humans', 'mice'
 
 print("Getting ready to run {} {} models: {}".format(len(model_names), run_on, model_names))
 
@@ -170,6 +171,15 @@ def create_model(choices, rewards, rts, group, age,
                 else:
                     cnalpha_rew = pm.Deterministic('cnalpha_rew', T.ones(n_subj, dtype='float32'))
                     print("Setting cnalpha_rew = 1.")
+
+                # ATTENTIONL NEEDS TO BE FIXED!!!
+                rta = pm.Deterministic('rta', T.zeros(n_subj, dtype='float32'))
+                nrta = pm.Deterministic('nrta', T.zeros(n_subj, dtype='float32'))
+                crta = pm.Deterministic('crta', T.zeros(n_subj, dtype='float32'))
+                cnrta = pm.Deterministic('cnrta', T.zeros(n_subj, dtype='float32'))
+                print('Setting rta, nrta, crta, cnrta = 0 (neutral).')
+                rtb = pm.Deterministic('rtb', T.zeros(n_subj, dtype='float32'))
+                print("Setting rtb = 0 (neutral).")
 
             elif 'B' in model_name:
 
@@ -487,11 +497,11 @@ n_groups = 1  # 'gender'  # 1
 kids_and_teens_only = False
 adults_only = False
 if not run_on_cluster:
-    fit_mcmc = False  # False
-    fit_individuals = True  # True
-    fit_map = True
-    n_tune = 20  # 100  # 20
-    n_samples = 20  # 300  # 20
+    fit_mcmc = True  # False  # False
+    fit_individuals = False  # True  # True
+    fit_map = False  # True
+    n_tune = 1000  # 100  # 20
+    n_samples = 5000  # 300  # 20
     n_cores = 2
     n_chains = 1
 else:
@@ -516,8 +526,9 @@ for model_name in model_names:
         n_subj, rewards, choices, group, n_groups, age = load_data(
             run_on_cluster, n_groups=n_groups, n_subj='all', kids_and_teens_only=kids_and_teens_only,  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
             adults_only=adults_only, n_trials=120,
+            fitted_data_name='RL_simulations',
             fit_slopes=any([i in model_name for i in 'lyouqtwv' for model_name in model_names]))  # make sure I load the same data for every model...
-
+        rts = np.zeros_like(rewards)
         # n_subj, rewards, choices, group, n_groups, age = load_data(
         #     run_on_cluster, fitted_data_name='BF_simulations', n_groups=n_groups, n_subj='all', kids_and_teens_only=kids_and_teens_only,  # n_groups can be 1, 2, 3 (for age groups) and 'gender" (for 2 gender groups)
         #     adults_only=adults_only, n_trials=120,
@@ -538,7 +549,7 @@ for model_name in model_names:
     print("Saving ages to " + ages_dir)
     age.to_csv(ages_dir, index=False)
 
-    slope_variables = ['session']  # For mice: Include sloep letters to use the slope variable; will be ignore otherwise # ['age_z', 'PDS_z', 'meanT_log_z']  # get_slope_variables(model_name, kids_and_teens_only, adults_only)
+    slope_variables = ['age_z']  # ['session']  # For mice: Include slope letters to use the slope variable; will be ignored otherwise # ['age_z', 'PDS_z', 'meanT_log_z']  # get_slope_variables(model_name, kids_and_teens_only, adults_only)
     for slope_variable in slope_variables:
 
         # Create model
